@@ -9,8 +9,8 @@ import {
   FlatList,
   SafeAreaView
 } from 'react-native';
-import { COLORS } from '../app/theme';
-import { useI18n } from '../constants/i18n';
+import { COLORS } from '../../theme';
+import { useI18n } from '../../constants/i18n';
 
 export default function InventoryModal({ visible, onClose, items, onClear, onReplace }) {
   const { t } = useI18n();

@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
-import { COLORS } from '../../app/theme';
+import { COLORS } from '../../theme';
 import { useI18n } from '../../constants/i18n';
 import { MemoryAudioControls } from './MemoryAudioControls';
 

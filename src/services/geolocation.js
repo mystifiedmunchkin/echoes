@@ -1,5 +1,5 @@
 import { PermissionsAndroid, Platform } from 'react-native';
-import Geolocation from '@react-native-community/geolocation';
+import Geolocation from 'react-native-geolocation-service';
 
 export async function requestForegroundPermissionsAsync() {
   if (Platform.OS === 'android') {
@@ -12,7 +12,16 @@ export async function requestForegroundPermissionsAsync() {
       canAskAgain: result !== PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN,
     };
   }
-  return { status: 'granted', granted: true };
+
+  return new Promise((resolve) => {
+    Geolocation.requestAuthorization((status) => {
+      resolve({
+        status,
+        granted: status === 'granted',
+        canAskAgain: status !== 'blocked' && status !== 'restricted',
+      });
+    });
+  });
 }
 
 export function getCurrentPositionAsync(options = {}) {
@@ -27,9 +36,9 @@ export function getCurrentPositionAsync(options = {}) {
         reject(error);
       },
       {
-        enableHighAccuracy: false, // Changed to false for better non-GMS compatibility
+        enableHighAccuracy: options.enableHighAccuracy ?? false,
         timeout: options.timeout ?? 20000,
-        maximumAge: 10000,
+        maximumAge: options.maximumAge ?? 10000,
       }
     );
   });

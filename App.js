@@ -8,7 +8,7 @@ import DeviceInfo from 'react-native-device-info';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useCameraPermission } from 'react-native-vision-camera';
 import Slider from '@react-native-community/slider';
-import InventoryModal from './components/InventoryModal';
+import InventoryModal from './src/components/InventoryModal';
 import {
   Camera,
   GeoJSONSource,
@@ -23,14 +23,13 @@ import {
 } from './src/utils/geo';
 import { useInventory } from './src/hooks/useInventory';
 import { useRadar } from './src/hooks/useRadar';
-import CollectionParticle from './components/CollectionParticle';
-import { CreateMemoryModal } from './components/CreateMemoryModal';
-import { MemoryAudioPlayer } from './components/MemoryAudioPlayer';
-import { MemoryInfoModal } from './components/MemoryInfoModal';
-import FilamentModelViewer from './components/FilamentModelViewer';
-import { FullscreenMediaViewer } from './components/FullscreenMediaViewer';
-import { AccountModal } from './components/AccountModal';
-import { useAuth } from './hooks/useAuth';
+import CollectionParticle from './src/components/CollectionParticle';
+import { CreateMemoryModal } from './src/components/CreateMemoryModal';
+import { MemoryAudioPlayer } from './src/components/MemoryAudioPlayer';
+import { MemoryInfoModal } from './src/components/MemoryInfoModal';
+import { FullscreenMediaViewer } from './src/components/FullscreenMediaViewer';
+import { AccountModal } from './src/components/AccountModal';
+import { useAuth } from './src/hooks/useAuth'
 import { COLORS } from './theme';
 import { useI18n } from './constants/i18n';
 const ViroARView = React.lazy(() => import('./src/components/ViroARView'));

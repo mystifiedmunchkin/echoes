@@ -1,7 +1,7 @@
 /** Short native-driver collection feedback animation rendered above the AR view. */
 import React, { useEffect, useState } from 'react';
 import { Animated, StyleSheet, Dimensions } from 'react-native';
-import { COLORS } from '../app/theme';
+import { COLORS } from '../../theme';
 
 const { width } = Dimensions.get('window');
 

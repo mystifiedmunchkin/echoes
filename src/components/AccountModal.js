@@ -1,7 +1,7 @@
 /** Sign-in, registration, and account-management modal. */
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { COLORS } from '../../app/theme';
+import { COLORS } from '../../theme';
 import { useI18n } from '../../constants/i18n';
 
 export function AccountModal({ visible, onClose, user, onSignIn, onSignUp, onSignOut }) {

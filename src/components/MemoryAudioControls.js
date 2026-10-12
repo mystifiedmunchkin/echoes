@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Slider from '@react-native-community/slider';
 import Sound from 'react-native-nitro-sound';
-import { COLORS } from '../../app/theme';
+import { COLORS } from '../../theme';
 import { useI18n } from '../../constants/i18n';
 
 const formatDuration = (seconds) => {

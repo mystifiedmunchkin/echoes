@@ -17,7 +17,7 @@ import ImageResizer from '@bam.tech/react-native-image-resizer';
 import Sound from 'react-native-nitro-sound';
 import { Video } from 'react-native-compressor';
 import { createMemory } from '../services/api';
-import { COLORS } from '../../app/theme';
+import { COLORS } from '../../theme';
 import { useI18n } from '../../constants/i18n';
 
 const TARGET_IMAGE_PIXELS = 2_000_000;
