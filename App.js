@@ -11,9 +11,9 @@ import Slider from '@react-native-community/slider';
 import InventoryModal from './src/components/InventoryModal';
 import {
   Camera,
+  CircleLayer,
   FillLayer,
   MapView,
-  MarkerView,
   ShapeSource,
 } from '@maplibre/maplibre-react-native';
 import {
@@ -57,6 +57,31 @@ function AppContent() {
     location, errorMsg, memories, radius, isLoadingApi, apiError,
     updateRadius, refreshData, requestGpsPermission, cacheMemoryAssets
   } = useRadar(5000);
+  const memoryMarkers = useMemo(() => ({
+    type: 'FeatureCollection',
+    features: memories
+      .filter((memory) => Number.isFinite(Number(memory.lat)) && Number.isFinite(Number(memory.lng)))
+      .map((memory) => ({
+        type: 'Feature',
+        properties: { memoryId: String(memory.id) },
+        geometry: {
+          type: 'Point',
+          coordinates: [Number(memory.lng), Number(memory.lat)],
+        },
+      })),
+  }), [memories]);
+  const mapCameraRef = useRef(null);
+  const hasCenteredMapOnLocation = useRef(false);
+
+  useEffect(() => {
+    if (!location || hasCenteredMapOnLocation.current || !mapCameraRef.current) return;
+
+    mapCameraRef.current.flyTo(
+      [location.longitude, location.latitude],
+      1000,
+    );
+    hasCenteredMapOnLocation.current = true;
+  }, [location]);
 
   // --- Manage the memory's position in AR relative to the user's AR location (origin) ---
   const [selectedMemoryToPlace, setSelectedMemoryToPlace] = useState(null);
@@ -842,6 +867,7 @@ function AppContent() {
         }}
       >
         <Camera
+          ref={mapCameraRef}
           initialViewState={{
             center: location ? [location.longitude, location.latitude] : [1.3553, 44.0175],
             zoom: 14,
@@ -866,27 +892,52 @@ function AppContent() {
             />
           </ShapeSource>
         )}
-        {memories.map((memory) => (
-          <MarkerView
-            key={String(memory.id)}
-            coordinate={[memory.lng, memory.lat]}
-          >
-            <TouchableOpacity
-              onPress={() => {
-                setSelectedMemoryToInspect(memory);
-                setShowInfoModal(true);
-              }}
-            >
-              <View style={styles.mapMarker} />
-            </TouchableOpacity>
-          </MarkerView>
-        ))}
+        <ShapeSource
+          id="memory-markers"
+          shape={memoryMarkers}
+          onPress={(event) => {
+            const memoryId = event.features?.[0]?.properties?.memoryId;
+            const memory = memories.find((item) => String(item.id) === String(memoryId));
+            if (!memory) return;
+            setSelectedMemoryToInspect(memory);
+            setShowInfoModal(true);
+          }}
+        >
+          <CircleLayer
+            id="memory-marker-circles"
+            style={{
+              circleRadius: 8,
+              circleColor: COLORS.accent,
+              circleStrokeWidth: 2,
+              circleStrokeColor: COLORS.background,
+            }}
+          />
+        </ShapeSource>
         {selectedCreationCoords && (
-          <MarkerView
-            coordinate={[selectedCreationCoords.longitude, selectedCreationCoords.latitude]}
+          <ShapeSource
+            id="new-memory-marker"
+            shape={{
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                type: 'Point',
+                coordinates: [
+                  selectedCreationCoords.longitude,
+                  selectedCreationCoords.latitude,
+                ],
+              },
+            }}
           >
-            <View style={[styles.mapMarker, styles.newMemoryMarker]} />
-          </MarkerView>
+            <CircleLayer
+              id="new-memory-marker-circle"
+              style={{
+                circleRadius: 8,
+                circleColor: COLORS.primaryStrong,
+                circleStrokeWidth: 2,
+                circleStrokeColor: COLORS.background,
+              }}
+            />
+          </ShapeSource>
         )}
       </MapView>
 
@@ -1032,8 +1083,6 @@ const styles = StyleSheet.create({
   errorText: { color: COLORS.text, fontSize: 12, fontFamily: 'monospace' },
 
   map: { flex: 1, width: '100%' },
-  mapMarker: { width: 16, height: 16, borderRadius: 8, backgroundColor: COLORS.accent, borderWidth: 2, borderColor: COLORS.background },
-  newMemoryMarker: { width: 22, height: 22, borderRadius: 11, backgroundColor: COLORS.primaryStrong },
 
   bottomBar: { padding: 20, backgroundColor: COLORS.surface, alignItems: 'center' },
   button: { backgroundColor: COLORS.primaryStrong, paddingVertical: 15, borderRadius: 5, width: '100%', alignItems: 'center' },

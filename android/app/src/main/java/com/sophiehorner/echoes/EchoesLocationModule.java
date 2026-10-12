@@ -9,6 +9,7 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -25,6 +26,7 @@ import java.util.List;
 
 public class EchoesLocationModule extends ReactContextBaseJavaModule {
   private static final String MODULE_NAME = "EchoesLocation";
+  private static final String TAG = "EchoesLocation";
 
   private final LocationManager locationManager;
   private final Handler handler = new Handler(Looper.getMainLooper());
@@ -50,14 +52,13 @@ public class EchoesLocationModule extends ReactContextBaseJavaModule {
     final boolean highAccuracy = getBoolean(options, "enableHighAccuracy", false);
     final long timeout = getLong(options, "timeout", 20000L);
     final long maximumAge = getLong(options, "maximumAge", 10000L);
-    final String provider = getProvider(highAccuracy);
-
-    if (provider == null) {
+    final List<String> providers = getProviders();
+    if (providers.isEmpty()) {
       promise.reject("POSITION_UNAVAILABLE", "No Android location provider is enabled.");
       return;
     }
 
-    Location cachedLocation = getLastKnownLocation(provider);
+    Location cachedLocation = getBestLastKnownLocation(providers);
     if (cachedLocation != null
         && System.currentTimeMillis() - cachedLocation.getTime() <= maximumAge) {
       promise.resolve(toPosition(cachedLocation));
@@ -73,10 +74,6 @@ public class EchoesLocationModule extends ReactContextBaseJavaModule {
 
       @Override
       public void onProviderDisabled(@NonNull String disabledProvider) {
-        if (provider.equals(disabledProvider)) {
-          cleanup();
-          promise.reject("POSITION_UNAVAILABLE", "The Android location provider was disabled.");
-        }
       }
 
       @Override
@@ -99,7 +96,12 @@ public class EchoesLocationModule extends ReactContextBaseJavaModule {
     };
 
     try {
-      locationManager.requestLocationUpdates(provider, 1000L, 1.0f, listener, Looper.getMainLooper());
+      Log.i(TAG, "Requesting location from providers: " + providers);
+      for (String provider : providers) {
+        locationManager.requestLocationUpdates(
+            provider, 1000L, 1.0f, listener, Looper.getMainLooper()
+        );
+      }
       handler.postAtTime(timeoutRunnable, listener, System.currentTimeMillis() + timeout);
     } catch (SecurityException error) {
       promise.reject("PERMISSION_DENIED", "Location permission is not available.", error);
@@ -117,18 +119,20 @@ public class EchoesLocationModule extends ReactContextBaseJavaModule {
   }
 
   @Nullable
-  private String getProvider(boolean highAccuracy) {
+  private List<String> getProviders() {
     List<String> providers = locationManager.getProviders(true);
+    List<String> availableProviders = new java.util.ArrayList<>();
     boolean hasFinePermission = getReactApplicationContext().checkSelfPermission(
         Manifest.permission.ACCESS_FINE_LOCATION
     ) == PackageManager.PERMISSION_GRANTED;
     if (hasFinePermission && providers.contains(LocationManager.GPS_PROVIDER)) {
-      return LocationManager.GPS_PROVIDER;
+      availableProviders.add(LocationManager.GPS_PROVIDER);
     }
 
-    return providers.contains(LocationManager.NETWORK_PROVIDER)
-        ? LocationManager.NETWORK_PROVIDER
-        : null;
+    if (providers.contains(LocationManager.NETWORK_PROVIDER)) {
+      availableProviders.add(LocationManager.NETWORK_PROVIDER);
+    }
+    return availableProviders;
   }
 
   @Nullable
@@ -138,6 +142,18 @@ public class EchoesLocationModule extends ReactContextBaseJavaModule {
     } catch (SecurityException error) {
       return null;
     }
+  }
+
+  @Nullable
+  private Location getBestLastKnownLocation(List<String> providers) {
+    Location best = null;
+    for (String provider : providers) {
+      Location location = getLastKnownLocation(provider);
+      if (location != null && (best == null || location.getTime() > best.getTime())) {
+        best = location;
+      }
+    }
+    return best;
   }
 
   private WritableMap toPosition(Location location) {
