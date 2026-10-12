@@ -54,8 +54,8 @@ function AppContent() {
 
   // // --- Radar state and API interaction ---
   const {
-    location, memories, radius, isLoadingApi, apiError,
-    updateRadius, refreshData, cacheMemoryAssets
+    location, errorMsg, memories, radius, isLoadingApi, apiError,
+    updateRadius, refreshData, requestGpsPermission, cacheMemoryAssets
   } = useRadar(5000);
 
   // --- Manage the memory's position in AR relative to the user's AR location (origin) ---
@@ -794,6 +794,11 @@ function AppContent() {
       {apiError && (
         <TouchableOpacity style={styles.errorBanner} onPress={refreshData}>
           <Text style={styles.errorText}>{apiError} - {t('retryNetwork')}</Text>
+        </TouchableOpacity>
+      )}
+      {errorMsg && !apiError && (
+        <TouchableOpacity style={styles.errorBanner} onPress={requestGpsPermission}>
+          <Text style={styles.errorText}>{errorMsg}</Text>
         </TouchableOpacity>
       )}
 

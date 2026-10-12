@@ -42,7 +42,7 @@
     },
     "plugins": [
       "react-native-compressor",
-      "./plugins/withEchoesLocation",
+      "./plugins/withEchoesGmsCleanup",
       [
         "@reactvision/react-viro",
         {
@@ -56,7 +56,8 @@
             "savephotosPermission": "ECHOES a besoin d'enregistrer les souvenirs dans vos photos."
           }
         }
-      ]
+      ],
+      "./plugins/withEchoesLocation"
     ]
   }
 }

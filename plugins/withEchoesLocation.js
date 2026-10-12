@@ -1,34 +1,14 @@
 const fs = require('fs');
 const path = require('path');
-const { withAppBuildGradle, withDangerousMod } = require('expo/config-plugins');
+const { withDangerousMod } = require('expo/config-plugins');
 
 const PACKAGE_PATH = path.join('com', 'sophiehorner', 'echoes');
 const JAVA_FILES = ['EchoesLocationModule.java', 'EchoesLocationPackage.java'];
-
 module.exports = function withEchoesLocation(config) {
-  config = withAppBuildGradle(config, (config) => {
-    config.modResults.contents = config.modResults.contents.replace(
-      /\s*\/\/ Required for ARCore Geospatial API\s*\n\s*implementation ['"]com\.google\.android\.gms:play-services-location:[^'"]+['"]\s*\n/,
-      '\n',
-    );
-    return config;
-  });
-
   return withDangerousMod(config, [
     'android',
     async (config) => {
       const projectRoot = config.modRequest.projectRoot;
-      const appBuildGradlePath = path.join(
-        config.modRequest.platformProjectRoot,
-        'app',
-        'build.gradle',
-      );
-      const appBuildGradle = fs.readFileSync(appBuildGradlePath, 'utf8').replace(
-        /\r?\n\s*\/\/ Required for ARCore Geospatial API\r?\n\s*implementation ['"]com\.google\.android\.gms:play-services-location:[^'"]+['"]\r?\n/,
-        '\n',
-      );
-      fs.writeFileSync(appBuildGradlePath, appBuildGradle);
-
       const sourceDirectory = path.join(projectRoot, 'native', 'android', 'src', 'main', 'java', PACKAGE_PATH);
       const androidDirectory = path.join(
         config.modRequest.platformProjectRoot,

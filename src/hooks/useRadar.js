@@ -337,7 +337,15 @@ export function useRadar(initialRadius = 500) {
 
   const requestGpsPermission = useCallback(async () => {
     // This async function may call setState.
-    const { status, canAskAgain } = await Location.requestForegroundPermissionsAsync();
+    let permission;
+    try {
+      permission = await Location.requestForegroundPermissionsAsync();
+    } catch (error) {
+      console.warn('Location permission request failed:', error);
+      setErrorMsg(error.message || translate('gpsPermissionRequired'));
+      return false;
+    }
+    const { status, canAskAgain } = permission;
 
     const applyError = (msg) => setErrorMsg((prev) => (prev === msg ? prev : msg));
 
@@ -350,9 +358,16 @@ export function useRadar(initialRadius = 500) {
     }
 
     setPermissionStatus('granted');
-    const currentLoc = await Location.getCurrentPositionAsync({
-      timeout: 20000,
-    }).catch(() => null);
+    let currentLoc;
+    try {
+      currentLoc = await Location.getCurrentPositionAsync({
+        timeout: 20000,
+      });
+    } catch (error) {
+      console.warn('Location fix failed:', error);
+      setErrorMsg(error.message || translate('gpsLocationUnavailable'));
+      return false;
+    }
 
     if (currentLoc) {
       setLocation((prev) => (prev?.latitude === currentLoc.coords.latitude &&
