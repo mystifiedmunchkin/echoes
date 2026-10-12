@@ -119,13 +119,16 @@ public class EchoesLocationModule extends ReactContextBaseJavaModule {
   @Nullable
   private String getProvider(boolean highAccuracy) {
     List<String> providers = locationManager.getProviders(true);
-    String preferred = highAccuracy ? LocationManager.GPS_PROVIDER : LocationManager.NETWORK_PROVIDER;
-    if (providers.contains(preferred)) {
-      return preferred;
+    boolean hasFinePermission = getReactApplicationContext().checkSelfPermission(
+        Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED;
+    if (hasFinePermission && providers.contains(LocationManager.GPS_PROVIDER)) {
+      return LocationManager.GPS_PROVIDER;
     }
 
-    String fallback = highAccuracy ? LocationManager.NETWORK_PROVIDER : LocationManager.GPS_PROVIDER;
-    return providers.contains(fallback) ? fallback : null;
+    return providers.contains(LocationManager.NETWORK_PROVIDER)
+        ? LocationManager.NETWORK_PROVIDER
+        : null;
   }
 
   @Nullable

@@ -15,7 +15,6 @@ import {
   MapView,
   MarkerView,
   ShapeSource,
-  UserLocation,
 } from '@maplibre/maplibre-react-native';
 import {
   calculateBearing, createRadiusPolygon, getDistanceInMeters, formatRadiusText,
@@ -843,7 +842,6 @@ function AppContent() {
             zoom: 14,
           }}
         />
-        <UserLocation accuracy />
         {location && (
           <ShapeSource
             id="search-radius"

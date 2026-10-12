@@ -351,7 +351,7 @@ export function useRadar(initialRadius = 500) {
 
     setPermissionStatus('granted');
     const currentLoc = await Location.getCurrentPositionAsync({
-      timeout: 5000,
+      timeout: 20000,
     }).catch(() => null);
 
     if (currentLoc) {

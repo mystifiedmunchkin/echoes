@@ -4,13 +4,19 @@ const { EchoesLocation } = NativeModules;
 
 export async function requestForegroundPermissionsAsync() {
   if (Platform.OS === 'android') {
-    const result = await PermissionsAndroid.request(
+    const results = await PermissionsAndroid.requestMultiple([
       PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-    );
+      PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+    ]);
+    const result = results[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION];
+    const coarseGranted = results[PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION]
+      === PermissionsAndroid.RESULTS.GRANTED;
     return {
-      status: result === PermissionsAndroid.RESULTS.GRANTED ? 'granted' : 'denied',
-      granted: result === PermissionsAndroid.RESULTS.GRANTED,
-      canAskAgain: result !== PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN,
+      status: result === PermissionsAndroid.RESULTS.GRANTED || coarseGranted ? 'granted' : 'denied',
+      granted: result === PermissionsAndroid.RESULTS.GRANTED || coarseGranted,
+      canAskAgain: result !== PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN
+        && results[PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION]
+          !== PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN,
     };
   }
 
