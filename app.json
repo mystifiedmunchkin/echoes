@@ -1,4 +1,61 @@
 {
-  "name": "TestApp",
-  "displayName": "TestApp"
+  "expo": {
+    "newArchEnabled": true,
+    "name": "echoes",
+    "slug": "echoes",
+    "scheme": "echoes",
+    "version": "1.0.1",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "ECHOES a besoin de la caméra pour afficher les souvenirs en Réalité Augmentée.",
+        "NSLocationWhenInUseUsageDescription": "ECHOES utilise votre position pour afficher les souvenirs proches.",
+        "NSPhotoLibraryUsageDescription": "ECHOES a besoin d'accéder aux photos pour les souvenirs.",
+        "NSPhotoLibraryAddUsageDescription": "Allow $(PRODUCT_NAME) to save photos",
+        "NSMicrophoneUsageDescription": "ECHOES a besoin du microphone pour les souvenirs audio."
+      }
+    },
+    "android": {
+      "versionCode": 2,
+      "adaptiveIcon": {
+        "backgroundColor": "#13121E",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "package": "com.sophiehorner.echoes",
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "react-native-compressor",
+      [
+        "@reactvision/react-viro",
+        {
+          "android": {
+            "xRMode": "AR"
+          },
+          "ios": {
+            "cameraUsagePermission": "ECHOES a besoin de la caméra pour afficher les souvenirs en Réalité Augmentée.",
+            "microphoneUsagePermission": "ECHOES a besoin du microphone pour les souvenirs audio.",
+            "photosPermission": "ECHOES a besoin d'accéder aux photos pour les souvenirs.",
+            "savephotosPermission": "ECHOES a besoin d'enregistrer les souvenirs dans vos photos."
+          }
+        }
+      ]
+    ]
+  }
 }
