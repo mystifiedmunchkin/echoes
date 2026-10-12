@@ -1,5 +1,6 @@
-import { PermissionsAndroid, Platform } from 'react-native';
-import Geolocation from 'react-native-geolocation-service';
+import { NativeModules, PermissionsAndroid, Platform } from 'react-native';
+
+const { EchoesLocation } = NativeModules;
 
 export async function requestForegroundPermissionsAsync() {
   if (Platform.OS === 'android') {
@@ -13,33 +14,20 @@ export async function requestForegroundPermissionsAsync() {
     };
   }
 
-  return new Promise((resolve) => {
-    Geolocation.requestAuthorization((status) => {
-      resolve({
-        status,
-        granted: status === 'granted',
-        canAskAgain: status !== 'blocked' && status !== 'restricted',
-      });
-    });
-  });
+  throw new Error('iOS geolocation is not implemented by the Android-only native module.');
 }
 
 export function getCurrentPositionAsync(options = {}) {
-  return new Promise((resolve, reject) => {
-    // Note: 'enableHighAccuracy: false' is often more reliable on non-GMS devices
-    // as 'true' often forces a FusedLocationProvider (GMS) call which will fail.
-    Geolocation.getCurrentPosition(
-      (position) => resolve(position),
-      (error) => {
-        // Fallback or specific error handling
-        console.warn("Geolocation error:", error);
-        reject(error);
-      },
-      {
-        enableHighAccuracy: options.enableHighAccuracy ?? false,
-        timeout: options.timeout ?? 20000,
-        maximumAge: options.maximumAge ?? 10000,
-      }
-    );
+  if (Platform.OS !== 'android') {
+    return Promise.reject(new Error('Geolocation is only implemented on Android.'));
+  }
+  if (!EchoesLocation) {
+    return Promise.reject(new Error('EchoesLocation native module is not available.'));
+  }
+
+  return EchoesLocation.getCurrentPosition({
+    enableHighAccuracy: options.enableHighAccuracy ?? false,
+    timeout: options.timeout ?? 20000,
+    maximumAge: options.maximumAge ?? 10000,
   });
 }
