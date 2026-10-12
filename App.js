@@ -11,10 +11,10 @@ import Slider from '@react-native-community/slider';
 import InventoryModal from './src/components/InventoryModal';
 import {
   Camera,
-  GeoJSONSource,
-  Layer,
-  Map as MapLibreMap,
-  Marker,
+  FillLayer,
+  MapView,
+  MarkerView,
+  ShapeSource,
   UserLocation,
 } from '@maplibre/maplibre-react-native';
 import {
@@ -29,6 +29,7 @@ import { MemoryAudioPlayer } from './src/components/MemoryAudioPlayer';
 import { MemoryInfoModal } from './src/components/MemoryInfoModal';
 import { FullscreenMediaViewer } from './src/components/FullscreenMediaViewer';
 import { AccountModal } from './src/components/AccountModal';
+import ViroModelViewer from './src/components/ViroModelViewer';
 import { useAuth } from './src/hooks/useAuth'
 import { COLORS } from './theme';
 import { useI18n } from './constants/i18n';
@@ -126,7 +127,6 @@ function AppContent() {
   const mediaViewerTransitionTimer = useRef(null);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     const syncAssets = () => {
       if (!showInfoModal || !selectedMemoryToInspect) return;
 
@@ -151,7 +151,7 @@ function AppContent() {
       };
     };
     syncAssets();
-  }, [showInfoModal, selectedMemoryToInspect?.id, cacheMemoryAssets, t]);
+  }, [showInfoModal, selectedMemoryToInspect, cacheMemoryAssets, t]);
 
   useEffect(() => () => {
     if (modelViewerTransitionTimer.current) {
@@ -523,7 +523,7 @@ function AppContent() {
     return (
       <View style={styles.modelViewerScreen} collapsable={false}>
         {modelViewerMemory ? (
-          <FilamentModelViewer
+          <ViroModelViewer
             modelUrl={modelViewerMemory.model_url}
             style={styles.fullscreenModelViewer}
           />
@@ -799,12 +799,12 @@ function AppContent() {
       )}
 
 
-      <MapLibreMap
+      <MapView
         style={styles.map}
         mapStyle="https://tiles.openfreemap.org/styles/bright"
         onPress={(event) => {
           setSelectedCreationCoords(null);
-          const coordinates = event.nativeEvent?.lngLat;
+          const coordinates = event.geometry?.coordinates;
           if (coordinates) {
             const coords = { latitude: coordinates[1], longitude: coordinates[0] };
             const hit = memories.find((m) =>
@@ -818,7 +818,7 @@ function AppContent() {
           }
         }}
         onLongPress={(event) => {
-          const coordinates = event.nativeEvent?.lngLat;
+          const coordinates = event.geometry?.coordinates;
           if (!coordinates) return;
           const coords = { latitude: coordinates[1], longitude: coordinates[0] };
 
@@ -845,47 +845,47 @@ function AppContent() {
         />
         <UserLocation accuracy />
         {location && (
-          <GeoJSONSource
+          <ShapeSource
             id="search-radius"
-            data={createRadiusPolygon(
+            shape={createRadiusPolygon(
               location.latitude,
               location.longitude,
               slidingRadius || radius,
             )}
           >
-            <Layer
+            <FillLayer
               id="search-radius-fill"
-              type="fill"
-              paint={{
-                'fill-color': COLORS.primaryStrong,
-                'fill-opacity': 0.2,
-                'fill-outline-color': COLORS.primaryStrong,
+              style={{
+                fillColor: COLORS.primaryStrong,
+                fillOpacity: 0.2,
+                fillOutlineColor: COLORS.primaryStrong,
               }}
             />
-          </GeoJSONSource>
+          </ShapeSource>
         )}
         {memories.map((memory) => (
-          <Marker
+          <MarkerView
             key={String(memory.id)}
-            id={`memory-${memory.id}`}
-            lngLat={[memory.lng, memory.lat]}
-            onPress={() => {
-              setSelectedMemoryToInspect(memory);
-              setShowInfoModal(true);
-            }}
+            coordinate={[memory.lng, memory.lat]}
           >
-            <View style={styles.mapMarker} />
-          </Marker>
+            <TouchableOpacity
+              onPress={() => {
+                setSelectedMemoryToInspect(memory);
+                setShowInfoModal(true);
+              }}
+            >
+              <View style={styles.mapMarker} />
+            </TouchableOpacity>
+          </MarkerView>
         ))}
         {selectedCreationCoords && (
-          <Marker
-            id="new-memory"
-            lngLat={[selectedCreationCoords.longitude, selectedCreationCoords.latitude]}
+          <MarkerView
+            coordinate={[selectedCreationCoords.longitude, selectedCreationCoords.latitude]}
           >
             <View style={[styles.mapMarker, styles.newMemoryMarker]} />
-          </Marker>
+          </MarkerView>
         )}
-      </MapLibreMap>
+      </MapView>
 
       {/* Overlay UI elements outside MapView. */}
       {selectedCreationCoords && (
