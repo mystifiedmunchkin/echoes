@@ -1,16 +1,9 @@
-import java.io.FileInputStream
-import java.util.Properties
-
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
-def localProperties = new Properties()
-def localPropertiesFile = rootProject.file('local.properties')
-if (localPropertiesFile.exists()) {
-    localProperties.load(new FileInputStream(localPropertiesFile))
-}
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
@@ -89,15 +82,16 @@ def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBu
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
 android {
-    ndkVersion '27.1.12297006'
-    compileSdk 36
+    ndkVersion rootProject.ext.ndkVersion
 
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    compileSdk rootProject.ext.compileSdkVersion
 
     namespace 'com.sophiehorner.echoes'
     defaultConfig {
         applicationId 'com.sophiehorner.echoes'
-        minSdk 26
-        targetSdk 34
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 2
         versionName "1.0.1"
 
@@ -105,19 +99,10 @@ android {
     }
     signingConfigs {
         debug {
-            if (project.hasProperty('MYAPP_DEBUG_STORE_FILE')) {
-                MYAPP_DEBUG_STORE_FILE=debug.keystore
-                MYAPP_DEBUG_KEY_ALIAS=debug-upload
-                MYAPP_DEBUG_STORE_PASSWORD=SnuAywLismHz
-                MYAPP_DEBUG_KEY_PASSWORD=SnuAywLismHz
-        }}
-        release {
-            if (project.hasProperty('MYAPP_UPLOAD_STORE_FILE')) {
-                storeFile file(MYAPP_UPLOAD_STORE_FILE)
-                storePassword MYAPP_UPLOAD_STORE_PASSWORD
-                keyAlias MYAPP_UPLOAD_KEY_ALIAS
-                keyPassword MYAPP_UPLOAD_KEY_PASSWORD
-            }
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
         }
     }
     buildTypes {
@@ -127,7 +112,7 @@ android {
         release {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.release
+            signingConfig signingConfigs.debug
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds
@@ -145,11 +130,6 @@ android {
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
     }
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
-    }
-    buildToolsVersion '35.0.0'
 }
 
 // Apply static values from `gradle.properties` to the `android.packagingOptions`
@@ -211,5 +191,45 @@ dependencies {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
+    }
+}
+
+// echoes-release-signing
+def echoesLocalProperties = new java.util.Properties()
+def echoesLocalPropertiesFile = rootProject.file('local.properties')
+if (echoesLocalPropertiesFile.exists()) {
+    echoesLocalProperties.load(new java.io.FileInputStream(echoesLocalPropertiesFile))
+}
+def echoesSigningProperty = { String name ->
+    echoesLocalProperties.getProperty(name) ?: findProperty(name) ?: System.getenv(name)
+}
+def echoesSigningKeys = [
+    'MYAPP_UPLOAD_STORE_FILE',
+    'MYAPP_UPLOAD_STORE_PASSWORD',
+    'MYAPP_UPLOAD_KEY_ALIAS',
+    'MYAPP_UPLOAD_KEY_PASSWORD'
+]
+def echoesMissingSigningKeys = echoesSigningKeys.findAll {
+    !echoesSigningProperty(it)
+}
+if (echoesMissingSigningKeys) {
+    throw new GradleException(
+        "Missing release signing properties: " + echoesMissingSigningKeys.join(', ') +
+        ". Configure android/local.properties, Gradle properties, or environment variables."
+    )
+}
+android {
+    signingConfigs {
+        release {
+            storeFile file(echoesSigningProperty('MYAPP_UPLOAD_STORE_FILE'))
+            storePassword echoesSigningProperty('MYAPP_UPLOAD_STORE_PASSWORD')
+            keyAlias echoesSigningProperty('MYAPP_UPLOAD_KEY_ALIAS')
+            keyPassword echoesSigningProperty('MYAPP_UPLOAD_KEY_PASSWORD')
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+        }
     }
 }
