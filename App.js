@@ -34,6 +34,8 @@ import { COLORS } from './theme';
 import { useI18n } from './constants/i18n';
 const ViroARView = React.lazy(() => import('./src/components/ViroARView'));
 const AR_MEMORY_MAX_RADIUS_METERS = 5000;
+const MAP_NEIGHBORHOOD_ZOOM = 12;
+const DEFAULT_MAP_CENTER = [1.3553, 44.0175];
 const AR_SESSION_RELEASE_MS = 1500;
 const MODEL_VIEWER_RELEASE_MS = 500;
 
@@ -70,18 +72,12 @@ function AppContent() {
         },
       })),
   }), [memories]);
-  const mapCameraRef = useRef(null);
-  const hasCenteredMapOnLocation = useRef(false);
-
-  useEffect(() => {
-    if (!location || hasCenteredMapOnLocation.current || !mapCameraRef.current) return;
-
-    mapCameraRef.current.flyTo(
-      [location.longitude, location.latitude],
-      1000,
-    );
-    hasCenteredMapOnLocation.current = true;
-  }, [location]);
+  const mapCenterCoordinate = useMemo(
+    () => location
+      ? [location.longitude, location.latitude]
+      : DEFAULT_MAP_CENTER,
+    [location],
+  );
 
   // --- Manage the memory's position in AR relative to the user's AR location (origin) ---
   const [selectedMemoryToPlace, setSelectedMemoryToPlace] = useState(null);
@@ -867,11 +863,13 @@ function AppContent() {
         }}
       >
         <Camera
-          ref={mapCameraRef}
-          initialViewState={{
-            center: location ? [location.longitude, location.latitude] : [1.3553, 44.0175],
-            zoom: 14,
+          defaultSettings={{
+            centerCoordinate: DEFAULT_MAP_CENTER,
+            zoomLevel: MAP_NEIGHBORHOOD_ZOOM,
           }}
+          centerCoordinate={mapCenterCoordinate}
+          zoomLevel={MAP_NEIGHBORHOOD_ZOOM}
+          minZoomLevel={MAP_NEIGHBORHOOD_ZOOM}
         />
         {location && (
           <ShapeSource
