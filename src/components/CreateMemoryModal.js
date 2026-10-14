@@ -11,11 +11,12 @@ import {
   Alert,
   Image,
 } from 'react-native';
-import { Camera as VisionCameraModule } from 'react-native-vision-camera';
+import { VisionCamera } from 'react-native-vision-camera';
 import { launchCamera } from 'react-native-image-picker';
 import ImageResizer from '@bam.tech/react-native-image-resizer';
 import Sound from 'react-native-nitro-sound';
 import { Video } from 'react-native-compressor';
+import { Dirs, FileSystem } from 'react-native-file-access';
 import { createMemory } from '../services/api';
 import { COLORS } from '../../theme';
 import { useI18n } from '../../constants/i18n';
@@ -44,6 +45,18 @@ const MODEL_OPTIONS = [
   },
 ];
 
+const toFileUri = (uri) => {
+  if (!uri || uri.startsWith('file://') || uri.startsWith('content://')) return uri;
+  return uri.startsWith('/') ? `file://${uri}` : uri;
+};
+
+const requireSoundMethod = (methodName) => {
+  if (typeof Sound[methodName] !== 'function') {
+    throw new Error(`La méthode audio ${methodName} est indisponible dans le module natif.`);
+  }
+  return Sound[methodName].bind(Sound);
+};
+
 const compressCapturedImage = async (asset) => {
   const sourcePixels = Number(asset.width || 0) * Number(asset.height || 0);
   const scale = sourcePixels > TARGET_IMAGE_PIXELS
@@ -61,7 +74,7 @@ const compressCapturedImage = async (asset) => {
 
   return {
     ...asset,
-    uri: result.uri,
+    uri: toFileUri(result.uri),
     width: result.width,
     height: result.height,
     type: 'image',
@@ -80,7 +93,7 @@ const compressCapturedVideo = async (asset) => {
 
   return {
     ...asset,
-    uri,
+    uri: toFileUri(uri),
     type: 'video',
     mimeType: 'video/mp4',
     fileName: `video_${Date.now()}.mp4`,
@@ -101,21 +114,35 @@ export const CreateMemoryModal = ({ visible, onClose, currentLocation, onMemoryC
     if (!recorderIsRecordingRef.current) return null;
 
     try {
-      const uri = await Sound.stopRecorder();
+      const uri = await requireSoundMethod('stopRecorder')();
       recorderIsRecordingRef.current = false;
       setIsRecording(false);
       if (!saveRecording || !uri) return null;
 
       const audioAsset = {
-        uri,
+        uri: toFileUri(uri),
         type: 'audio',
+        mimeType: 'audio/m4a',
         fileName: `audio_${Date.now()}.m4a`,
       };
       setSelectedMedia(audioAsset);
       return audioAsset;
     } finally {
-      Sound.removeRecordBackListener();
+      recorderIsRecordingRef.current = false;
+      setIsRecording(false);
+      if (typeof Sound.removeRecordBackListener === 'function') {
+        Sound.removeRecordBackListener();
+      }
     }
+  }, []);
+
+  const resetForm = useCallback(() => {
+    setTitle('');
+    setDescription('');
+    setSelectedMedia(null);
+    setShowModelChoices(false);
+    setIsRecording(false);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -124,13 +151,13 @@ export const CreateMemoryModal = ({ visible, onClose, currentLocation, onMemoryC
     stopActiveRecording(false).catch((error) => {
       console.warn(t('audioRecordingStopError'), error);
     });
-  }, [stopActiveRecording, visible]);
+  }, [stopActiveRecording, t, visible]);
 
   useEffect(() => () => {
     stopActiveRecording(false).catch((error) => {
       console.warn(t('audioRecordingStopError'), error);
     });
-  }, [stopActiveRecording]);
+  }, [stopActiveRecording, t]);
 
   const captureMedia = async (mediaType) => {
     if (!currentLocation) {
@@ -138,14 +165,15 @@ export const CreateMemoryModal = ({ visible, onClose, currentLocation, onMemoryC
       return;
     }
 
-    const permission = await VisionCameraModule.requestCameraPermission();
-    if (permission !== 'granted') {
-      Alert.alert(t('photoRejectedTitle'), t('cameraPermission'));
-      return;
-    }
-
     setLoading(true);
     try {
+      if (recorderIsRecordingRef.current) await stopActiveRecording(false);
+      const permission = await VisionCamera.requestCameraPermission();
+      if (!permission) {
+        Alert.alert(t('photoRejectedTitle'), t('cameraPermission'));
+        return;
+      }
+
       const result = await launchCamera({
         mediaType: mediaType === 'videos' ? 'video' : 'photo',
         quality: mediaType === 'videos' ? undefined : 1,
@@ -171,11 +199,41 @@ export const CreateMemoryModal = ({ visible, onClose, currentLocation, onMemoryC
   const chooseModel = async (model) => {
     setLoading(true);
     try {
+      if (recorderIsRecordingRef.current) await stopActiveRecording(false);
       const asset = Image.resolveAssetSource(model.source);
       if (!asset?.uri) throw new Error(t('localModelMissing'));
 
+      const targetPath = `${Dirs.CacheDir}/echoes_${model.fileName}`;
+      try {
+        if (typeof FileSystem.cpAsset !== 'function') {
+          throw new Error('La copie des assets natifs est indisponible.');
+        }
+        let copied = false;
+        for (const bundledAsset of [`models/${model.fileName}`, model.fileName]) {
+          try {
+            await FileSystem.cpAsset(bundledAsset, targetPath);
+            copied = true;
+            break;
+          } catch (error) {
+            // Try the resolved Metro/file URI below when the native asset path differs.
+          }
+        }
+        if (!copied) throw new Error(t('localModelMissing'));
+      } catch (assetError) {
+        const sourceUri = asset.uri;
+        if (sourceUri.startsWith('http://') || sourceUri.startsWith('https://')) {
+          const response = await FileSystem.fetch(sourceUri, { path: targetPath });
+          if (!response.ok) throw assetError;
+        } else {
+          await FileSystem.cp(sourceUri.replace(/^file:\/\//, ''), targetPath);
+        }
+      }
+      if (!(await FileSystem.exists(targetPath))) {
+        throw new Error(t('localModelMissing'));
+      }
+
       setSelectedMedia({
-        uri: asset.uri,
+        uri: `file://${targetPath}`,
         type: 'model',
         mimeType: 'model/gltf-binary',
         fileName: model.fileName,
@@ -192,20 +250,49 @@ export const CreateMemoryModal = ({ visible, onClose, currentLocation, onMemoryC
 
   const toggleAudioRecording = async () => {
     if (isRecording) {
-      await stopActiveRecording(true);
+      try {
+        setLoading(true);
+        await stopActiveRecording(true);
+      } catch (error) {
+        console.error(t('audioRecordingStopError'), error);
+        Alert.alert(t('error'), error.message || t('audioRecordingStopError'));
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
-    const permission = await VisionCameraModule.requestMicrophonePermission();
-    if (permission !== 'granted') {
-      Alert.alert(t('error'), t('microphonePermission'));
-      return;
-    }
+    try {
+      setLoading(true);
+      const permission = await VisionCamera.requestMicrophonePermission();
+      if (!permission) {
+        Alert.alert(t('error'), t('microphonePermission'));
+        return;
+      }
 
-    Sound.setSubscriptionDuration(0.25);
-    await Sound.startRecorder();
-    recorderIsRecordingRef.current = true;
-    setIsRecording(true);
+      if (typeof Sound.setSubscriptionDuration === 'function') {
+        Sound.setSubscriptionDuration(0.25);
+      }
+      await requireSoundMethod('startRecorder')();
+      recorderIsRecordingRef.current = true;
+      setIsRecording(true);
+    } catch (error) {
+      console.error(t('microphonePermission'), error);
+      Alert.alert(t('error'), error.message || t('microphonePermission'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    try {
+      await stopActiveRecording(false);
+    } catch (error) {
+      console.warn(t('audioRecordingStopError'), error);
+    } finally {
+      resetForm();
+      if (typeof onClose === 'function') onClose();
+    }
   };
 
   const handleSubmit = async () => {
@@ -238,6 +325,7 @@ export const CreateMemoryModal = ({ visible, onClose, currentLocation, onMemoryC
       setDescription('');
       setSelectedMedia(null);
       setShowModelChoices(false);
+      setIsRecording(false);
       
       // Safely invoke prop functions
       if (typeof onMemoryCreated === 'function') {
@@ -333,7 +421,7 @@ export const CreateMemoryModal = ({ visible, onClose, currentLocation, onMemoryC
           )}
 
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.cancelButton} onPress={onClose} disabled={loading}>
+            <TouchableOpacity style={styles.cancelButton} onPress={handleCancel} disabled={loading}>
               <Text style={styles.cancelText}>{t('cancel')}</Text>
             </TouchableOpacity>
 

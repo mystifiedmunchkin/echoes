@@ -17,9 +17,11 @@ function withAndroidBuildConfig(config) {
   });
 
   return withAppBuildGradle(config, (config) => {
-    if (config.modResults.contents.includes(SIGNING_MARKER)) {
-      return config;
-    }
+    let contents = config.modResults.contents;
+    contents = contents.replace(
+      /(buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?)signingConfig signingConfigs\.debug/,
+      '$1',
+    );
 
     const signingConfig = `
 ${SIGNING_MARKER}
@@ -37,33 +39,41 @@ def echoesSigningKeys = [
     'MYAPP_UPLOAD_KEY_ALIAS',
     'MYAPP_UPLOAD_KEY_PASSWORD'
 ]
-def echoesMissingSigningKeys = echoesSigningKeys.findAll {
-    !echoesSigningProperty(it)
+def echoesReleaseBuildRequested = gradle.startParameter.taskNames.any { taskName ->
+    taskName.toLowerCase().contains('release')
 }
-if (echoesMissingSigningKeys) {
-    throw new GradleException(
-        "Missing release signing properties: " + echoesMissingSigningKeys.join(', ') +
-        ". Configure android/local.properties, Gradle properties, or environment variables."
-    )
-}
+def echoesMissingSigningKeys = echoesSigningKeys.findAll { !echoesSigningProperty(it) }
 android {
     signingConfigs {
-        release {
-            storeFile file(echoesSigningProperty('MYAPP_UPLOAD_STORE_FILE'))
-            storePassword echoesSigningProperty('MYAPP_UPLOAD_STORE_PASSWORD')
-            keyAlias echoesSigningProperty('MYAPP_UPLOAD_KEY_ALIAS')
-            keyPassword echoesSigningProperty('MYAPP_UPLOAD_KEY_PASSWORD')
+        if (!echoesMissingSigningKeys) {
+            release {
+                storeFile file(echoesSigningProperty('MYAPP_UPLOAD_STORE_FILE'))
+                storePassword echoesSigningProperty('MYAPP_UPLOAD_STORE_PASSWORD')
+                keyAlias echoesSigningProperty('MYAPP_UPLOAD_KEY_ALIAS')
+                keyPassword echoesSigningProperty('MYAPP_UPLOAD_KEY_PASSWORD')
+            }
         }
     }
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            if (echoesReleaseBuildRequested && echoesMissingSigningKeys) {
+                throw new GradleException(
+                    "Missing release signing properties: " + echoesMissingSigningKeys.join(', ') +
+                    ". Configure android/local.properties, Gradle properties, or environment variables."
+                )
+            }
+            if (!echoesMissingSigningKeys) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
 `;
 
-    config.modResults.contents += signingConfig;
+    const markerIndex = contents.indexOf(SIGNING_MARKER);
+    if (markerIndex >= 0) contents = contents.slice(0, markerIndex).trimEnd();
+    contents += signingConfig;
+    config.modResults.contents = contents;
     return config;
   });
 }

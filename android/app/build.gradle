@@ -112,7 +112,6 @@ android {
         release {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds
@@ -209,27 +208,32 @@ def echoesSigningKeys = [
     'MYAPP_UPLOAD_KEY_ALIAS',
     'MYAPP_UPLOAD_KEY_PASSWORD'
 ]
-def echoesMissingSigningKeys = echoesSigningKeys.findAll {
-    !echoesSigningProperty(it)
+def echoesReleaseBuildRequested = gradle.startParameter.taskNames.any { taskName ->
+    taskName.toLowerCase().contains('release')
 }
-if (echoesMissingSigningKeys) {
-    throw new GradleException(
-        "Missing release signing properties: " + echoesMissingSigningKeys.join(', ') +
-        ". Configure android/local.properties, Gradle properties, or environment variables."
-    )
-}
+def echoesMissingSigningKeys = echoesSigningKeys.findAll { !echoesSigningProperty(it) }
 android {
     signingConfigs {
-        release {
-            storeFile file(echoesSigningProperty('MYAPP_UPLOAD_STORE_FILE'))
-            storePassword echoesSigningProperty('MYAPP_UPLOAD_STORE_PASSWORD')
-            keyAlias echoesSigningProperty('MYAPP_UPLOAD_KEY_ALIAS')
-            keyPassword echoesSigningProperty('MYAPP_UPLOAD_KEY_PASSWORD')
+        if (!echoesMissingSigningKeys) {
+            release {
+                storeFile file(echoesSigningProperty('MYAPP_UPLOAD_STORE_FILE'))
+                storePassword echoesSigningProperty('MYAPP_UPLOAD_STORE_PASSWORD')
+                keyAlias echoesSigningProperty('MYAPP_UPLOAD_KEY_ALIAS')
+                keyPassword echoesSigningProperty('MYAPP_UPLOAD_KEY_PASSWORD')
+            }
         }
     }
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            if (echoesReleaseBuildRequested && echoesMissingSigningKeys) {
+                throw new GradleException(
+                    "Missing release signing properties: " + echoesMissingSigningKeys.join(', ') +
+                    ". Configure android/local.properties, Gradle properties, or environment variables."
+                )
+            }
+            if (!echoesMissingSigningKeys) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
