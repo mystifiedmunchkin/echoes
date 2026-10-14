@@ -174,10 +174,12 @@ export const CreateMemoryModal = ({ visible, onClose, currentLocation, onMemoryC
         return;
       }
 
-      const result = await launchCamera({
+      const cameraOptions = {
         mediaType: mediaType === 'videos' ? 'video' : 'photo',
-        quality: mediaType === 'videos' ? undefined : 1,
-      });
+      };
+      if (mediaType !== 'videos') cameraOptions.quality = 1;
+
+      const result = await launchCamera(cameraOptions);
 
       if (result.didCancel || !result.assets?.[0]) return;
       const asset = result.assets[0];

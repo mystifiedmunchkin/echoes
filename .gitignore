@@ -79,3 +79,4 @@ yarn-error.log
 *.jks
 *.keystore
 android/local.properties
+local.properties

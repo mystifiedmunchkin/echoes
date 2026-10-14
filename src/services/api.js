@@ -5,7 +5,7 @@ import { translate } from '../../constants/i18n';
 const API_URL = 'https://echoes.sophiehorner.art/api';
 
 const MEDIA_TYPES = [
-  ['model', 'models_3d', 'glb'],
+  ['model', 'models_3D', 'glb'],
   ['image', 'images', 'jpg'],
   ['audio', 'audios', 'mp3'],
   ['video', 'videos', 'mp4'],
@@ -23,7 +23,7 @@ const createContents = (memoryData) => {
   if (!mediaContents || typeof mediaContents !== 'object') return [];
 
   const mediaFields = [
-    ['models_3d', 'model_3D'],
+    ['models_3D', 'model_3D'],
     ['images', 'image'],
     ['audios', 'audio'],
     ['videos', 'video'],
@@ -50,7 +50,7 @@ const appendFile = (formData, asset, index) => {
   const mimeType = asset.mimeType || (
     asset.type === 'model' ? 'model/gltf-binary' : `${asset.type}/${extension}`
   );
-  formData.append(`contents[${index}][${field === 'models_3d' ? 'model_3D' : field.slice(0, -1)}]`, {
+  formData.append(`contents[${index}][${field === 'models_3D' ? 'models_3D' : field.slice(0, -1)}]`, {
     uri,
     name,
     type: mimeType,
@@ -75,6 +75,22 @@ const createMultipartPayload = (memoryData, mediaAsset) => {
   appendFile(formData, mediaAsset, 0);
   return formData;
 };
+
+const sendMultipartRequest = (url, headers, body) => new Promise((resolve, reject) => {
+  const request = new XMLHttpRequest();
+  request.open('POST', url);
+  Object.entries(headers).forEach(([name, value]) => {
+    request.setRequestHeader(name, value);
+  });
+  request.onload = () => resolve({
+    ok: request.status >= 200 && request.status < 300,
+    status: request.status,
+    json: async () => JSON.parse(request.responseText),
+  });
+  request.onerror = () => reject(new Error('Network request failed while uploading memory media.'));
+  request.onabort = () => reject(new Error('Memory media upload was aborted.'));
+  request.send(body);
+});
 
 export const createMemory = async (memoryData) => {
   try {
@@ -105,11 +121,13 @@ export const createMemory = async (memoryData) => {
     };
     if (!hasLocalFile) headers['Content-Type'] = 'application/json';
 
-    const response = await fetch(`${API_URL}/memories`, {
-      method: 'POST',
-      headers,
-      body: requestBody,
-    });
+    const response = hasLocalFile
+      ? await sendMultipartRequest(`${API_URL}/memories`, headers, requestBody)
+      : await fetch(`${API_URL}/memories`, {
+        method: 'POST',
+        headers,
+        body: requestBody,
+      });
 
     if (!response.ok) {
       const errorDetails = await response.json().catch(() => null);

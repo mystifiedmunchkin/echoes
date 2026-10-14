@@ -73,7 +73,7 @@ const isVideoUrl = (value) => /\.(mp4|mov|m4v|webm)(\?|$)/i.test(value || '');
 const isImageUrl = (value) => /\.(jpe?g|png|webp|gif)(\?|$)/i.test(value || '');
 const isAudioUrl = (value) => /\.(mp3|wav|m4a|aac|ogg)(\?|$)/i.test(value || '');
 const is3DReference = (value) => /\.(glb|gltf|usdz|obj|fbx)(\?|$)/i.test(value || '')
-  || /\/(?:model|models|models_3d|model-files)\//i.test(value || '');
+  || /\/(?:model|models|models_3d|model_3D|model_3Ds|models_3D|model-files)\//i.test(value || '');
 const isVideoReference = (value) => isVideoUrl(value) || /\/(?:videos?|video-files)\//i.test(value || '');
 const isImageReference = (value) => isImageUrl(value) || /\/(?:images?|photos?|image-files)\//i.test(value || '');
 const isAudioReference = (value) => isAudioUrl(value) || /\/(?:audios?|audio-files)\//i.test(value || '');
@@ -206,12 +206,12 @@ export function useRadar(initialRadius = 500) {
         const latVal = Number(String(item.lat || item.latitude).replace(',', '.'));
         const lngVal = Number(String(item.lng || item.longitude).replace(',', '.'));
 
-        // Laravel flattens contents into model_url + media_contents.models_3d on save
+        // Laravel flattens contents into model_url + media_contents.models_3D on save
         const mediaContents = parseJsonValue(item.media_contents, {});
         const rawContents = parseJsonValue(item.contents, []);
         const isContentObject = rawContents && typeof rawContents === 'object'
           && !Array.isArray(rawContents)
-          && ['model_3D', 'model_3d', 'model_url', 'image', 'image_url', 'audio', 'audio_url', 'video', 'video_url']
+          && ['model_3D', 'models_3D', 'model_3d', 'model_url', 'image', 'image_url', 'audio', 'audio_url', 'video', 'video_url']
             .some((key) => Object.prototype.hasOwnProperty.call(rawContents, key));
         const mediaArray = Array.isArray(rawContents)
           ? rawContents
@@ -221,7 +221,7 @@ export function useRadar(initialRadius = 500) {
         const normalizeContent = (content, contentIndex) => {
           const source = content && typeof content === 'object' ? content : {};
           const modelUrl = extractMediaUrl(
-            source.model_3D || source.model_3d || source.model_url || source.models_3d
+            source.model_3D || source.models_3D || source.model_3d || source.model_url || source.models_3d
           );
           const imageUrl = extractMediaUrl(source.image || source.image_url);
           const audioUrl = extractMediaUrl(source.audio || source.audio_url);
@@ -230,7 +230,7 @@ export function useRadar(initialRadius = 500) {
           return {
             ...source,
             index: contentIndex,
-            model_3D: modelUrl ? resolvePrivateFileUrl(modelUrl, userId, 'model') : null,
+            model_3D: modelUrl ? resolvePrivateFileUrl(modelUrl, userId, 'model_3Ds') : null,
             image: imageUrl ? resolvePrivateFileUrl(imageUrl, userId, 'image') : null,
             audio: audioUrl ? resolvePrivateFileUrl(audioUrl, userId, 'audio') : null,
             video: videoUrl ? resolvePrivateFileUrl(videoUrl, userId, 'video') : null,
@@ -254,10 +254,12 @@ export function useRadar(initialRadius = 500) {
         const modelCandidates = [
           ...explicitModelUrls,
           ...contentModelUrls,
-          ...findMediaUrls(['models_3d', 'model_3d', 'model_3D'], 'model'),
+          ...findMediaUrls(['models_3D', 'models_3d', 'model_3d', 'model_3D'], 'model'),
         ];
-        const modelUrls = [...new Set(modelCandidates.filter(is3DReference))];
-        const explicitModelUrl = explicitModelUrls[0] || '';
+        const modelUrls = [...new Set(modelCandidates
+          .map((value) => resolvePrivateFileUrl(value, userId, 'model_3Ds'))
+          .filter(is3DReference))];
+        const explicitModelUrl = modelUrls[0] || '';
         const inferredMediaType = String(
           item.media_type || item.mime_type || item.content_type || item.type || ''
         ).toLowerCase();

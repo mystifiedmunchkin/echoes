@@ -10,3 +10,490 @@
 {"_e":"metro:config","_t":1791765405439,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
 {"_e":"expo:dev-tools-plugin:load","_t":1791765405689,"plugins":[]}
 {"_e":"metro:instantiate","_t":1791765409610,"atlas":false,"workers":8,"host":"::","port":8081}
+{"_e":"root:init","_t":1791960100023,"format":"v0-jsonl","version":"57.0.28"}
+{"_e":"env:mode","_t":1791960100024,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1791960100026,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1791960100497,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1791960101099,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1791960101553,"plugins":[]}
+{"_e":"metro:instantiate","_t":1791960110075,"atlas":false,"workers":8,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1791960116765,"id":"1","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791960116765,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791960116772,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791960117424,"id":"1","progress":0.010000000000000002,"total":1,"current":1}
+{"_e":"metro:bundling:progress","_t":1791960117525,"id":"1","progress":0.04000000000000001,"total":4,"current":2}
+{"_e":"metro:bundling:progress","_t":1791960117989,"id":"1","progress":0.09,"total":4,"current":3}
+{"_e":"metro:bundling:progress","_t":1791960118089,"id":"1","progress":0.25,"total":12,"current":6}
+{"_e":"metro:bundling:progress","_t":1791960118222,"id":"1","progress":0.25,"total":21,"current":9}
+{"_e":"metro:bundling:progress","_t":1791960118322,"id":"1","progress":0.25,"total":119,"current":15}
+{"_e":"metro:bundling:progress","_t":1791960118427,"id":"1","progress":0.25,"total":120,"current":17}
+{"_e":"metro:bundling:progress","_t":1791960118538,"id":"1","progress":0.25,"total":131,"current":19}
+{"_e":"metro:bundling:progress","_t":1791960118639,"id":"1","progress":0.25,"total":137,"current":23}
+{"_e":"metro:bundling:progress","_t":1791960118744,"id":"1","progress":0.25,"total":145,"current":25}
+{"_e":"metro:bundling:progress","_t":1791960118853,"id":"1","progress":0.25,"total":173,"current":32}
+{"_e":"metro:bundling:progress","_t":1791960118953,"id":"1","progress":0.25,"total":179,"current":36}
+{"_e":"metro:bundling:progress","_t":1791960119059,"id":"1","progress":0.25,"total":187,"current":39}
+{"_e":"metro:bundling:progress","_t":1791960119170,"id":"1","progress":0.25,"total":213,"current":46}
+{"_e":"metro:bundling:progress","_t":1791960119273,"id":"1","progress":0.25,"total":229,"current":55}
+{"_e":"metro:bundling:progress","_t":1791960119382,"id":"1","progress":0.25,"total":242,"current":66}
+{"_e":"metro:bundling:progress","_t":1791960119482,"id":"1","progress":0.25,"total":260,"current":83}
+{"_e":"metro:bundling:progress","_t":1791960119582,"id":"1","progress":0.25,"total":280,"current":97}
+{"_e":"metro:bundling:progress","_t":1791960119684,"id":"1","progress":0.25,"total":287,"current":117}
+{"_e":"metro:bundling:progress","_t":1791960119785,"id":"1","progress":0.25,"total":306,"current":140}
+{"_e":"metro:bundling:progress","_t":1791960119886,"id":"1","progress":0.25,"total":353,"current":151}
+{"_e":"metro:bundling:progress","_t":1791960119986,"id":"1","progress":0.25,"total":362,"current":160}
+{"_e":"metro:bundling:progress","_t":1791960120086,"id":"1","progress":0.25,"total":461,"current":167}
+{"_e":"metro:bundling:progress","_t":1791960120187,"id":"1","progress":0.25,"total":481,"current":182}
+{"_e":"metro:bundling:progress","_t":1791960120287,"id":"1","progress":0.25,"total":496,"current":205}
+{"_e":"metro:bundling:progress","_t":1791960120392,"id":"1","progress":0.25,"total":503,"current":221}
+{"_e":"metro:bundling:progress","_t":1791960120499,"id":"1","progress":0.25,"total":539,"current":233}
+{"_e":"metro:bundling:progress","_t":1791960120600,"id":"1","progress":0.25,"total":553,"current":255}
+{"_e":"metro:bundling:progress","_t":1791960120700,"id":"1","progress":0.25,"total":578,"current":275}
+{"_e":"metro:bundling:progress","_t":1791960120803,"id":"1","progress":0.25,"total":596,"current":295}
+{"_e":"metro:bundling:progress","_t":1791960120904,"id":"1","progress":0.2635111111111111,"total":600,"current":308}
+{"_e":"metro:bundling:progress","_t":1791960121006,"id":"1","progress":0.2756674087394072,"total":619,"current":325}
+{"_e":"metro:bundling:progress","_t":1791960121106,"id":"1","progress":0.2756674087394072,"total":679,"current":342}
+{"_e":"metro:bundling:progress","_t":1791960121207,"id":"1","progress":0.2756674087394072,"total":688,"current":355}
+{"_e":"metro:bundling:progress","_t":1791960121307,"id":"1","progress":0.27787959183673466,"total":700,"current":369}
+{"_e":"metro:bundling:progress","_t":1791960121407,"id":"1","progress":0.3221761555246975,"total":710,"current":403}
+{"_e":"metro:bundling:progress","_t":1791960121507,"id":"1","progress":0.40093446854532966,"total":717,"current":454}
+{"_e":"metro:bundling:progress","_t":1791960121608,"id":"1","progress":0.40093446854532966,"total":747,"current":471}
+{"_e":"metro:bundling:progress","_t":1791960121710,"id":"1","progress":0.4269138585101823,"total":753,"current":492}
+{"_e":"metro:bundling:progress","_t":1791960121823,"id":"1","progress":0.43752712673611116,"total":768,"current":508}
+{"_e":"metro:bundling:progress","_t":1791960121931,"id":"1","progress":0.43752712673611116,"total":854,"current":519}
+{"_e":"metro:bundling:progress","_t":1791960122032,"id":"1","progress":0.43752712673611116,"total":864,"current":537}
+{"_e":"metro:bundling:progress","_t":1791960122145,"id":"1","progress":0.43752712673611116,"total":867,"current":556}
+{"_e":"metro:bundling:progress","_t":1791960122248,"id":"1","progress":0.43752712673611116,"total":873,"current":573}
+{"_e":"metro:bundling:progress","_t":1791960122348,"id":"1","progress":0.4556634842789701,"total":877,"current":592}
+{"_e":"metro:bundling:progress","_t":1791960122448,"id":"1","progress":0.4746025368030958,"total":884,"current":609}
+{"_e":"metro:bundling:progress","_t":1791960122549,"id":"1","progress":0.484403599188496,"total":898,"current":625}
+{"_e":"metro:bundling:progress","_t":1791960122650,"id":"1","progress":0.5014761105396961,"total":908,"current":643}
+{"_e":"metro:bundling:progress","_t":1791960122754,"id":"1","progress":0.5124199490873844,"total":922,"current":660}
+{"_e":"metro:bundling:progress","_t":1791960122854,"id":"1","progress":0.5388353542731922,"total":925,"current":679}
+{"_e":"metro:bundling:progress","_t":1791960122954,"id":"1","progress":0.5388353542731922,"total":957,"current":692}
+{"_e":"metro:bundling:progress","_t":1791960123061,"id":"1","progress":0.5516156684027778,"total":960,"current":713}
+{"_e":"metro:bundling:progress","_t":1791960123161,"id":"1","progress":0.5706226385797836,"total":973,"current":735}
+{"_e":"metro:bundling:progress","_t":1791960123262,"id":"1","progress":0.5866908103214123,"total":987,"current":756}
+{"_e":"metro:bundling:progress","_t":1791960123363,"id":"1","progress":0.5951460352747598,"total":1002,"current":773}
+{"_e":"metro:bundling:progress","_t":1791960123464,"id":"1","progress":0.6125442217713758,"total":1003,"current":785}
+{"_e":"metro:bundling:progress","_t":1791960123565,"id":"1","progress":0.6289042350436871,"total":1005,"current":797}
+{"_e":"metro:bundling:progress","_t":1791960123665,"id":"1","progress":0.647010154341654,"total":1007,"current":810}
+{"_e":"metro:bundling:progress","_t":1791960123777,"id":"1","progress":0.6663228305535531,"total":1007,"current":822}
+{"_e":"metro:bundling:progress","_t":1791960123885,"id":"1","progress":0.6821354810242622,"total":1011,"current":835}
+{"_e":"metro:bundling:progress","_t":1791960123996,"id":"1","progress":0.7093161226069737,"total":1014,"current":854}
+{"_e":"metro:bundling:progress","_t":1791960124096,"id":"1","progress":0.7192757570902099,"total":1027,"current":871}
+{"_e":"metro:bundling:progress","_t":1791960124199,"id":"1","progress":0.7276532485113238,"total":1041,"current":888}
+{"_e":"metro:bundling:progress","_t":1791960124300,"id":"1","progress":0.7583159726196744,"total":1045,"current":910}
+{"_e":"metro:bundling:progress","_t":1791960124403,"id":"1","progress":0.7811192743764173,"total":1050,"current":928}
+{"_e":"metro:bundling:progress","_t":1791960124511,"id":"1","progress":0.8259754385110509,"total":1053,"current":957}
+{"_e":"metro:bundling:progress","_t":1791960124613,"id":"1","progress":0.8304637759243131,"total":1071,"current":976}
+{"_e":"metro:bundling:progress","_t":1791960124713,"id":"1","progress":0.8310185891761546,"total":1086,"current":990}
+{"_e":"metro:bundling:progress","_t":1791960124822,"id":"1","progress":0.8549449881055364,"total":1088,"current":1006}
+{"_e":"metro:bundling:progress","_t":1791960124922,"id":"1","progress":0.8609128250036489,"total":1095,"current":1016}
+{"_e":"metro:bundling:progress","_t":1791960125027,"id":"1","progress":0.8733752066115703,"total":1100,"current":1028}
+{"_e":"metro:bundling:progress","_t":1791960125128,"id":"1","progress":0.8797495277159568,"total":1112,"current":1043}
+{"_e":"metro:bundling:progress","_t":1791960125227,"id":"1","progress":0.8797495277159568,"total":1178,"current":1060}
+{"_e":"metro:bundling:progress","_t":1791960125327,"id":"1","progress":0.8797495277159568,"total":1200,"current":1079}
+{"_e":"metro:bundling:progress","_t":1791960125439,"id":"1","progress":0.8797495277159568,"total":1232,"current":1090}
+{"_e":"metro:bundling:progress","_t":1791960125538,"id":"1","progress":0.8797495277159568,"total":1244,"current":1106}
+{"_e":"metro:bundling:progress","_t":1791960125642,"id":"1","progress":0.8797495277159568,"total":1263,"current":1123}
+{"_e":"metro:bundling:progress","_t":1791960125747,"id":"1","progress":0.8797495277159568,"total":1271,"current":1135}
+{"_e":"metro:bundling:progress","_t":1791960125857,"id":"1","progress":0.8797495277159568,"total":1302,"current":1151}
+{"_e":"metro:bundling:progress","_t":1791960125959,"id":"1","progress":0.8797495277159568,"total":1336,"current":1169}
+{"_e":"metro:bundling:progress","_t":1791960126059,"id":"1","progress":0.8797495277159568,"total":1349,"current":1185}
+{"_e":"metro:bundling:progress","_t":1791960126160,"id":"1","progress":0.8797495277159568,"total":1361,"current":1199}
+{"_e":"metro:bundling:progress","_t":1791960126264,"id":"1","progress":0.8797495277159568,"total":1363,"current":1214}
+{"_e":"metro:bundling:progress","_t":1791960126367,"id":"1","progress":0.8797495277159568,"total":1365,"current":1225}
+{"_e":"metro:bundling:progress","_t":1791960126468,"id":"1","progress":0.8797495277159568,"total":1367,"current":1238}
+{"_e":"metro:bundling:progress","_t":1791960126569,"id":"1","progress":0.8797495277159568,"total":1367,"current":1247}
+{"_e":"metro:bundling:progress","_t":1791960126746,"id":"1","progress":0.8797495277159568,"total":1370,"current":1258}
+{"_e":"metro:bundling:progress","_t":1791960126847,"id":"1","progress":0.8797495277159568,"total":1385,"current":1278}
+{"_e":"metro:bundling:progress","_t":1791960126948,"id":"1","progress":0.8797495277159568,"total":1404,"current":1300}
+{"_e":"metro:bundling:progress","_t":1791960127050,"id":"1","progress":0.8797495277159568,"total":1417,"current":1321}
+{"_e":"metro:bundling:progress","_t":1791960127150,"id":"1","progress":0.8797495277159568,"total":1441,"current":1337}
+{"_e":"metro:bundling:progress","_t":1791960127250,"id":"1","progress":0.8797495277159568,"total":1454,"current":1359}
+{"_e":"metro:bundling:progress","_t":1791960127351,"id":"1","progress":0.8919032865738449,"total":1457,"current":1376}
+{"_e":"metro:bundling:progress","_t":1791960127461,"id":"1","progress":0.8993382600662434,"total":1471,"current":1395}
+{"_e":"metro:bundling:progress","_t":1791960127558,"id":"1","progress":0.9127994886778671,"total":1480,"current":1414}
+{"_e":"metro:bundling:progress","_t":1791960127664,"id":"1","progress":0.9166768626734844,"total":1480,"current":1417}
+{"_e":"metro:bundling:progress","_t":1791960127768,"id":"1","progress":0.9171151469823101,"total":1488,"current":1425}
+{"_e":"metro:bundling:progress","_t":1791960127868,"id":"1","progress":0.9326707924375801,"total":1489,"current":1438}
+{"_e":"metro:bundling:progress","_t":1791960127968,"id":"1","progress":0.9510818821918643,"total":1494,"current":1457}
+{"_e":"metro:bundling:progress","_t":1791960128073,"id":"1","progress":0.9631368307193077,"total":1505,"current":1477}
+{"_e":"metro:bundling:progress","_t":1791960128174,"id":"1","progress":0.9724873991409139,"total":1516,"current":1495}
+{"_e":"metro:bundling:progress","_t":1791960128287,"id":"1","progress":0.9724873991409139,"total":1554,"current":1519}
+{"_e":"metro:bundling:progress","_t":1791960128387,"id":"1","progress":0.9724873991409139,"total":1573,"current":1546}
+{"_e":"metro:bundling:progress","_t":1791960128487,"id":"1","progress":0.9724873991409139,"total":1596,"current":1561}
+{"_e":"metro:bundling:progress","_t":1791960128620,"id":"1","progress":0.9724873991409139,"total":1610,"current":1573}
+{"_e":"metro:bundling:progress","_t":1791960128730,"id":"1","progress":0.9724873991409139,"total":1619,"current":1595}
+{"_e":"metro:bundling:progress","_t":1791960128830,"id":"1","progress":0.9987680937418022,"total":1623,"current":1622}
+{"_e":"metro:bundling:progress","_t":1791960128941,"id":"1","progress":0.999,"total":1623,"current":1623}
+{"_e":"metro:bundling:done","_t":1791960129115,"id":"1","total":1623,"ms":12349.4353}
+{"_e":"metro:client_log","_t":1791960132172,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791960132172,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791960132859,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:client_log","_t":1791960174935,"level":"error","data":["Erreur lors de la création du souvenir","[Error: Unsupported FormDataPart implementation]"]}
+{"_e":"metro:client_log","_t":1791960181659,"level":"error","data":["Erreur lors de la création du souvenir","[Error: Unsupported FormDataPart implementation]"]}
+{"_e":"metro:client_log","_t":1791960197419,"level":"error","data":["Erreur lors de la création du souvenir","[Error: Unsupported FormDataPart implementation]"]}
+{"_e":"metro:bundling:started","_t":1791960300921,"id":"6","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791960300921,"id":"6","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791960300964,"id":"6","total":1,"ms":42.6814}
+{"_e":"metro:client_log","_t":1791960304330,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791960304330,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791960304456,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:client_log","_t":1791960444749,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:bundling:started","_t":1791960505581,"id":"9","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791960505581,"id":"9","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791960505614,"id":"9","total":1,"ms":32.8581}
+{"_e":"metro:client_log","_t":1791960508996,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791960508997,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791960509045,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1791960522752,"id":"b","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791960522752,"id":"b","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791960522781,"id":"b","total":1,"ms":28.1503}
+{"_e":"metro:client_log","_t":1791960526121,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791960526121,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791960526266,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1791960537316,"id":"e","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791960537316,"id":"e","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791960537348,"id":"e","total":1,"ms":32.2526}
+{"_e":"metro:client_log","_t":1791960540645,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791960540645,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791960540770,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1791960566432,"id":"g","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791960566432,"id":"g","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791960566466,"id":"g","total":1,"ms":34.3909}
+{"_e":"metro:client_log","_t":1791960569890,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791960569890,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791960570023,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1791960578062,"id":"i","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791960578062,"id":"i","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791960578095,"id":"i","total":1,"ms":32.5724}
+{"_e":"metro:client_log","_t":1791960581467,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791960581467,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791960581531,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1791961022222,"id":"k","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791961022222,"id":"k","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791961022256,"id":"k","total":1,"ms":34.8257}
+{"_e":"metro:client_log","_t":1791961026962,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791961026962,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791961027105,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1791961057379,"id":"n","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791961057380,"id":"n","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791961057418,"id":"n","total":1,"ms":38.4362}
+{"_e":"metro:client_log","_t":1791961060715,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791961060715,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791961060842,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1791961358582,"id":"q","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791961358582,"id":"q","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791961358617,"id":"q","total":1,"ms":34.9919}
+{"_e":"metro:client_log","_t":1791961361964,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791961361964,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791961362143,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"root:init","_t":1791961390901,"format":"v0-jsonl","version":"57.0.28"}
+{"_e":"env:mode","_t":1791961390901,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1791961390904,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1791961391265,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1791961391538,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1791961391781,"plugins":[]}
+{"_e":"metro:instantiate","_t":1791961399144,"atlas":false,"workers":8,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1791961439210,"id":"1","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791961439210,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791961439214,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791961439315,"id":"1","progress":0.007488905325443786,"total":208,"current":18}
+{"_e":"metro:bundling:progress","_t":1791961439422,"id":"1","progress":0.05021616489733149,"total":357,"current":80}
+{"_e":"metro:bundling:progress","_t":1791961439522,"id":"1","progress":0.1145562130177515,"total":455,"current":154}
+{"_e":"metro:bundling:progress","_t":1791961439622,"id":"1","progress":0.32287518531444537,"total":579,"current":329}
+{"_e":"metro:bundling:progress","_t":1791961439722,"id":"1","progress":0.3399294002446583,"total":837,"current":488}
+{"_e":"metro:bundling:progress","_t":1791961439822,"id":"1","progress":0.4566171064020243,"total":919,"current":621}
+{"_e":"metro:bundling:progress","_t":1791961439922,"id":"1","progress":0.6580272873979167,"total":1001,"current":812}
+{"_e":"metro:bundling:progress","_t":1791961440022,"id":"1","progress":0.8101620243032404,"total":1111,"current":1000}
+{"_e":"metro:bundling:progress","_t":1791961440122,"id":"1","progress":0.8101620243032404,"total":1241,"current":1101}
+{"_e":"metro:bundling:progress","_t":1791961440222,"id":"1","progress":0.8365233381014114,"total":1382,"current":1264}
+{"_e":"metro:bundling:progress","_t":1791961440322,"id":"1","progress":0.9222710898658804,"total":1488,"current":1429}
+{"_e":"metro:bundling:progress","_t":1791961440434,"id":"1","progress":0.9709703115470901,"total":1573,"current":1550}
+{"_e":"metro:bundling:done","_t":1791961440530,"id":"1","total":1573,"ms":1320.2729}
+{"_e":"metro:client_log","_t":1791961443316,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791961443316,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791961443456,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1791961935723,"id":"3","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791961935724,"id":"3","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791961935763,"id":"3","total":1,"ms":39.7157}
+{"_e":"metro:client_log","_t":1791961940228,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791961940228,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791961940370,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1791962456995,"id":"5","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791962456995,"id":"5","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962456999,"id":"5","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962457143,"id":"5","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962457144,"id":"5","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962457244,"id":"5","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962457344,"id":"5","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962457445,"id":"5","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962457545,"id":"5","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962457645,"id":"5","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962457745,"id":"5","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962457851,"id":"5","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962457951,"id":"5","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962458086,"id":"5","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962458739,"id":"5","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791962458804,"id":"5","total":1,"ms":1808.9744}
+{"_e":"metro:client_log","_t":1791962461745,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791962461745,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791962461883,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1791962494514,"id":"7","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791962494514,"id":"7","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791962494542,"id":"7","total":1,"ms":27.8082}
+{"_e":"metro:client_log","_t":1791962498976,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791962498976,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791962499115,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:client_log","_t":1791962522725,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1791962522932,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1791962524838,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1791962524839,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:bundling:started","_t":1791962705022,"id":"b","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791962705022,"id":"b","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962705024,"id":"b","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962705127,"id":"b","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962705227,"id":"b","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962705327,"id":"b","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962705428,"id":"b","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962705528,"id":"b","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962705628,"id":"b","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962705728,"id":"b","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962705828,"id":"b","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962705928,"id":"b","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791962706041,"id":"b","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791962706159,"id":"b","total":1,"ms":1137.0499}
+{"_e":"metro:client_log","_t":1791962709066,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791962709066,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791962709199,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:server_log","_t":1791963277407,"level":"error","data":["[timeout] connection terminated with Device for app='%s' on device='%s' after not responding for %s seconds.","com.sophiehorner.echoes","SM-A336B - 16 - API 36","60"]}
+{"_e":"root:init","_t":1791963996431,"format":"v0-jsonl","version":"57.0.28"}
+{"_e":"env:mode","_t":1791963996432,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1791963996434,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1791963996779,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1791963997041,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1791963997276,"plugins":[]}
+{"_e":"metro:instantiate","_t":1791964013534,"atlas":false,"workers":8,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1791964057467,"id":"1","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791964057467,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791964057471,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791964057571,"id":"1","progress":0.01061524334251607,"total":330,"current":34}
+{"_e":"metro:bundling:progress","_t":1791964057671,"id":"1","progress":0.09994671117456616,"total":446,"current":141}
+{"_e":"metro:bundling:progress","_t":1791964057771,"id":"1","progress":0.2718240923369129,"total":702,"current":366}
+{"_e":"metro:bundling:progress","_t":1791964057871,"id":"1","progress":0.40010302326695063,"total":879,"current":556}
+{"_e":"metro:bundling:progress","_t":1791964057971,"id":"1","progress":0.5721366244503834,"total":977,"current":739}
+{"_e":"metro:bundling:progress","_t":1791964058071,"id":"1","progress":0.8065641608178831,"total":1099,"current":987}
+{"_e":"metro:bundling:progress","_t":1791964058171,"id":"1","progress":0.8065641608178831,"total":1330,"current":1161}
+{"_e":"metro:bundling:progress","_t":1791964058271,"id":"1","progress":0.8871759962884904,"total":1463,"current":1378}
+{"_e":"metro:bundling:progress","_t":1791964058387,"id":"1","progress":0.9636508170834799,"total":1581,"current":1552}
+{"_e":"metro:bundling:done","_t":1791964058469,"id":"1","total":1581,"ms":1002.2056}
+{"_e":"metro:client_log","_t":1791964061439,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791964061439,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791964062032,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1791964099779,"id":"3","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791964099779,"id":"3","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791964099815,"id":"3","total":1,"ms":35.9944}
+{"_e":"metro:client_log","_t":1791964101994,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791964101994,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:bundling:started","_t":1791964109323,"id":"4","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791964109324,"id":"4","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791964109356,"id":"4","total":1,"ms":32.1448}
+{"_e":"metro:client_log","_t":1791964112711,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791964112711,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791964112835,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:client_log","_t":1791964129412,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:bundling:started","_t":1791964317419,"id":"6","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791964317419,"id":"6","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791964317421,"id":"6","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791964317521,"id":"6","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791964317620,"id":"6","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791964317720,"id":"6","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791964317824,"id":"6","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791964317924,"id":"6","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791964318025,"id":"6","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791964318125,"id":"6","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791964318225,"id":"6","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791964318325,"id":"6","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791964318425,"id":"6","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791964318531,"id":"6","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791964319314,"id":"6","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791964319405,"id":"6","total":1,"ms":1986.157}
+{"_e":"metro:client_log","_t":1791964322791,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791964322791,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791964323663,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1791964328344,"id":"8","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791964328344,"id":"8","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791964328375,"id":"8","total":1,"ms":30.8287}
+{"_e":"metro:client_log","_t":1791964331927,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791964331927,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791964332273,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:client_log","_t":1791964413337,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:client_log","_t":1791964422114,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:client_log","_t":1791964593914,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:client_log","_t":1791964598983,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:bundling:started","_t":1791964618704,"id":"a","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791964618704,"id":"a","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791964618705,"id":"a","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791964618849,"id":"a","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791964618886,"id":"a","total":1,"ms":181.9365}
+{"_e":"metro:client_log","_t":1791964622329,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791964622329,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791964622450,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:client_log","_t":1791964639752,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:client_log","_t":1791964644891,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:client_log","_t":1791964665559,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:client_log","_t":1791964736089,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:client_log","_t":1791964739755,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:server_log","_t":1791964947419,"level":"error","data":["[timeout] connection terminated with Device for app='%s' on device='%s' after not responding for %s seconds.","com.sophiehorner.echoes","SM-A336B - 16 - API 36","60"]}
+{"_e":"metro:client_log","_t":1791964950512,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:client_log","_t":1791964954065,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:client_log","_t":1791964958235,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:bundling:started","_t":1791965859731,"id":"d","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791965859731,"id":"d","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791965859765,"id":"d","total":1,"ms":33.8748}
+{"_e":"metro:client_log","_t":1791965863337,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791965863337,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791965863516,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:client_log","_t":1791965867528,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:client_log","_t":1791965897867,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:bundling:started","_t":1791965903390,"id":"f","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791965903390,"id":"f","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791965903433,"id":"f","total":1,"ms":43.0549}
+{"_e":"metro:client_log","_t":1791965906722,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791965906722,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791965906846,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:client_log","_t":1791965910093,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:client_log","_t":1791965916304,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:client_log","_t":1791965919067,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1791965919070,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1791965919113,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1791965919312,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1791965919320,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1791965919547,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1791965927722,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1791965930309,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:client_log","_t":1791965934106,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:server_log","_t":1791966211986,"level":"error","data":["[timeout] connection terminated with Device for app='%s' on device='%s' after not responding for %s seconds.","com.sophiehorner.echoes","SM-A336B - 16 - API 36","60"]}
+{"_e":"root:init","_t":1791966986011,"format":"v0-jsonl","version":"57.0.28"}
+{"_e":"env:mode","_t":1791966986012,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1791966986014,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1791966986443,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1791966986819,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1791966987080,"plugins":[]}
+{"_e":"metro:instantiate","_t":1791966994361,"atlas":false,"workers":8,"host":"::","port":8081}
+{"_e":"root:init","_t":1791967028307,"format":"v0-jsonl","version":"57.0.28"}
+{"_e":"env:mode","_t":1791967028308,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1791967028310,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1791967028655,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1791967028917,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1791967029234,"plugins":[]}
+{"_e":"metro:instantiate","_t":1791967036897,"atlas":false,"workers":8,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1791967039325,"id":"1","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791967039325,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791967039328,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791967039432,"id":"1","progress":0.006944444444444444,"total":204,"current":17}
+{"_e":"metro:bundling:progress","_t":1791967039533,"id":"1","progress":0.04183884297520662,"total":352,"current":72}
+{"_e":"metro:bundling:progress","_t":1791967039635,"id":"1","progress":0.061879656444147425,"total":402,"current":100}
+{"_e":"metro:bundling:progress","_t":1791967039735,"id":"1","progress":0.10194640144345406,"total":451,"current":144}
+{"_e":"metro:bundling:progress","_t":1791967039839,"id":"1","progress":0.155236,"total":500,"current":197}
+{"_e":"metro:bundling:progress","_t":1791967039939,"id":"1","progress":0.34773978789114846,"total":524,"current":309}
+{"_e":"metro:bundling:progress","_t":1791967040039,"id":"1","progress":0.34773978789114846,"total":690,"current":352}
+{"_e":"metro:bundling:progress","_t":1791967040140,"id":"1","progress":0.34773978789114846,"total":747,"current":405}
+{"_e":"metro:bundling:progress","_t":1791967040240,"id":"1","progress":0.34773978789114846,"total":814,"current":454}
+{"_e":"metro:bundling:progress","_t":1791967040342,"id":"1","progress":0.3523179447693704,"total":839,"current":498}
+{"_e":"metro:bundling:progress","_t":1791967040442,"id":"1","progress":0.3934972329770222,"total":872,"current":547}
+{"_e":"metro:bundling:progress","_t":1791967040542,"id":"1","progress":0.4157783152676999,"total":915,"current":590}
+{"_e":"metro:bundling:progress","_t":1791967040642,"id":"1","progress":0.4580888769431693,"total":919,"current":622}
+{"_e":"metro:bundling:progress","_t":1791967040745,"id":"1","progress":0.49835967859751645,"total":925,"current":653}
+{"_e":"metro:bundling:progress","_t":1791967040845,"id":"1","progress":0.5336686980609419,"total":950,"current":694}
+{"_e":"metro:bundling:progress","_t":1791967040946,"id":"1","progress":0.565959756068176,"total":977,"current":735}
+{"_e":"metro:bundling:progress","_t":1791967041047,"id":"1","progress":0.6168925896179251,"total":988,"current":776}
+{"_e":"metro:bundling:progress","_t":1791967041147,"id":"1","progress":0.6729893506400373,"total":1002,"current":822}
+{"_e":"metro:bundling:progress","_t":1791967041251,"id":"1","progress":0.7537474916043027,"total":1009,"current":876}
+{"_e":"metro:bundling:progress","_t":1791967041355,"id":"1","progress":0.7744,"total":1050,"current":924}
+{"_e":"metro:bundling:progress","_t":1791967041455,"id":"1","progress":0.78467622410115,"total":1086,"current":962}
+{"_e":"metro:bundling:progress","_t":1791967041557,"id":"1","progress":0.8134059130485507,"total":1111,"current":1002}
+{"_e":"metro:bundling:progress","_t":1791967041657,"id":"1","progress":0.8134059130485507,"total":1176,"current":1046}
+{"_e":"metro:bundling:progress","_t":1791967041757,"id":"1","progress":0.8134059130485507,"total":1237,"current":1090}
+{"_e":"metro:bundling:progress","_t":1791967041857,"id":"1","progress":0.8134059130485507,"total":1297,"current":1133}
+{"_e":"metro:bundling:progress","_t":1791967041957,"id":"1","progress":0.8134059130485507,"total":1330,"current":1179}
+{"_e":"metro:bundling:progress","_t":1791967042058,"id":"1","progress":0.8134059130485507,"total":1355,"current":1213}
+{"_e":"metro:bundling:progress","_t":1791967042158,"id":"1","progress":0.8320934822769585,"total":1378,"current":1257}
+{"_e":"metro:bundling:progress","_t":1791967042258,"id":"1","progress":0.8393171859411327,"total":1431,"current":1311}
+{"_e":"metro:bundling:progress","_t":1791967042359,"id":"1","progress":0.8719695600475623,"total":1450,"current":1354}
+{"_e":"metro:bundling:progress","_t":1791967042460,"id":"1","progress":0.8937452058369773,"total":1483,"current":1402}
+{"_e":"metro:bundling:progress","_t":1791967042560,"id":"1","progress":0.932626333246618,"total":1488,"current":1437}
+{"_e":"metro:bundling:progress","_t":1791967042660,"id":"1","progress":0.9646045918367346,"total":1512,"current":1485}
+{"_e":"metro:bundling:progress","_t":1791967042760,"id":"1","progress":0.9646045918367346,"total":1567,"current":1537}
+{"_e":"metro:bundling:progress","_t":1791967042863,"id":"1","progress":0.9741310623656443,"total":1613,"current":1592}
+{"_e":"metro:bundling:progress","_t":1791967042965,"id":"1","progress":0.999,"total":1623,"current":1623}
+{"_e":"metro:bundling:done","_t":1791967043006,"id":"1","total":1623,"ms":3680.8911}
+{"_e":"metro:client_log","_t":1791967046856,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791967046856,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791967047036,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:client_log","_t":1791967059715,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:bundling:started","_t":1791967462942,"id":"4","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791967462942,"id":"4","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791967462978,"id":"4","total":1,"ms":36.4844}
+{"_e":"metro:client_log","_t":1791967466367,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791967466367,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791967466483,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:server_log","_t":1791967690911,"level":"error","data":["[timeout] connection terminated with Device for app='%s' on device='%s' after not responding for %s seconds.","com.sophiehorner.echoes","SM-A336B - 16 - API 36","60"]}
+{"_e":"metro:bundling:started","_t":1791968071527,"id":"6","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791968071527,"id":"6","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791968071562,"id":"6","total":1,"ms":34.217}
+{"_e":"metro:client_log","_t":1791968074926,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791968074926,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791968075056,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:client_log","_t":1791968117533,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:client_log","_t":1791968154939,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:server_log","_t":1791968363999,"level":"error","data":["[timeout] connection terminated with Device for app='%s' on device='%s' after not responding for %s seconds.","com.sophiehorner.echoes","SM-A336B - 16 - API 36","60"]}
+{"_e":"root:init","_t":1791969621230,"format":"v0-jsonl","version":"57.0.28"}
+{"_e":"env:mode","_t":1791969621231,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1791969621234,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1791969621610,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1791969621882,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1791969622180,"plugins":[]}
+{"_e":"metro:instantiate","_t":1791969635999,"atlas":false,"workers":8,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1791969963144,"id":"1","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791969963144,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791969963147,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791969963249,"id":"1","progress":0.02028968361276366,"total":344,"current":49}
+{"_e":"metro:bundling:progress","_t":1791969963347,"id":"1","progress":0.10363107524863953,"total":438,"current":141}
+{"_e":"metro:bundling:progress","_t":1791969963447,"id":"1","progress":0.24345482958869338,"total":683,"current":337}
+{"_e":"metro:bundling:progress","_t":1791969963547,"id":"1","progress":0.3703270591874724,"total":866,"current":527}
+{"_e":"metro:bundling:progress","_t":1791969963648,"id":"1","progress":0.5473216654710547,"total":957,"current":708}
+{"_e":"metro:bundling:progress","_t":1791969963748,"id":"1","progress":0.7588996382866873,"total":1071,"current":933}
+{"_e":"metro:bundling:progress","_t":1791969963848,"id":"1","progress":0.7937709685281564,"total":1247,"current":1111}
+{"_e":"metro:bundling:progress","_t":1791969963948,"id":"1","progress":0.855141618812903,"total":1435,"current":1327}
+{"_e":"metro:bundling:progress","_t":1791969964048,"id":"1","progress":0.9620329473271743,"total":1513,"current":1484}
+{"_e":"metro:bundling:done","_t":1791969964177,"id":"1","total":1513,"ms":1033.7994}
+{"_e":"metro:client_log","_t":1791969967296,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791969967296,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791969967869,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1791970268259,"id":"3","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791970268259,"id":"3","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791970268294,"id":"3","total":1,"ms":35.7453}
+{"_e":"metro:client_log","_t":1791970271646,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791970271646,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791970271715,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:client_log","_t":1791970298026,"level":"error","data":["Erreur de validation du serveur","{\"message\": \"Server Error\"}"]}
+{"_e":"metro:client_log","_t":1791970298069,"level":"error","data":["Erreur lors de la création du souvenir","[Error: Server Error]"]}
+{"_e":"metro:server_log","_t":1791970494279,"level":"error","data":["[timeout] connection terminated with Device for app='%s' on device='%s' after not responding for %s seconds.","com.sophiehorner.echoes","SM-A336B - 16 - API 36","60"]}
+{"_e":"metro:client_log","_t":1791971284090,"level":"error","data":["Erreur de validation du serveur","{\"message\": \"Server Error\"}"]}
+{"_e":"metro:client_log","_t":1791971284099,"level":"error","data":["Erreur lors de la création du souvenir","[Error: Server Error]"]}
+{"_e":"metro:bundling:started","_t":1791971299561,"id":"8","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791971299561,"id":"8","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791971299595,"id":"8","total":1,"ms":33.4507}
+{"_e":"metro:client_log","_t":1791971303589,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791971303589,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791971304258,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:client_log","_t":1791971407171,"level":"error","data":["Erreur de validation du serveur","{\"message\": \"Server Error\"}"]}
+{"_e":"metro:client_log","_t":1791971407212,"level":"error","data":["Erreur lors de la création du souvenir","[Error: Server Error]"]}
+{"_e":"metro:client_log","_t":1791971575544,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1791971575548,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1791971575548,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1791971852911,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:client_log","_t":1791971856602,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}

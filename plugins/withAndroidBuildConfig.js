@@ -1,9 +1,34 @@
-const { withAppBuildGradle, withGradleProperties } = require('expo/config-plugins');
+const {
+  withAppBuildGradle,
+  withGradleProperties,
+  withSettingsGradle,
+} = require('expo/config-plugins');
 
 const GRADLE_MEMORY = '-Xmx6g -XX:MaxMetaspaceSize=1024m';
 const SIGNING_MARKER = '// echoes-release-signing';
+const LOCAL_PROPERTIES_COPY_MARKER = '// echoes-copy-root-local-properties';
+
+const localPropertiesCopy = `${LOCAL_PROPERTIES_COPY_MARKER}
+def echoesRootLocalProperties = new File(settingsDir.parentFile, 'local.properties')
+if (echoesRootLocalProperties.isFile()) {
+    java.nio.file.Files.copy(
+        echoesRootLocalProperties.toPath(),
+        new File(settingsDir, 'local.properties').toPath(),
+        java.nio.file.StandardCopyOption.REPLACE_EXISTING
+    )
+}
+`;
 
 function withAndroidBuildConfig(config) {
+  config = withSettingsGradle(config, (modConfig) => {
+    let contents = modConfig.modResults.contents;
+    if (!contents.includes(LOCAL_PROPERTIES_COPY_MARKER)) {
+      contents = `${contents.trimEnd()}\n\n${localPropertiesCopy}`;
+    }
+    modConfig.modResults.contents = contents;
+    return modConfig;
+  });
+
   config = withGradleProperties(config, (config) => {
     config.modResults = config.modResults.filter(
       (property) => property.key !== 'org.gradle.jvmargs',
