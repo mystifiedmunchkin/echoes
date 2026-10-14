@@ -36,7 +36,7 @@ jobs:
       run: |
         {
           echo "MYAPP_UPLOAD_STORE_FILE=upload.keystore"
-          echo "MYAPP_UPLOAD_STORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD"
+          echo "MYAPP_UPLOAD_STORE_PASSWORD=$ANDROID_STORE_PASSWORD"
           echo "MYAPP_UPLOAD_KEY_ALIAS=$ANDROID_KEY_ALIAS"
           echo "MYAPP_UPLOAD_KEY_PASSWORD=$ANDROID_KEY_PASSWORD"
         } >> android/local.properties
