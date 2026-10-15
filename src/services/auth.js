@@ -51,7 +51,7 @@ export async function logout() {
       headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
     }).catch(() => null);
   }
-  await AsyncStorage.removeMany([TOKEN_KEY, USER_KEY]);
+  await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
 }
 
 export async function getAuthToken() {

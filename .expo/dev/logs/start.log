@@ -497,3 +497,187 @@
 {"_e":"metro:client_log","_t":1791971575548,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
 {"_e":"metro:client_log","_t":1791971852911,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
 {"_e":"metro:client_log","_t":1791971856602,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:client_log","_t":1791972218395,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:client_log","_t":1791972445326,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:client_log","_t":1791972455168,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:client_log","_t":1791972479696,"level":"warn","data":["Impossible de préparer les médias du souvenir","[Error: Téléchargement du fichier refusé (404)]"]}
+{"_e":"metro:bundling:started","_t":1791972494033,"id":"c","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1791972494033,"id":"c","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791972494069,"id":"c","total":1,"ms":36.1342}
+{"_e":"metro:client_log","_t":1791972497858,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1791972497858,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1791972498031,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:client_log","_t":1791972524870,"level":"warn","data":["MapLibre warning","Request failed due to a permanent error: stream was reset: CANCEL ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: stream was reset: CANCEL \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1791972525437,"level":"warn","data":["MapLibre warning","Request failed due to a permanent error: stream was reset: CANCEL ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: stream was reset: CANCEL \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"root:init","_t":1792067274944,"format":"v0-jsonl","version":"57.0.28"}
+{"_e":"devserver:start","_t":1792067274997,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1792067275978,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1792067276636,"plugins":[]}
+{"_e":"metro:instantiate","_t":1792067288379,"atlas":false,"workers":8,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1792067297582,"id":"1","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1792067297583,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1792067297588,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1792067298300,"id":"1","progress":0.010000000000000002,"total":1,"current":1}
+{"_e":"metro:bundling:progress","_t":1792067298405,"id":"1","progress":0.010000000000000002,"total":4,"current":1}
+{"_e":"metro:bundling:progress","_t":1792067298975,"id":"1","progress":0.04000000000000001,"total":4,"current":2}
+{"_e":"metro:bundling:progress","_t":1792067299084,"id":"1","progress":0.04000000000000001,"total":33,"current":3}
+{"_e":"metro:bundling:progress","_t":1792067299275,"id":"1","progress":0.04000000000000001,"total":33,"current":4}
+{"_e":"metro:bundling:progress","_t":1792067299383,"id":"1","progress":0.04000000000000001,"total":39,"current":5}
+{"_e":"metro:bundling:progress","_t":1792067299493,"id":"1","progress":0.04000000000000001,"total":40,"current":7}
+{"_e":"metro:bundling:progress","_t":1792067299605,"id":"1","progress":0.04000000000000001,"total":41,"current":8}
+{"_e":"metro:bundling:progress","_t":1792067299701,"id":"1","progress":0.04818560380725759,"total":41,"current":9}
+{"_e":"metro:bundling:progress","_t":1792067299802,"id":"1","progress":0.04818560380725759,"total":163,"current":10}
+{"_e":"metro:bundling:progress","_t":1792067299895,"id":"1","progress":0.04818560380725759,"total":163,"current":11}
+{"_e":"metro:bundling:progress","_t":1792067300002,"id":"1","progress":0.04818560380725759,"total":163,"current":12}
+{"_e":"metro:bundling:progress","_t":1792067300061,"id":"1","progress":0.04818560380725759,"total":163,"current":13}
+{"_e":"metro:bundling:progress","_t":1792067300162,"id":"1","progress":0.04818560380725759,"total":165,"current":16}
+{"_e":"metro:bundling:progress","_t":1792067300268,"id":"1","progress":0.04818560380725759,"total":169,"current":19}
+{"_e":"metro:bundling:progress","_t":1792067300355,"id":"1","progress":0.04818560380725759,"total":169,"current":20}
+{"_e":"metro:bundling:progress","_t":1792067300493,"id":"1","progress":0.04818560380725759,"total":180,"current":27}
+{"_e":"metro:bundling:progress","_t":1792067300595,"id":"1","progress":0.04818560380725759,"total":187,"current":32}
+{"_e":"metro:bundling:progress","_t":1792067300723,"id":"1","progress":0.04818560380725759,"total":196,"current":36}
+{"_e":"metro:bundling:progress","_t":1792067300839,"id":"1","progress":0.04818560380725759,"total":348,"current":42}
+{"_e":"metro:bundling:progress","_t":1792067300945,"id":"1","progress":0.04818560380725759,"total":360,"current":55}
+{"_e":"metro:bundling:progress","_t":1792067301046,"id":"1","progress":0.05975308641975308,"total":360,"current":88}
+{"_e":"metro:bundling:progress","_t":1792067301146,"id":"1","progress":0.12572033670705413,"total":361,"current":128}
+{"_e":"metro:bundling:progress","_t":1792067301248,"id":"1","progress":0.14760670878839402,"total":367,"current":141}
+{"_e":"metro:bundling:progress","_t":1792067301348,"id":"1","progress":0.16346873388016653,"total":371,"current":150}
+{"_e":"metro:bundling:progress","_t":1792067301476,"id":"1","progress":0.16346873388016653,"total":399,"current":155}
+{"_e":"metro:bundling:progress","_t":1792067301576,"id":"1","progress":0.16346873388016653,"total":409,"current":165}
+{"_e":"metro:bundling:progress","_t":1792067301676,"id":"1","progress":0.17081826439706388,"total":421,"current":174}
+{"_e":"metro:bundling:progress","_t":1792067301792,"id":"1","progress":0.19140625,"total":432,"current":189}
+{"_e":"metro:bundling:progress","_t":1792067301892,"id":"1","progress":0.19981311983690458,"total":434,"current":194}
+{"_e":"metro:bundling:progress","_t":1792067301992,"id":"1","progress":0.20528986379988373,"total":437,"current":198}
+{"_e":"metro:bundling:progress","_t":1792067302103,"id":"1","progress":0.2101552834238101,"total":445,"current":204}
+{"_e":"metro:bundling:progress","_t":1792067302230,"id":"1","progress":0.2101552834238101,"total":459,"current":210}
+{"_e":"metro:bundling:progress","_t":1792067302331,"id":"1","progress":0.2101552834238101,"total":554,"current":215}
+{"_e":"metro:bundling:progress","_t":1792067302435,"id":"1","progress":0.2101552834238101,"total":556,"current":218}
+{"_e":"metro:bundling:progress","_t":1792067302467,"id":"1","progress":0.2101552834238101,"total":556,"current":219}
+{"_e":"metro:bundling:progress","_t":1792067302568,"id":"1","progress":0.2101552834238101,"total":560,"current":228}
+{"_e":"metro:bundling:progress","_t":1792067302668,"id":"1","progress":0.2101552834238101,"total":573,"current":238}
+{"_e":"metro:bundling:progress","_t":1792067302771,"id":"1","progress":0.2101552834238101,"total":597,"current":251}
+{"_e":"metro:bundling:progress","_t":1792067302871,"id":"1","progress":0.2101552834238101,"total":609,"current":266}
+{"_e":"metro:bundling:progress","_t":1792067302972,"id":"1","progress":0.2101552834238101,"total":626,"current":282}
+{"_e":"metro:bundling:progress","_t":1792067303072,"id":"1","progress":0.22406422892856795,"total":638,"current":302}
+{"_e":"metro:bundling:progress","_t":1792067303172,"id":"1","progress":0.24458639396878454,"total":643,"current":318}
+{"_e":"metro:bundling:progress","_t":1792067303279,"id":"1","progress":0.25770370993837033,"total":654,"current":332}
+{"_e":"metro:bundling:progress","_t":1792067303384,"id":"1","progress":0.27566483451958523,"total":659,"current":346}
+{"_e":"metro:bundling:progress","_t":1792067303489,"id":"1","progress":0.29766652249134945,"total":680,"current":371}
+{"_e":"metro:bundling:progress","_t":1792067303598,"id":"1","progress":0.3041198096885814,"total":680,"current":375}
+{"_e":"metro:bundling:progress","_t":1792067303701,"id":"1","progress":0.32226692854827327,"total":687,"current":390}
+{"_e":"metro:bundling:progress","_t":1792067303806,"id":"1","progress":0.33553139715469765,"total":694,"current":402}
+{"_e":"metro:bundling:progress","_t":1792067303908,"id":"1","progress":0.33553139715469765,"total":714,"current":412}
+{"_e":"metro:bundling:progress","_t":1792067304014,"id":"1","progress":0.34160362019170093,"total":734,"current":429}
+{"_e":"metro:bundling:progress","_t":1792067304118,"id":"1","progress":0.3584017777777778,"total":750,"current":449}
+{"_e":"metro:bundling:progress","_t":1792067304220,"id":"1","progress":0.3584017777777778,"total":774,"current":461}
+{"_e":"metro:bundling:progress","_t":1792067304332,"id":"1","progress":0.36308349769888226,"total":780,"current":470}
+{"_e":"metro:bundling:progress","_t":1792067304444,"id":"1","progress":0.3771219592373439,"total":780,"current":479}
+{"_e":"metro:bundling:progress","_t":1792067304551,"id":"1","progress":0.3872313147889783,"total":781,"current":486}
+{"_e":"metro:bundling:progress","_t":1792067304656,"id":"1","progress":0.4028925653534805,"total":783,"current":497}
+{"_e":"metro:bundling:progress","_t":1792067304757,"id":"1","progress":0.4165516972094961,"total":784,"current":506}
+{"_e":"metro:bundling:progress","_t":1792067304857,"id":"1","progress":0.4281565623698459,"total":784,"current":513}
+{"_e":"metro:bundling:progress","_t":1792067304964,"id":"1","progress":0.4399208663057059,"total":784,"current":520}
+{"_e":"metro:bundling:progress","_t":1792067305072,"id":"1","progress":0.4546416908023987,"total":789,"current":532}
+{"_e":"metro:bundling:progress","_t":1792067305183,"id":"1","progress":0.46814404432132967,"total":798,"current":546}
+{"_e":"metro:bundling:progress","_t":1792067305285,"id":"1","progress":0.4791582948932055,"total":809,"current":560}
+{"_e":"metro:bundling:progress","_t":1792067305385,"id":"1","progress":0.48612349961658285,"total":829,"current":578}
+{"_e":"metro:bundling:progress","_t":1792067305485,"id":"1","progress":0.4941507650292356,"total":845,"current":594}
+{"_e":"metro:bundling:progress","_t":1792067305586,"id":"1","progress":0.4941507650292356,"total":874,"current":607}
+{"_e":"metro:bundling:progress","_t":1792067305687,"id":"1","progress":0.4941507650292356,"total":890,"current":622}
+{"_e":"metro:bundling:progress","_t":1792067305793,"id":"1","progress":0.5034390194738473,"total":902,"current":640}
+{"_e":"metro:bundling:progress","_t":1792067305893,"id":"1","progress":0.5196667069194542,"total":910,"current":656}
+{"_e":"metro:bundling:progress","_t":1792067305994,"id":"1","progress":0.5515127442504302,"total":917,"current":681}
+{"_e":"metro:bundling:progress","_t":1792067306095,"id":"1","progress":0.5868326858569126,"total":919,"current":704}
+{"_e":"metro:bundling:progress","_t":1792067306196,"id":"1","progress":0.6082990333155287,"total":927,"current":723}
+{"_e":"metro:bundling:progress","_t":1792067306295,"id":"1","progress":0.6273726606539544,"total":933,"current":739}
+{"_e":"metro:bundling:progress","_t":1792067306404,"id":"1","progress":0.6434087822544138,"total":940,"current":754}
+{"_e":"metro:bundling:progress","_t":1792067306522,"id":"1","progress":0.6515160431756127,"total":949,"current":766}
+{"_e":"metro:bundling:progress","_t":1792067306627,"id":"1","progress":0.6813625814212942,"total":951,"current":785}
+{"_e":"metro:bundling:progress","_t":1792067306729,"id":"1","progress":0.693861000282466,"total":952,"current":793}
+{"_e":"metro:bundling:progress","_t":1792067306830,"id":"1","progress":0.6996625434027778,"total":960,"current":803}
+{"_e":"metro:bundling:progress","_t":1792067306933,"id":"1","progress":0.7120776738898651,"total":967,"current":816}
+{"_e":"metro:bundling:progress","_t":1792067307034,"id":"1","progress":0.7354522711805922,"total":969,"current":831}
+{"_e":"metro:bundling:progress","_t":1792067307134,"id":"1","progress":0.7482780684256088,"total":978,"current":846}
+{"_e":"metro:bundling:progress","_t":1792067307234,"id":"1","progress":0.756758543195188,"total":984,"current":856}
+{"_e":"metro:bundling:progress","_t":1792067307335,"id":"1","progress":0.7581308029792877,"total":990,"current":862}
+{"_e":"metro:bundling:progress","_t":1792067307448,"id":"1","progress":0.763434685001265,"total":998,"current":872}
+{"_e":"metro:bundling:progress","_t":1792067307551,"id":"1","progress":0.763434685001265,"total":1024,"current":886}
+{"_e":"metro:bundling:progress","_t":1792067307654,"id":"1","progress":0.7715947629790004,"total":1028,"current":903}
+{"_e":"metro:bundling:progress","_t":1792067307761,"id":"1","progress":0.7785467128027681,"total":1037,"current":915}
+{"_e":"metro:bundling:progress","_t":1792067307875,"id":"1","progress":0.7785467128027681,"total":1079,"current":928}
+{"_e":"metro:bundling:progress","_t":1792067307976,"id":"1","progress":0.7785467128027681,"total":1117,"current":939}
+{"_e":"metro:bundling:progress","_t":1792067308082,"id":"1","progress":0.7785467128027681,"total":1120,"current":958}
+{"_e":"metro:bundling:progress","_t":1792067308182,"id":"1","progress":0.7785467128027681,"total":1127,"current":969}
+{"_e":"metro:bundling:progress","_t":1792067308286,"id":"1","progress":0.7785467128027681,"total":1138,"current":979}
+{"_e":"metro:bundling:progress","_t":1792067308387,"id":"1","progress":0.7785467128027681,"total":1143,"current":987}
+{"_e":"metro:bundling:progress","_t":1792067308488,"id":"1","progress":0.7785467128027681,"total":1147,"current":998}
+{"_e":"metro:bundling:progress","_t":1792067308591,"id":"1","progress":0.7785467128027681,"total":1147,"current":1007}
+{"_e":"metro:bundling:progress","_t":1792067308692,"id":"1","progress":0.7795373733741836,"total":1153,"current":1018}
+{"_e":"metro:bundling:progress","_t":1792067308794,"id":"1","progress":0.79509520047818,"total":1154,"current":1029}
+{"_e":"metro:bundling:progress","_t":1792067308898,"id":"1","progress":0.8143581781464678,"total":1158,"current":1045}
+{"_e":"metro:bundling:progress","_t":1792067309001,"id":"1","progress":0.8143581781464678,"total":1178,"current":1056}
+{"_e":"metro:bundling:progress","_t":1792067309102,"id":"1","progress":0.8143581781464678,"total":1200,"current":1065}
+{"_e":"metro:bundling:progress","_t":1792067309202,"id":"1","progress":0.8143581781464678,"total":1217,"current":1080}
+{"_e":"metro:bundling:progress","_t":1792067309303,"id":"1","progress":0.8143581781464678,"total":1253,"current":1093}
+{"_e":"metro:bundling:progress","_t":1792067309403,"id":"1","progress":0.8143581781464678,"total":1276,"current":1101}
+{"_e":"metro:bundling:progress","_t":1792067309505,"id":"1","progress":0.8143581781464678,"total":1291,"current":1115}
+{"_e":"metro:bundling:progress","_t":1792067309605,"id":"1","progress":0.8143581781464678,"total":1295,"current":1123}
+{"_e":"metro:bundling:progress","_t":1792067309705,"id":"1","progress":0.8143581781464678,"total":1302,"current":1133}
+{"_e":"metro:bundling:progress","_t":1792067309806,"id":"1","progress":0.8143581781464678,"total":1310,"current":1144}
+{"_e":"metro:bundling:progress","_t":1792067309911,"id":"1","progress":0.8143581781464678,"total":1311,"current":1162}
+{"_e":"metro:bundling:progress","_t":1792067310010,"id":"1","progress":0.8143581781464678,"total":1326,"current":1179}
+{"_e":"metro:bundling:progress","_t":1792067310109,"id":"1","progress":0.8143581781464678,"total":1330,"current":1190}
+{"_e":"metro:bundling:progress","_t":1792067310213,"id":"1","progress":0.8143581781464678,"total":1337,"current":1201}
+{"_e":"metro:bundling:progress","_t":1792067310317,"id":"1","progress":0.8155127035207512,"total":1341,"current":1211}
+{"_e":"metro:bundling:progress","_t":1792067310416,"id":"1","progress":0.8219189900434168,"total":1349,"current":1223}
+{"_e":"metro:bundling:progress","_t":1792067310518,"id":"1","progress":0.8219189900434168,"total":1367,"current":1239}
+{"_e":"metro:bundling:progress","_t":1792067310618,"id":"1","progress":0.8327227600744589,"total":1372,"current":1252}
+{"_e":"metro:bundling:progress","_t":1792067310718,"id":"1","progress":0.8352002488057116,"total":1382,"current":1263}
+{"_e":"metro:bundling:progress","_t":1792067310819,"id":"1","progress":0.8352002488057116,"total":1403,"current":1279}
+{"_e":"metro:bundling:progress","_t":1792067310921,"id":"1","progress":0.8395189396362529,"total":1409,"current":1291}
+{"_e":"metro:bundling:progress","_t":1792067311023,"id":"1","progress":0.8504648403817953,"total":1414,"current":1304}
+{"_e":"metro:bundling:progress","_t":1792067311125,"id":"1","progress":0.8560816899783362,"total":1418,"current":1312}
+{"_e":"metro:bundling:progress","_t":1792067311226,"id":"1","progress":0.8594564184676878,"total":1426,"current":1322}
+{"_e":"metro:bundling:progress","_t":1792067311342,"id":"1","progress":0.8727665115440876,"total":1429,"current":1335}
+{"_e":"metro:bundling:progress","_t":1792067311459,"id":"1","progress":0.8787432707689747,"total":1438,"current":1348}
+{"_e":"metro:bundling:progress","_t":1792067311567,"id":"1","progress":0.8787432707689747,"total":1453,"current":1362}
+{"_e":"metro:bundling:progress","_t":1792067311755,"id":"1","progress":0.8827738195870064,"total":1456,"current":1368}
+{"_e":"metro:bundling:progress","_t":1792067311858,"id":"1","progress":0.8850595539029666,"total":1469,"current":1382}
+{"_e":"metro:bundling:progress","_t":1792067311966,"id":"1","progress":0.8901903231800761,"total":1469,"current":1386}
+{"_e":"metro:bundling:progress","_t":1792067312068,"id":"1","progress":0.8979142811200016,"total":1469,"current":1392}
+{"_e":"metro:bundling:progress","_t":1792067312170,"id":"1","progress":0.9070294784580498,"total":1470,"current":1400}
+{"_e":"metro:bundling:progress","_t":1792067312274,"id":"1","progress":0.9240538050862476,"total":1472,"current":1415}
+{"_e":"metro:bundling:progress","_t":1792067312382,"id":"1","progress":0.9397932604265122,"total":1472,"current":1427}
+{"_e":"metro:bundling:progress","_t":1792067312491,"id":"1","progress":0.9571383190413697,"total":1477,"current":1445}
+{"_e":"metro:bundling:progress","_t":1792067312591,"id":"1","progress":0.9571383190413697,"total":1491,"current":1458}
+{"_e":"metro:bundling:progress","_t":1792067312691,"id":"1","progress":0.9643475524422758,"total":1501,"current":1474}
+{"_e":"metro:bundling:progress","_t":1792067312792,"id":"1","progress":0.9643475524422758,"total":1519,"current":1488}
+{"_e":"metro:bundling:progress","_t":1792067312898,"id":"1","progress":0.9643475524422758,"total":1548,"current":1505}
+{"_e":"metro:bundling:progress","_t":1792067312999,"id":"1","progress":0.9667329864724247,"total":1550,"current":1524}
+{"_e":"metro:bundling:progress","_t":1792067313099,"id":"1","progress":0.9695642499157896,"total":1565,"current":1541}
+{"_e":"metro:bundling:progress","_t":1792067313208,"id":"1","progress":0.9695642499157896,"total":1587,"current":1555}
+{"_e":"metro:bundling:progress","_t":1792067313308,"id":"1","progress":0.9738084344998067,"total":1593,"current":1572}
+{"_e":"metro:bundling:progress","_t":1792067313414,"id":"1","progress":0.986305794980573,"total":1601,"current":1590}
+{"_e":"metro:bundling:progress","_t":1792067313523,"id":"1","progress":0.9987542822759872,"total":1605,"current":1604}
+{"_e":"metro:bundling:progress","_t":1792067313638,"id":"1","progress":0.999,"total":1605,"current":1605}
+{"_e":"metro:bundling:done","_t":1792067313954,"id":"1","total":1605,"ms":16371.9359}
+{"_e":"metro:client_log","_t":1792067317113,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1792067317114,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1792067317986,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:client_log","_t":1792067326897,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1792067329285,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1792067329289,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1792067329411,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1792067332106,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1792067350749,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1792067350792,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1792067351395,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1792067351397,"level":"log","data":["MapLibre [info]","Request failed due to a permanent error: Canceled ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: Canceled \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:client_log","_t":1792067351399,"level":"warn","data":["MapLibre warning","Request failed due to a permanent error: stream was reset: CANCEL ","{\"level\": \"warning\", \"message\": \"Request failed due to a permanent error: stream was reset: CANCEL \", \"tag\": \"Mbgl-HttpRequest\"}"]}
+{"_e":"metro:server_log","_t":1792067480858,"level":"error","data":["[timeout] connection terminated with Device for app='%s' on device='%s' after not responding for %s seconds.","com.sophiehorner.echoes","SM-A336B - 16 - API 36","60"]}
+{"_e":"metro:bundling:started","_t":1792067672377,"id":"4","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1792067672377,"id":"4","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1792067672414,"id":"4","total":1,"ms":36.3065}
+{"_e":"metro:client_log","_t":1792067676251,"level":"warn","data":["The global process.env.EXPO_OS is not defined. This should be inlined by babel-preset-expo during transformation."]}
+{"_e":"metro:client_log","_t":1792067676251,"level":"log","data":["VRTMaterialManager lookup:","FOUND"]}
+{"_e":"metro:client_log","_t":1792067676965,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}

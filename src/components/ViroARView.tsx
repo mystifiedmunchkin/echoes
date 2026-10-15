@@ -9,7 +9,6 @@ import {
   ViroDirectionalLight,
   ViroNode,
   ViroMaterials,
-  ViroText,
   ViroSphere,
 } from '@reactvision/react-viro';
 import { ViroARViewProps } from './ViroAR.types';
@@ -27,7 +26,6 @@ function MemoryARScene(props: any) {
   const {
     arMemories,
     onMemorySelected,
-    onPlaneTapped
   } = props.viroAppProps;
 
   return (
@@ -65,16 +63,6 @@ function MemoryARScene(props: any) {
           </ViroNode>
         );
       })}
-
-      {/* SURFACE INTERACTION */}
-      <ViroNode
-        onClick={(_position: any) => {
-          console.log(`[AR Click] Surface tapped`);
-          if (onPlaneTapped) onPlaneTapped();
-        }}
-      >
-        <ViroText text="Tap surface to place" color="#FFFFFF" scale={[0.2, 0.2, 0.2]} position={[0, 0, -1]} />
-      </ViroNode>
     </ViroARScene>
   );
 }

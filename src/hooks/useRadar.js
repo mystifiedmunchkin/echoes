@@ -8,6 +8,7 @@ import { Dirs, FileSystem } from 'react-native-file-access';
 import { getAuthToken } from '../services/auth';
 import * as Location from '../services/geolocation';
 import { translate } from '../../constants/i18n';
+import { MAP_RADIUS_METERS } from '../utils/memoryAccess';
 
 const PRIVATE_FILES_BASE_URL = 'https://echoes.sophiehorner.art/api/private-files';
 
@@ -69,11 +70,70 @@ const parseJsonValue = (value, fallback) => {
   }
 };
 
+const parseJsonCollection = (value, fallback) => {
+  const parsed = parseJsonValue(value, fallback);
+  return parsed == null ? fallback : parsed;
+};
+
+export const normalizeInteractiveGames = (value) => {
+  const parsed = parseJsonCollection(value, []);
+  const games = Array.isArray(parsed) ? parsed : parsed?.games;
+  if (!Array.isArray(games)) return [];
+
+  return games.map((game, gameIndex) => {
+    const source = parseJsonCollection(game, {});
+    if (!source || typeof source !== 'object' || Array.isArray(source)) {
+      return { index: gameIndex, value: source };
+    }
+
+    const objects = parseJsonCollection(source.objects, []);
+    const normalizedObjects = Array.isArray(objects)
+      ? objects.map((object, objectIndex) => {
+        const normalizedObject = parseJsonCollection(object, {});
+        if (!normalizedObject || typeof normalizedObject !== 'object' || Array.isArray(normalizedObject)) {
+          return { index: objectIndex, value: normalizedObject };
+        }
+        const actions = parseJsonCollection(normalizedObject.actions, []);
+        return {
+          ...normalizedObject,
+          index: objectIndex,
+          properties: parseJsonCollection(normalizedObject.properties, {}),
+          actions: Array.isArray(actions)
+            ? actions.map((action) => parseJsonCollection(action, {}))
+            : actions,
+        };
+      })
+      : objects;
+
+    return {
+      ...source,
+      index: gameIndex,
+      type: source.type || source.game_type || null,
+      assets: parseJsonCollection(source.assets, []),
+      objects: normalizedObjects,
+    };
+  });
+};
+
+export const normalizeInteractive = (value) => {
+  const source = parseJsonCollection(value, {});
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return null;
+
+  const logic = parseJsonCollection(source.logic, {});
+  return {
+    ...source,
+    logic: {
+      ...logic,
+      games: normalizeInteractiveGames(logic.games),
+    },
+  };
+};
+
 const isVideoUrl = (value) => /\.(mp4|mov|m4v|webm)(\?|$)/i.test(value || '');
 const isImageUrl = (value) => /\.(jpe?g|png|webp|gif)(\?|$)/i.test(value || '');
 const isAudioUrl = (value) => /\.(mp3|wav|m4a|aac|ogg)(\?|$)/i.test(value || '');
 const is3DReference = (value) => /\.(glb|gltf|usdz|obj|fbx)(\?|$)/i.test(value || '')
-  || /\/(?:model|models|models_3d|model_3D|model_3Ds|models_3D|model-files)\//i.test(value || '');
+  || /\/model_3D\//i.test(value || '');
 const isVideoReference = (value) => isVideoUrl(value) || /\/(?:videos?|video-files)\//i.test(value || '');
 const isImageReference = (value) => isImageUrl(value) || /\/(?:images?|photos?|image-files)\//i.test(value || '');
 const isAudioReference = (value) => isAudioUrl(value) || /\/(?:audios?|audio-files)\//i.test(value || '');
@@ -112,12 +172,12 @@ const resolvePrivateFileUrl = (value, userId, mediaType) => {
   return `${PRIVATE_FILES_BASE_URL}/${encodeURIComponent(String(userId))}/${mediaType}/${encodeURIComponent(fileName)}`;
 };
 
-export function useRadar(initialRadius = 500) {
+export function useRadar(initialRadius = MAP_RADIUS_METERS) {
   const [location, setLocation] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [permissionStatus, setPermissionStatus] = useState(null);
   const [memories, setMemories] = useState([]);
-  const [radius, setRadius] = useState(initialRadius);
+  const [radius, setRadius] = useState(Math.min(initialRadius, MAP_RADIUS_METERS));
   const [isLoadingApi, setIsLoadingApi] = useState(false);
   const [apiError, setApiError] = useState(null);
   const startedRef = useRef(false);
@@ -182,13 +242,13 @@ export function useRadar(initialRadius = 500) {
     return cachedMemory;
   }, [cacheRemoteAsset]);
 
-  const fetchMemories = useCallback(async (lat, lng, currentRadius) => {
+  const fetchMemories = useCallback(async (lat, lng, currentRadius, throwOnError = false) => {
     setIsLoadingApi(true);
     setApiError(null);
     try {
       const token = await getAuthToken();
       const response = await fetch(
-        `https://echoes.sophiehorner.art/api/memories-near-me?lat=${lat}&lng=${lng}&radius=${currentRadius}`,
+        `https://echoes.sophiehorner.art/api/memories-near-me?lat=${lat}&lng=${lng}&radius=${Math.min(currentRadius, MAP_RADIUS_METERS)}`,
         {
           headers: {
             Accept: 'application/json',
@@ -203,15 +263,16 @@ export function useRadar(initialRadius = 500) {
       const dataArray = Array.isArray(rawData) ? rawData : (rawData.data || rawData.memories || []);
 
       const formattedMemories = dataArray.map((item, index) => {
-        const latVal = Number(String(item.lat || item.latitude).replace(',', '.'));
-        const lngVal = Number(String(item.lng || item.longitude).replace(',', '.'));
+        const latVal = Number(String(item.latitude ?? NaN).replace(',', '.'));
+        const lngVal = Number(String(item.longitude ?? NaN).replace(',', '.'));
 
-        // Laravel flattens contents into model_url + media_contents.models_3D on save
+        // The server uses model_3D as the canonical 3D asset field.
         const mediaContents = parseJsonValue(item.media_contents, {});
+        const interactive = normalizeInteractive(item.interactive);
         const rawContents = parseJsonValue(item.contents, []);
         const isContentObject = rawContents && typeof rawContents === 'object'
           && !Array.isArray(rawContents)
-          && ['model_3D', 'models_3D', 'model_3d', 'model_url', 'image', 'image_url', 'audio', 'audio_url', 'video', 'video_url']
+          && ['model_3D', 'image', 'image_url', 'audio', 'audio_url', 'video', 'video_url']
             .some((key) => Object.prototype.hasOwnProperty.call(rawContents, key));
         const mediaArray = Array.isArray(rawContents)
           ? rawContents
@@ -221,7 +282,7 @@ export function useRadar(initialRadius = 500) {
         const normalizeContent = (content, contentIndex) => {
           const source = content && typeof content === 'object' ? content : {};
           const modelUrl = extractMediaUrl(
-            source.model_3D || source.models_3D || source.model_3d || source.model_url || source.models_3d
+            source.model_3D
           );
           const imageUrl = extractMediaUrl(source.image || source.image_url);
           const audioUrl = extractMediaUrl(source.audio || source.audio_url);
@@ -230,7 +291,7 @@ export function useRadar(initialRadius = 500) {
           return {
             ...source,
             index: contentIndex,
-            model_3D: modelUrl ? resolvePrivateFileUrl(modelUrl, userId, 'model_3Ds') : null,
+            model_3D: modelUrl ? resolvePrivateFileUrl(modelUrl, userId, 'model_3D') : null,
             image: imageUrl ? resolvePrivateFileUrl(imageUrl, userId, 'image') : null,
             audio: audioUrl ? resolvePrivateFileUrl(audioUrl, userId, 'audio') : null,
             video: videoUrl ? resolvePrivateFileUrl(videoUrl, userId, 'video') : null,
@@ -250,14 +311,14 @@ export function useRadar(initialRadius = 500) {
           return [...directMatches, ...contentMatches].filter(Boolean);
         };
         const contentModelUrls = contents.map((content) => content.model_3D).filter(Boolean);
-        const explicitModelUrls = extractMediaUrls(item.model_url);
+        const explicitModelUrls = extractMediaUrls(item.model_3D);
         const modelCandidates = [
           ...explicitModelUrls,
           ...contentModelUrls,
-          ...findMediaUrls(['models_3D', 'models_3d', 'model_3d', 'model_3D'], 'model'),
+          ...findMediaUrls(['model_3D'], 'model'),
         ];
         const modelUrls = [...new Set(modelCandidates
-          .map((value) => resolvePrivateFileUrl(value, userId, 'model_3Ds'))
+          .map((value) => resolvePrivateFileUrl(value, userId, 'model_3D'))
           .filter(is3DReference))];
         const explicitModelUrl = modelUrls[0] || '';
         const inferredMediaType = String(
@@ -313,8 +374,8 @@ export function useRadar(initialRadius = 500) {
           lng: lngVal,
           latitude: latVal,
           longitude: lngVal,
-          interactive: parseJsonValue(item.interactive, null),
-          interactive_json: JSON.stringify(parseJsonValue(item.interactive, null)),
+          interactive,
+          interactive_json: JSON.stringify(interactive),
           contents,
           model_url: effectiveModelUrl,
           model_urls: effectiveModelUrls,
@@ -328,14 +389,26 @@ export function useRadar(initialRadius = 500) {
         };
       });
 
-      setMemories(formattedMemories.filter(m => !isNaN(m.lat) && !isNaN(m.lng)));
+      const validMemories = formattedMemories.filter(m => Number.isFinite(m.lat) && Number.isFinite(m.lng));
+      setMemories(validMemories);
+      return validMemories;
 
     } catch (err) {
       setApiError(err.message || translate('networkUnavailable'));
+      if (throwOnError) throw err;
     } finally {
       setIsLoadingApi(false);
     }
   }, []);
+
+  const loadNearbyMemories = useCallback(async () => {
+    const currentLoc = await Location.getCurrentPositionAsync({ timeout: 20000 });
+    if (!currentLoc?.coords) throw new Error(translate('gpsLocationUnavailable'));
+    const origin = currentLoc.coords;
+    setLocation(origin);
+    const nearby = await fetchMemories(origin.latitude, origin.longitude, MAP_RADIUS_METERS, true);
+    return { location: origin, memories: nearby };
+  }, [fetchMemories]);
 
   const requestGpsPermission = useCallback(async () => {
     // This async function may call setState.
@@ -398,8 +471,9 @@ export function useRadar(initialRadius = 500) {
   }, [requestGpsPermission]);
 
   const updateRadius = (newRadius) => {
-    setRadius(newRadius);
-    if (location) fetchMemories(location.latitude, location.longitude, newRadius);
+    const limitedRadius = Math.min(newRadius, MAP_RADIUS_METERS);
+    setRadius(limitedRadius);
+    if (location) fetchMemories(location.latitude, location.longitude, limitedRadius);
   };
 
   const openSettings = () => Linking.openSettings();
@@ -414,6 +488,7 @@ export function useRadar(initialRadius = 500) {
     apiError,
     updateRadius,
     cacheMemoryAssets,
+    loadNearbyMemories,
     requestGpsPermission,
     openSettings,
     refreshData: () => location && fetchMemories(location.latitude, location.longitude, radius)

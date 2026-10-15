@@ -43,4 +43,13 @@ project(':arcore_client').projectDir = new File('../node_modules/@reactvision/re
 project(':gvr_common').projectDir = new File('../node_modules/@reactvision/react-viro/android/gvr_common')
 project(':viro_renderer').projectDir = new File('../node_modules/@reactvision/react-viro/android/viro_renderer')
 project(':react_viro').projectDir = new File('../node_modules/@reactvision/react-viro/android/react_viro')
-    
+
+// echoes-copy-root-local-properties
+def echoesRootLocalProperties = new File(settingsDir.parentFile, 'local.properties')
+if (echoesRootLocalProperties.isFile()) {
+    java.nio.file.Files.copy(
+        echoesRootLocalProperties.toPath(),
+        new File(settingsDir, 'local.properties').toPath(),
+        java.nio.file.StandardCopyOption.REPLACE_EXISTING
+    )
+}

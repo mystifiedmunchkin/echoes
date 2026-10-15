@@ -22,19 +22,21 @@ export const MemoryInfoModal = ({
   onViewImage,
   onViewModel,
   onViewVideo,
+  canViewContent = false,
+  previewMessage,
 }) => {
   const { t } = useI18n();
   if (!memory) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.container}>
           <Text style={styles.title}>{memory.name}</Text>
-          {!!memory.creatorName && <Text style={styles.creatorName}>{memory.creatorName}</Text>}
+          {canViewContent && !!memory.creatorName && <Text style={styles.creatorName}>{memory.creatorName}</Text>}
 
           {/* Collectible badge. */}
-          {memory.is_collectible && (
+          {canViewContent && memory.is_collectible && (
             <View style={styles.collectibleBadge}>
               <Text style={styles.collectibleText}>✦ {t('collectible')}</Text>
             </View>
@@ -47,26 +49,29 @@ export const MemoryInfoModal = ({
             <Text style={styles.descriptionMuted}>{t('noDescription')}</Text>
           )}
 
-          {!!memory.audio_url && <MemoryAudioControls source={memory.audio_url} />}
+          {!canViewContent && <Text style={styles.descriptionMuted}>{previewMessage}</Text>}
+          {canViewContent && !!memory.audio_url && <MemoryAudioControls source={memory.audio_url} />}
 
           {/* Metadata. */}
-          <View style={styles.metaRow}>
-            <View style={styles.metaCell}>
-              <Text style={styles.metaLabel}>{t('memoryId')}</Text>
-              <Text style={styles.metaValue}>#{memory.id}</Text>
+          {canViewContent && (
+            <View style={styles.metaRow}>
+              <View style={styles.metaCell}>
+                <Text style={styles.metaLabel}>{t('memoryId')}</Text>
+                <Text style={styles.metaValue}>#{memory.id}</Text>
+              </View>
+              <View style={styles.metaCell}>
+                <Text style={styles.metaLabel}>{t('latitude')}</Text>
+                <Text style={styles.metaValue}>{Number(memory.lat).toFixed(5)}</Text>
+              </View>
+              <View style={styles.metaCell}>
+                <Text style={styles.metaLabel}>{t('longitude')}</Text>
+                <Text style={styles.metaValue}>{Number(memory.lng).toFixed(5)}</Text>
+              </View>
             </View>
-            <View style={styles.metaCell}>
-              <Text style={styles.metaLabel}>{t('latitude')}</Text>
-              <Text style={styles.metaValue}>{Number(memory.lat).toFixed(5)}</Text>
-            </View>
-            <View style={styles.metaCell}>
-              <Text style={styles.metaLabel}>{t('longitude')}</Text>
-              <Text style={styles.metaValue}>{Number(memory.lng).toFixed(5)}</Text>
-            </View>
-          </View>
+          )}
 
           <View style={styles.buttonRow}>
-            {!!memory.model_url && (
+            {canViewContent && !!memory.model_url && (
               <TouchableOpacity
                 style={styles.modelButton}
                 onPress={() => onViewModel?.(memory)}
@@ -74,7 +79,7 @@ export const MemoryInfoModal = ({
                 <Text style={styles.modelButtonText}>{t('viewModel')}</Text>
               </TouchableOpacity>
             )}
-            {!!memory.image_url && (
+            {canViewContent && !!memory.image_url && (
               <TouchableOpacity
                 style={styles.mediaButton}
                 onPress={() => onViewImage?.(memory)}
@@ -82,7 +87,7 @@ export const MemoryInfoModal = ({
                 <Text style={styles.modelButtonText}>{t('viewImage')}</Text>
               </TouchableOpacity>
             )}
-            {!!memory.video_url && (
+            {canViewContent && !!memory.video_url && (
               <TouchableOpacity
                 style={styles.mediaButton}
                 onPress={() => onViewVideo?.(memory)}

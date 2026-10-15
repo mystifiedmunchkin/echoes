@@ -7,23 +7,28 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import DeviceInfo from 'react-native-device-info';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useCameraPermission } from 'react-native-vision-camera';
-import Slider from '@react-native-community/slider';
 import InventoryModal from './src/components/InventoryModal';
+import MenuModal from './src/components/MenuModal';
 import {
   Camera,
   CircleLayer,
   FillLayer,
+  LineLayer,
   MapView,
   ShapeSource,
+  UserLocation,
 } from '@maplibre/maplibre-react-native';
 import {
-  calculateBearing, createRadiusPolygon, getDistanceInMeters, formatRadiusText,
-  getRelativeARPosition, spreadARPositions,
+  createRadiusPolygon, getDistanceInMeters,
 } from './src/utils/geo';
+import {
+  MAP_RADIUS_METERS, DISCOVERY_RADIUS_METERS, isGalaxyADevice,
+  canViewMemoryContent, getMemoryDistance, createARSession,
+} from './src/utils/memoryAccess';
 import { useInventory } from './src/hooks/useInventory';
+import { useVisitedPlaces } from './src/hooks/useVisitedPlaces';
 import { useRadar } from './src/hooks/useRadar';
 import CollectionParticle from './src/components/CollectionParticle';
-import { CreateMemoryModal } from './src/components/CreateMemoryModal';
 import { MemoryAudioPlayer } from './src/components/MemoryAudioPlayer';
 import { MemoryInfoModal } from './src/components/MemoryInfoModal';
 import { FullscreenMediaViewer } from './src/components/FullscreenMediaViewer';
@@ -33,7 +38,6 @@ import { useAuth } from './src/hooks/useAuth'
 import { COLORS } from './theme';
 import { useI18n } from './constants/i18n';
 const ViroARView = React.lazy(() => import('./src/components/ViroARView'));
-const AR_MEMORY_MAX_RADIUS_METERS = 5000;
 const MAP_NEIGHBORHOOD_ZOOM = 12;
 const DEFAULT_MAP_CENTER = [1.3553, 44.0175];
 const AR_SESSION_RELEASE_MS = 1500;
@@ -56,22 +60,25 @@ function AppContent() {
 
   // // --- Radar state and API interaction ---
   const {
-    location, errorMsg, memories, radius, isLoadingApi, apiError,
-    updateRadius, refreshData, requestGpsPermission, cacheMemoryAssets
-  } = useRadar(5000);
+    location, errorMsg, memories, isLoadingApi, apiError,
+    refreshData, requestGpsPermission, cacheMemoryAssets, loadNearbyMemories,
+  } = useRadar(MAP_RADIUS_METERS);
   const memoryMarkers = useMemo(() => ({
     type: 'FeatureCollection',
     features: memories
       .filter((memory) => Number.isFinite(Number(memory.lat)) && Number.isFinite(Number(memory.lng)))
       .map((memory) => ({
         type: 'Feature',
-        properties: { memoryId: String(memory.id) },
+        properties: {
+          memoryId: String(memory.id),
+          isNearby: getMemoryDistance(location, memory) <= DISCOVERY_RADIUS_METERS,
+        },
         geometry: {
           type: 'Point',
           coordinates: [Number(memory.lng), Number(memory.lat)],
         },
       })),
-  }), [memories]);
+  }), [memories, location]);
   const mapCenterCoordinate = useMemo(
     () => location
       ? [location.longitude, location.latitude]
@@ -95,6 +102,21 @@ function AppContent() {
       : item;
   }), [collectedMemories, memories]);
 
+  // --- Places/games already seen by the player, listed in the menu ---
+  const { visitedPlaces, markPlaceVisited } = useVisitedPlaces();
+  const [showMenu, setShowMenu] = useState(false);
+  const menuPlaces = useMemo(() => {
+    const collectedIds = new Set(collectedMemories.map((item) => String(item.id)));
+    const visitedIds = new Set(visitedPlaces.map((place) => String(place.id)));
+    const collectedOnly = collectedMemories
+      .filter((item) => !visitedIds.has(String(item.id)))
+      .map((item) => ({ ...item, lastSeenAt: item.collectedAt }));
+    return [...visitedPlaces, ...collectedOnly].map((place) => ({
+      ...place,
+      isDone: collectedIds.has(String(place.id)),
+    }));
+  }, [collectedMemories, visitedPlaces]);
+
   // --- Authentication and account management ---
   const { user, signIn, signUp, signOut } = useAuth();
   const [showAccount, setShowAccount] = useState(false);
@@ -109,32 +131,33 @@ function AppContent() {
   const [showCamera, setShowCamera] = useState(false);
   const [cameraKey, setCameraKey] = useState(0);
   const { hasPermission, requestPermission } = useCameraPermission();
-  const isProblematicARDevice = () => {
-    const manufacturer = DeviceInfo.getManufacturerSync().toLowerCase();
-    const model = DeviceInfo.getModel();
-    return manufacturer === 'samsung' && (model.includes('A') || model.includes('M') || model.includes('Galaxy A'));
-  };
+  const isGalaxyA = useMemo(() => isGalaxyADevice(
+    DeviceInfo.getManufacturerSync(), DeviceInfo.getModel(), DeviceInfo.getDeviceId(),
+  ), []);
+  const canViewContent = useCallback(
+    (memory) => canViewMemoryContent(location, memory, isGalaxyA),
+    [location, isGalaxyA],
+  );
 
   useEffect(() => {
-    if (isProblematicARDevice()) {
+    if (isGalaxyA) {
       Alert.alert(
         t('samsungDeviceMode'),
         t('samsungDeviceDescription'),
       );
     }
-  }, [t]);
+  }, [isGalaxyA, t]);
 
   const [arSessionMemories, setArSessionMemories] = useState([]);
   const [isPlacingMode, setIsPlacingMode] = useState(false);
   const [isModelLoading, setIsModelLoading] = useState(false);
   const [isPreparingPlacement, setIsPreparingPlacement] = useState(false);
   const [resetPlacedMemoryKey, setResetPlacedMemoryKey] = useState(0);
-  const [slidingRadius, setSlidingRadius] = useState(5000);
   const [activeParticle, setActiveParticle] = useState(null);
   const lastARCloseAt = useRef(0);
-  // --- Modal management for creating and inspecting memories ---
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedCreationCoords, setSelectedCreationCoords] = useState(null);
+  const preparingAR = useRef(false);
+  const [isPreparingAR, setIsPreparingAR] = useState(false);
+  // --- Modal management for inspecting memories ---
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [selectedMemoryToInspect, setSelectedMemoryToInspect] = useState(null);
   const [modelViewerMemory, setModelViewerMemory] = useState(null);
@@ -148,7 +171,13 @@ function AppContent() {
 
   useEffect(() => {
     const syncAssets = () => {
-      if (!showInfoModal || !selectedMemoryToInspect) return;
+      if (!showInfoModal || !selectedMemoryToInspect || !canViewContent(selectedMemoryToInspect)) return;
+      const hasRemoteMedia = [
+        ...(selectedMemoryToInspect.model_urls || []),
+        selectedMemoryToInspect.model_url, selectedMemoryToInspect.image_url,
+        selectedMemoryToInspect.video_url, selectedMemoryToInspect.audio_url,
+      ].some((url) => /^https?:\/\//i.test(url || ''));
+      if (!hasRemoteMedia) return;
 
       let isCurrentSelection = true;
       cacheMemoryAssets(selectedMemoryToInspect)
@@ -170,8 +199,8 @@ function AppContent() {
         isCurrentSelection = false;
       };
     };
-    syncAssets();
-  }, [showInfoModal, selectedMemoryToInspect, cacheMemoryAssets, t]);
+    return syncAssets();
+  }, [showInfoModal, selectedMemoryToInspect, cacheMemoryAssets, canViewContent, t]);
 
   useEffect(() => () => {
     if (modelViewerTransitionTimer.current) {
@@ -183,6 +212,10 @@ function AppContent() {
   }, []);
 
   const openModelViewer = useCallback(async (memory) => {
+    if (!canViewContent(memory)) {
+      Alert.alert(t('contentPreview'), t('contentDiscoveryHint'));
+      return;
+    }
     if (!memory?.model_url) return;
 
     const requestKey = ++modelViewerRequestKey.current;
@@ -210,7 +243,7 @@ function AppContent() {
         error instanceof Error ? error.message : t('modelPreparationError'),
       );
     }
-  }, [cacheMemoryAssets, t]);
+  }, [cacheMemoryAssets, canViewContent, t]);
 
   const closeModelViewer = useCallback(() => {
     const requestKey = ++modelViewerRequestKey.current;
@@ -233,6 +266,10 @@ function AppContent() {
   }, [modelViewerMemory]);
 
   const openMediaViewer = useCallback(async (memory, type) => {
+    if (!canViewContent(memory)) {
+      Alert.alert(t('contentPreview'), t('contentDiscoveryHint'));
+      return;
+    }
     const mediaUrl = memory?.[`${type}_url`];
     if (!mediaUrl) return;
 
@@ -263,7 +300,7 @@ function AppContent() {
         error instanceof Error ? error.message : t('mediaLoadError'),
       );
     }
-  }, [cacheMemoryAssets, t]);
+  }, [cacheMemoryAssets, canViewContent, t]);
 
   const closeMediaViewer = useCallback(() => {
     const requestKey = ++mediaViewerRequestKey.current;
@@ -285,10 +322,6 @@ function AppContent() {
     }, MODEL_VIEWER_RELEASE_MS);
   }, [mediaViewer]);
 
-  // --- Memory creation mode from the AR view ---
-  const [isCreatingInAR, setIsCreatingInAR] = useState(false);
-
-
   // --- AR camera closure ---
   //// TODO :  maybe this needs looking at closely to get the correct order of instructions (buggy?)
   const closeARCamera = useCallback(() => {
@@ -298,66 +331,54 @@ function AppContent() {
     setIsPlacingMode(false);
     setSelectedMemoryToPlace(null);
     setSelectedArMemory(null);
-    setIsCreatingInAR(false);
     setIsModelLoading(false);
     setIsPreparingPlacement(false);
     setActiveParticle(null);
   }, []);
 
   // --- AR camera opening ---
-  const openARCamera = useCallback(() => {
-    if (isProblematicARDevice()) {
+  const openARCamera = useCallback(async () => {
+    if (isGalaxyA) {
       Alert.alert(
         t('arUnavailable'),
         t('arUnavailableDescription'),
       );
       return false;
     }
+    if (preparingAR.current) return false;
     const elapsedSinceClose = Date.now() - lastARCloseAt.current;
     if (lastARCloseAt.current > 0 && elapsedSinceClose < AR_SESSION_RELEASE_MS) {
       Alert.alert(t('arClosing'), t('arClosingWait'));
       return false;
     }
-    // Prepare AR session memories based on the current location and nearby memories
-    const sessionMemories = spreadARPositions(memories
-      .map((memory) => {
-        const distanceMeters = getDistanceInMeters(
-          location.latitude,
-          location.longitude,
-          memory.lat,
-          memory.lng,
-        );
-        return {
-          memory,
-          bearingDeg: calculateBearing(
-            location.latitude,
-            location.longitude,
-            memory.lat,
-            memory.lng,
-          ),
-          distanceMeters,
-          relativePosition: getRelativeARPosition(
-            calculateBearing(
-              location.latitude,
-              location.longitude,
-              memory.lat,
-              memory.lng,
-            ),
-            distanceMeters,
-          ),
-        };
-      })
-      .filter(({ distanceMeters }) => distanceMeters <= Math.min(radius, AR_MEMORY_MAX_RADIUS_METERS))
-      .sort((left, right) => left.distanceMeters - right.distanceMeters));
-    // Set the memories to choose from during the AR session.
-    setArSessionMemories(sessionMemories);
-    setCameraKey((prev) => prev + 1);
-    setShowCamera(true);
-    return true;
-  }, [location, memories, radius, t]);
+    preparingAR.current = true;
+    setIsPreparingAR(true);
+    try {
+      const nearby = await loadNearbyMemories();
+      const session = createARSession(nearby.memories, nearby.location);
+      const preparedSession = await Promise.all(session.map(async (entry) => ({
+        ...entry,
+        memory: await cacheMemoryAssets(entry.memory),
+      })));
+      setArSessionMemories(preparedSession);
+      setCameraKey((prev) => prev + 1);
+      setShowCamera(true);
+      return true;
+    } catch (error) {
+      Alert.alert(t('arPreparationError'), error.message);
+      return false;
+    } finally {
+      preparingAR.current = false;
+      setIsPreparingAR(false);
+    }
+  }, [isGalaxyA, loadNearbyMemories, cacheMemoryAssets, t]);
 
   // --- Request camera permission and start AR session (FIRST)
   const requestCameraAndStart = useCallback(async () => {
+    if (isGalaxyA) {
+      await openARCamera();
+      return;
+    }
     let granted = hasPermission;
     if (!granted) {
       try {
@@ -375,34 +396,17 @@ function AppContent() {
       return;
     }
 
-    openARCamera();
-  }, [hasPermission, requestPermission, location, openARCamera, t]);
+    await openARCamera();
+  }, [hasPermission, requestPermission, location, openARCamera, isGalaxyA, t]);
 
   const handleOpenARCamera = useCallback(async () => {
-    requestCameraAndStart();
+    await requestCameraAndStart();
   }, [requestCameraAndStart]);
-
-
-  // AR uses local plane coordinates for rendering. This saved GPS coordinate is only
-  // persisted with a newly created memory so it remains discoverable on the map.
-  const handlePlaneTapped = useCallback(() => {
-    const coords = location && {
-      latitude: location.latitude,
-      longitude: location.longitude,
-    };
-    if (!coords) return;
-    setSelectedCreationCoords(coords);
-    // Let the native Viro click callback return before unmounting the scene.
-    setTimeout(() => {
-      closeARCamera();
-      setShowCreateModal(true);
-    }, 0);
-  }, [closeARCamera, location]);
 
   // This list is intentionally captured when AR opens, so nearby memories do not
   // appear, disappear, or move while the AR session is running.
   const arMemories = useMemo(
-    () => arSessionMemories.map(({ memory }) => memory),
+    () => arSessionMemories.map(({ memory, relativePosition }) => ({ ...memory, relativePosition })),
     [arSessionMemories],
   );
   const nearbyMemories = useMemo(
@@ -418,28 +422,6 @@ function AppContent() {
     })),
     [arSessionMemories, user],
   );
-
-  // The radar cache replaces remote model URLs with local file:// URLs after the
-  // AR session may already have been opened. Keep the captured session in sync so
-  // Viro never retries a protected remote URL without request headers.
-  useEffect(() => {
-    // Wrap in function to avoid direct setState in render/effect if needed
-    const syncMemories = () => {
-      setArSessionMemories((currentSession) => {
-        let changed = false;
-        const nextSession = currentSession.map((entry) => {
-          const refreshedMemory = memories.find(
-            (memory) => String(memory.id) === String(entry.memory.id),
-          );
-          if (!refreshedMemory || refreshedMemory === entry.memory) return entry;
-          changed = true;
-          return { ...entry, memory: refreshedMemory };
-        });
-        return changed ? nextSession : currentSession;
-      });
-    };
-    syncMemories();
-  }, [memories]);
 
   useEffect(() => {
     const syncSelected = () => {
@@ -460,7 +442,7 @@ function AppContent() {
     try {
       const cachedMemory = await cacheMemoryAssets(sourceMemory || memory);
       setSelectedMemoryToPlace({ ...cachedMemory, is_collectible: false });
-      if (!openARCamera()) setSelectedMemoryToPlace(null);
+      if (!(await openARCamera())) setSelectedMemoryToPlace(null);
     } catch (error) {
       setSelectedMemoryToPlace(null);
       Alert.alert(t('modelLoadError'), error.message);
@@ -474,6 +456,7 @@ function AppContent() {
     if (!memory || isPreparingPlacement) return;
 
     setIsPreparingPlacement(true);
+    markPlaceVisited(memory);
     try {
       const cachedMemory = await cacheMemoryAssets(memory);
       setSelectedArMemory(cachedMemory);
@@ -484,7 +467,14 @@ function AppContent() {
     } finally {
       setIsPreparingPlacement(false);
     }
-  }, [arMemories, cacheMemoryAssets, isPreparingPlacement, t]);
+  }, [arMemories, cacheMemoryAssets, isPreparingPlacement, markPlaceVisited, t]);
+
+  const openMemoryInfo = useCallback((memory) => {
+    if (!memory) return;
+    markPlaceVisited(memory);
+    setSelectedMemoryToInspect(memory);
+    setShowInfoModal(true);
+  }, [markPlaceVisited]);
 
 
 
@@ -624,8 +614,6 @@ function AppContent() {
             }}
             resetPlacedMemoryKey={resetPlacedMemoryKey}
             canCollect={!!user}
-            onPlaneTapped={handlePlaneTapped}
-            creatingMemoryMode={isCreatingInAR}
             memoryToPlace={isPlacingMode ? arMemoryToPlace : null}
             arMemories={arMemories}
             nearbyMemories={nearbyMemories}
@@ -696,22 +684,19 @@ function AppContent() {
           </View>
         )}
 
-        {/* --- Hints and cancel button for placing and creating memories in AR */}
-        {(isPlacingMode || isCreatingInAR) && (
+        {/* --- Hint and cancel button for placing memories in AR */}
+        {isPlacingMode && (
           <View
             style={[styles.placementBanner, { top: insets.top + 58 }]}
             pointerEvents="auto"
           >
-            <Text style={styles.placingHint}>
-              {isPlacingMode ? t('placeOnFloor') : t('touchHorizontalPlane')}
-            </Text>
+            <Text style={styles.placingHint}>{t('placeOnFloor')}</Text>
             <TouchableOpacity
               style={styles.cancelButton}
               onPress={() => {
                 setIsPlacingMode(false);
                 setSelectedMemoryToPlace(null);
                 setSelectedArMemory(null);
-                setIsCreatingInAR(false);
                 setResetPlacedMemoryKey((key) => key + 1);
               }}
               accessibilityRole="button"
@@ -721,7 +706,7 @@ function AppContent() {
             </TouchableOpacity>
           </View>
         )}
-        {/* --- Bottom controls for creating, placing, and accessing the collection in AR */}
+        {/* --- Bottom controls for placing and accessing the collection in AR */}
         <View
           style={[
             styles.bottomControlsArea,
@@ -730,25 +715,9 @@ function AppContent() {
           pointerEvents="box-none"
         >
           <TouchableOpacity
-            style={[
-              styles.bottomAction,
-              styles.createAction,
-              (!user || isPlacingMode || isCreatingInAR) && styles.disabledAction,
-            ]}
-            onPress={() => {
-              if (!requireAuthentication()) return;
-              setIsCreatingInAR(true);
-              setShowCreateModal(false);
-              setSelectedCreationCoords(null);
-            }}
-            disabled={isPlacingMode || isCreatingInAR}
-          >
-            <Text style={styles.bottomActionText}>+ {t('createMemory')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.bottomAction, (!arMemoryToPlace || isPlacingMode || isCreatingInAR || isPreparingPlacement) && styles.disabledAction]}
+            style={[styles.bottomAction, (!arMemoryToPlace || isPlacingMode || isPreparingPlacement) && styles.disabledAction]}
             onPress={() => handleMemorySelected(arMemoryToPlace.id)}
-            disabled={!arMemoryToPlace || isPlacingMode || isCreatingInAR || isPreparingPlacement}
+            disabled={!arMemoryToPlace || isPlacingMode || isPreparingPlacement}
           >
             <Text style={styles.bottomActionText}>⌄ {t('placeShort')}</Text>
           </TouchableOpacity>
@@ -792,21 +761,12 @@ function AppContent() {
   // --- Default map view ---
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('ministry')}</Text>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <Text style={styles.headerTitle}>{t('appName')}</Text>
         <View style={styles.headerActions}>
+          {isLoadingApi && <ActivityIndicator size="small" color={COLORS.accent} />}
           <TouchableOpacity onPress={() => setShowAccount(true)}>
             <Text style={styles.accountText}>{user ? t('account') : t('signIn')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => {
-              if (!requireAuthentication()) return;
-              setShowInventory(true);
-            }}
-          >
-            <Text style={[styles.inventoryBadge, !user && styles.disabledText]}>
-              {t('collection')} ({collectedMemories.length})
-            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -828,38 +788,14 @@ function AppContent() {
         style={styles.map}
         mapStyle="https://tiles.openfreemap.org/styles/bright"
         onPress={(event) => {
-          setSelectedCreationCoords(null);
           const coordinates = event.geometry?.coordinates;
           if (coordinates) {
             const coords = { latitude: coordinates[1], longitude: coordinates[0] };
             const hit = memories.find((m) =>
               getDistanceInMeters(coords.latitude, coords.longitude, m.lat, m.lng) < 2
             );
-            if (hit) {
-              setSelectedCreationCoords(null);
-              setSelectedMemoryToInspect(hit);
-              setShowInfoModal(true);
-            }
+            if (hit) openMemoryInfo(hit);
           }
-        }}
-        onLongPress={(event) => {
-          const coordinates = event.geometry?.coordinates;
-          if (!coordinates) return;
-          const coords = { latitude: coordinates[1], longitude: coordinates[0] };
-
-          const hit = memories.find((m) =>
-            getDistanceInMeters(coords.latitude, coords.longitude, m.lat, m.lng) < 2
-          );
-          if (hit) {
-            setSelectedCreationCoords(null);
-            setSelectedMemoryToInspect(hit);
-            setShowInfoModal(true);
-            return;
-          }
-
-          if (!requireAuthentication()) return;
-          setSelectedCreationCoords(coords);
-          setShowCreateModal(false);
         }}
       >
         <Camera
@@ -877,7 +813,7 @@ function AppContent() {
             shape={createRadiusPolygon(
               location.latitude,
               location.longitude,
-              slidingRadius || radius,
+              MAP_RADIUS_METERS,
             )}
           >
             <FillLayer
@@ -888,6 +824,25 @@ function AppContent() {
                 fillOutlineColor: COLORS.primaryStrong,
               }}
             />
+            <LineLayer
+              id="search-radius-outline"
+              style={{ lineColor: COLORS.primaryStrong, lineWidth: 1 }}
+            />
+          </ShapeSource>
+        )}
+        {location && (
+          <ShapeSource
+            id="discovery-radius"
+            shape={createRadiusPolygon(location.latitude, location.longitude, DISCOVERY_RADIUS_METERS)}
+          >
+            <FillLayer
+              id="discovery-radius-fill"
+              style={{ fillColor: COLORS.accent, fillOpacity: 0.25 }}
+            />
+            <LineLayer
+              id="discovery-radius-outline"
+              style={{ lineColor: COLORS.accent, lineWidth: 2 }}
+            />
           </ShapeSource>
         )}
         <ShapeSource
@@ -896,119 +851,62 @@ function AppContent() {
           onPress={(event) => {
             const memoryId = event.features?.[0]?.properties?.memoryId;
             const memory = memories.find((item) => String(item.id) === String(memoryId));
-            if (!memory) return;
-            setSelectedMemoryToInspect(memory);
-            setShowInfoModal(true);
+            openMemoryInfo(memory);
           }}
         >
           <CircleLayer
             id="memory-marker-circles"
             style={{
               circleRadius: 8,
-              circleColor: COLORS.accent,
+              circleColor: ['case', ['get', 'isNearby'], COLORS.nearbyMemoryMarker, COLORS.distantMemoryMarker],
               circleStrokeWidth: 2,
               circleStrokeColor: COLORS.background,
             }}
           />
         </ShapeSource>
-        {selectedCreationCoords && (
-          <ShapeSource
-            id="new-memory-marker"
-            shape={{
-              type: 'Feature',
-              properties: {},
-              geometry: {
-                type: 'Point',
-                coordinates: [
-                  selectedCreationCoords.longitude,
-                  selectedCreationCoords.latitude,
-                ],
-              },
-            }}
-          >
-            <CircleLayer
-              id="new-memory-marker-circle"
-              style={{
-                circleRadius: 8,
-                circleColor: COLORS.primaryStrong,
-                circleStrokeWidth: 2,
-                circleStrokeColor: COLORS.background,
-              }}
-            />
-          </ShapeSource>
+        {location && (
+          <UserLocation
+            renderMode="native"
+            androidRenderMode="compass"
+            showsUserHeadingIndicator
+          />
         )}
       </MapView>
 
-      {/* Overlay UI elements outside MapView. */}
-      {selectedCreationCoords && (
+      <View style={[styles.mapBottomBar, { bottom: insets.bottom + 14 }]}>
         <TouchableOpacity
-          style={[
-            styles.createAtLocationButton,
-            { bottom: insets.bottom + 160 },
-            !user && styles.disabledAction,
-          ]}
+          style={[styles.bottomAction, styles.mapBottomAction, !user && styles.disabledAction]}
           onPress={() => {
             if (!requireAuthentication()) return;
-            setShowCreateModal(true);
+            setShowInventory(true);
           }}
           accessibilityRole="button"
+          accessibilityLabel={t('openCollection')}
         >
-          <Text style={[
-            styles.createAtLocationButtonText,
-            !user && styles.disabledText,
-          ]}
-          >
-            {t('createHere')}
-          </Text>
+          <Text style={styles.bottomActionText}>{t('collection')} ({collectedMemories.length})</Text>
         </TouchableOpacity>
-      )}
-
-      {/* Creation modal. */}
-      <CreateMemoryModal
-        visible={showCreateModal}
-        currentLocation={selectedCreationCoords}
-        onClose={() => {
-          setShowCreateModal(false);
-          setSelectedCreationCoords(null);
-        }}
-        onMemoryCreated={() => {
-          if (typeof refreshData === 'function') {
-            refreshData();
-          }
-        }}
-      />
-
-      <View style={[styles.sliderContainer, { bottom: insets.bottom + 14, right: 82 }]}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={styles.sliderText}>
-            {t('radius')} : <Text style={styles.radiusValue}>{formatRadiusText(slidingRadius || radius)}</Text>
-          </Text>
-          {isLoadingApi && <ActivityIndicator size="small" color={COLORS.accent} />}
-        </View>
-        <Slider
-          style={{ width: '100%', height: 40 }}
-          minimumValue={5}
-          maximumValue={5000}
-          step={5}
-          value={radius}
-          minimumTrackTintColor={COLORS.primaryStrong}
-          maximumTrackTintColor={COLORS.surfaceMuted}
-          thumbTintColor={COLORS.accent}
-          onValueChange={(val) => setSlidingRadius(val)}
-          onSlidingComplete={(val) => {
-            setSlidingRadius(null);
-            updateRadius(val);
-          }}
-        />
+        <TouchableOpacity
+          style={[styles.bottomAction, styles.mapBottomAction]}
+          onPress={() => setShowMenu(true)}
+          accessibilityRole="button"
+          accessibilityLabel={t('openMenu')}
+        >
+          <Text style={styles.bottomActionText}>☰ {t('menu')}</Text>
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity
         style={[styles.mapArButton, { bottom: insets.bottom + 14 }]}
         onPress={handleOpenARCamera}
+        disabled={isPreparingAR}
         accessibilityRole="button"
         accessibilityLabel={t('scanAr')}
       >
-        <Text style={styles.mapArButtonIcon}>👁</Text>
+        {isPreparingAR ? (
+          <ActivityIndicator size="small" color={COLORS.textOnDark} />
+        ) : (
+          <Text style={styles.mapArButtonIcon}>👁</Text>
+        )}
       </TouchableOpacity>
 
       <InventoryModal
@@ -1019,9 +917,24 @@ function AppContent() {
         onReplace={handleReplaceFromInventory}
       />
 
+      <MenuModal
+        visible={showMenu}
+        onClose={() => setShowMenu(false)}
+        places={menuPlaces}
+        onSelectPlace={(place) => {
+          const memory = memories.find((item) => String(item.id) === String(place.id));
+          setShowMenu(false);
+          openMemoryInfo(memory || place);
+        }}
+      />
+
       <MemoryInfoModal
         visible={showInfoModal}
         memory={selectedMemoryToInspect}
+        canViewContent={canViewContent(selectedMemoryToInspect)}
+        previewMessage={getMemoryDistance(location, selectedMemoryToInspect) > DISCOVERY_RADIUS_METERS
+          ? t('contentTooFar')
+          : t('contentInAR')}
         onViewImage={(memory) => openMediaViewer(memory, 'image')}
         onViewModel={openModelViewer}
         onViewVideo={(memory) => openMediaViewer(memory, 'video')}
@@ -1071,11 +984,10 @@ const styles = StyleSheet.create({
   retryButton: { backgroundColor: COLORS.accent, paddingVertical: 12, paddingHorizontal: 25, borderRadius: 25 },
   retryText: { color: COLORS.background, fontWeight: 'bold' },
 
-  header: { paddingTop: 50, paddingBottom: 15, backgroundColor: COLORS.surface, alignItems: 'center' },
-  headerActions: { alignItems: 'center' },
-  headerTitle: { color: COLORS.accent, fontSize: 16, fontWeight: 'bold', fontFamily: 'monospace' },
-  inventoryBadge: { color: COLORS.text, fontSize: 13, fontFamily: 'monospace', marginTop: 5 },
-  accountText: { color: COLORS.primary, fontSize: 12, fontFamily: 'monospace', marginTop: 8 },
+  header: { paddingBottom: 8, paddingHorizontal: 14, backgroundColor: COLORS.surface, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerTitle: { color: COLORS.accent, fontSize: 13, fontWeight: 'bold', fontFamily: 'monospace' },
+  accountText: { color: COLORS.primary, fontSize: 12, fontFamily: 'monospace' },
 
   errorBanner: { backgroundColor: COLORS.danger, padding: 8, alignItems: 'center' },
   errorText: { color: COLORS.text, fontSize: 12, fontFamily: 'monospace' },
@@ -1113,7 +1025,6 @@ const styles = StyleSheet.create({
 
   bottomControlsArea: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingTop: 10, backgroundColor: COLORS.transparent, zIndex: 20, elevation: 20 },
   bottomAction: { flex: 1, minHeight: 42, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: COLORS.controlBorderOverlay, backgroundColor: COLORS.controlOverlay, justifyContent: 'center', alignItems: 'center' },
-  createAction: { backgroundColor: COLORS.createActionOverlay, borderColor: COLORS.primary },
   bottomActionText: { color: COLORS.textOnDark, fontWeight: 'bold', fontFamily: 'monospace', fontSize: 11, textAlign: 'center' },
   disabledAction: { opacity: 0.42 },
   disabledText: { opacity: 0.45 },
@@ -1122,33 +1033,10 @@ const styles = StyleSheet.create({
   cancelButton: { backgroundColor: COLORS.cancelOverlay, paddingVertical: 6, paddingHorizontal: 15, borderRadius: 15 },
   cancelPromptText: { color: COLORS.textOnDark, fontWeight: 'bold' },
 
-  sliderContainer: { position: 'absolute', left: 15, right: 15, backgroundColor: COLORS.sliderSurface, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: COLORS.sliderBorder },
-  sliderText: { color: COLORS.textOnDark, fontFamily: 'monospace', fontSize: 12 },
-  radiusValue: { color: COLORS.accent, fontWeight: 'bold' },
+  mapBottomBar: { position: 'absolute', left: 14, right: 82, height: 54, flexDirection: 'row', gap: 8 },
+  mapBottomAction: { minHeight: 54 },
   mapArButton: { position: 'absolute', right: 14, width: 54, height: 54, borderRadius: 27, backgroundColor: COLORS.accentStrong, justifyContent: 'center', alignItems: 'center', elevation: 6, shadowColor: COLORS.background, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.35, shadowRadius: 4 },
   mapArButtonIcon: { fontSize: 25, color: COLORS.textOnDark },
-  createAtLocationButton: {
-    position: 'absolute',
-    bottom: 160,
-    alignSelf: 'center',
-    backgroundColor: COLORS.primaryStrong,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 5,
-    shadowColor: COLORS.background,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  createAtLocationButtonText: {
-    fontSize: 14,
-    color: COLORS.textOnDark,
-    fontWeight: 'bold',
-    fontFamily: 'monospace',
-  },
   disclosureOverlay: {
     flex: 1,
     justifyContent: 'center',
