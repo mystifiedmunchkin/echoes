@@ -125,18 +125,19 @@ Legacy string-encoded fields remain readable for backwards compatibility.
 
 ### Aiming: server configuration
 
-Add `aiming` to a game of type `aiming` to enable plane preparation and camera-axis
-shooting. Games without this section retain the original objects-only behavior.
+Add `settings` to a game whose own `type` is `aiming` to enable plane preparation
+and camera-axis shooting. Games without this section retain the original
+objects-only behavior.
 The backend supplies this JSON through the same experience API; this repository
 contains the mobile consumer, not a server editor or backend.
 
 ```json
 {
-  "type": "aiming",
   "logic": {
     "games": [
       {
         "id": 100,
+        "type": "aiming",
         "assets": [
           {
             "id": 101,
