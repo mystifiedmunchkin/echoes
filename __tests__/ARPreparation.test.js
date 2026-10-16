@@ -1,6 +1,7 @@
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { Alert } from 'react-native';
+import DeviceInfo from 'react-native-device-info';
 import App from '../App';
 
 jest.mock('react-native', () => ({
@@ -15,7 +16,7 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
 jest.mock('react-native-device-info', () => ({
-  getManufacturerSync: () => 'Google', getModel: () => 'Pixel 8', getDeviceId: () => 'husky',
+  getManufacturerSync: jest.fn(() => 'Google'), getModel: jest.fn(() => 'Pixel 8'), getDeviceId: () => 'husky',
 }));
 jest.mock('react-native-gesture-handler', () => ({ GestureHandlerRootView: 'GestureHandlerRootView' }));
 jest.mock('react-native-vision-camera', () => ({
@@ -50,6 +51,10 @@ jest.mock('../src/components/MemoryInfoModal', () => ({ MemoryInfoModal: 'Memory
 jest.mock('../src/components/FullscreenMediaViewer', () => ({ FullscreenMediaViewer: 'FullscreenMediaViewer' }));
 jest.mock('../src/components/AccountModal', () => ({ AccountModal: 'AccountModal' }));
 jest.mock('../src/components/ViroModelViewer', () => 'ViroModelViewer');
+jest.mock('../src/experiences/ExperienceViewer', () => ({
+  __esModule: true,
+  default: (props) => require('react').createElement('ExperienceViewer', props),
+}));
 jest.mock('../src/components/ViroARView', () => ({
   __esModule: true,
   default: (props) => require('react').createElement('ViroARView', props),
@@ -68,6 +73,9 @@ let renderer;
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  DeviceInfo.getManufacturerSync.mockReturnValue('Google');
+  DeviceInfo.getModel.mockReturnValue('Pixel 8');
+  mockRadar.memories = [];
   mockRadar.location = origin;
   mockRadar.loadNearbyMemories.mockResolvedValue({
     location: origin, memories: [memoryAt(49), memoryAt(51)],
@@ -77,6 +85,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   act(() => renderer.unmount());
+  jest.useRealTimers();
 });
 
 test('shows the native user marker with a compass heading indicator', () => {
@@ -125,4 +134,90 @@ test('a failed media download keeps the map visible and reports the error', asyn
   expect(renderer.root.findAllByType('ViroARView')).toHaveLength(0);
   expect(renderer.root.findAllByType('MapView')).toHaveLength(1);
   expect(Alert.alert).toHaveBeenCalledWith('arPreparationError', 'Download failed');
+});
+
+test('selecting an experience routes to its template without entering legacy placement', async () => {
+  const memory = {
+    ...memoryAt(10),
+    type: 'images',
+    interactive: {
+      logic: {
+        games: [
+          {
+            id: 'poster',
+            assets: [],
+            objects: [],
+            target: {
+              id: 'target',
+              imageUrl: 'file://poster.jpg',
+              physicalWidth: 0.5,
+            },
+          },
+        ],
+      },
+    },
+  };
+  mockRadar.loadNearbyMemories.mockResolvedValue({
+    location: origin,
+    memories: [memory],
+  });
+  mockRadar.cacheMemoryAssets.mockImplementation(async item => item);
+  await act(async () => {
+    await renderer.root
+      .findByProps({ accessibilityLabel: 'scanAr' })
+      .props.onPress();
+  });
+  await act(async () => {
+    await renderer.root
+      .findByType('ViroARView')
+      .props.onMemorySelected({ nativeEvent: { id: 10 } });
+  });
+  const arView = renderer.root.findByType('ViroARView');
+  expect(arView.props.experience.games[0].type).toBe('images');
+  expect(arView.props.memoryToPlace).toBeNull();
+  expect(JSON.stringify(renderer.toJSON())).toContain('experienceHint_images');
+  act(() =>
+    renderer.root
+      .findByProps({ accessibilityLabel: 'closeExperience' })
+      .props.onPress(),
+  );
+  expect(renderer.root.findByType('ViroARView').props.experience).toBeNull();
+});
+
+test('Galaxy A opens an experience without a model URL in the fallback scene', async () => {
+  jest.useFakeTimers();
+  DeviceInfo.getManufacturerSync.mockReturnValue('samsung');
+  DeviceInfo.getModel.mockReturnValue('Galaxy A55');
+  const memory = {
+    ...memoryAt(10),
+    type: 'discovery',
+    interactive: {
+      logic: {
+        games: [
+          {
+            id: 'content',
+            assets: [],
+            objects: [
+              { id: 'info', properties: { text: 'Place information' } },
+            ],
+          },
+        ],
+      },
+    },
+  };
+  mockRadar.memories = [memory];
+  mockRadar.cacheMemoryAssets.mockImplementation(async item => item);
+  await act(async () => {
+    renderer.unmount();
+    renderer = TestRenderer.create(<App />);
+  });
+  await act(async () => {
+    await renderer.root.findByType('MemoryInfoModal').props.onViewModel(memory);
+    jest.advanceTimersByTime(500);
+  });
+  expect(renderer.root.findAllByType('ViroModelViewer')).toHaveLength(0);
+  expect(renderer.root.findAllByType('ViroARView')).toHaveLength(0);
+  expect(
+    renderer.root.findByType('ExperienceViewer').props.experience.games[0].type,
+  ).toBe('discovery');
 });

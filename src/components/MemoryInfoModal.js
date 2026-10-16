@@ -10,6 +10,7 @@ import {
 import { COLORS } from '../../theme';
 import { useI18n } from '../../constants/i18n';
 import { MemoryAudioControls } from './MemoryAudioControls';
+import { hasExperience } from '../experiences/experience';
 
 /**
  * Read-only modal displaying an existing memory's details.
@@ -71,12 +72,12 @@ export const MemoryInfoModal = ({
           )}
 
           <View style={styles.buttonRow}>
-            {canViewContent && !!memory.model_url && (
+            {canViewContent && (!!memory.model_url || hasExperience(memory)) && (
               <TouchableOpacity
                 style={styles.modelButton}
                 onPress={() => onViewModel?.(memory)}
               >
-                <Text style={styles.modelButtonText}>{t('viewModel')}</Text>
+                <Text style={styles.modelButtonText}>{t(hasExperience(memory) ? 'openExperience' : 'viewModel')}</Text>
               </TouchableOpacity>
             )}
             {canViewContent && !!memory.image_url && (

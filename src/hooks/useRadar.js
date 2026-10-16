@@ -9,6 +9,7 @@ import { getAuthToken } from '../services/auth';
 import * as Location from '../services/geolocation';
 import { translate } from '../../constants/i18n';
 import { MAP_RADIUS_METERS } from '../utils/memoryAccess';
+import { cacheExperience } from '../experiences/experience';
 
 const PRIVATE_FILES_BASE_URL = 'https://echoes.sophiehorner.art/api/private-files';
 
@@ -116,6 +117,7 @@ export const normalizeInteractiveGames = (value) => {
 };
 
 export const normalizeInteractive = (value) => {
+  if (value == null) return null;
   const source = parseJsonCollection(value, {});
   if (!source || typeof source !== 'object' || Array.isArray(source)) return null;
 
@@ -138,6 +140,13 @@ const isVideoReference = (value) => isVideoUrl(value) || /\/(?:videos?|video-fil
 const isImageReference = (value) => isImageUrl(value) || /\/(?:images?|photos?|image-files)\//i.test(value || '');
 const isAudioReference = (value) => isAudioUrl(value) || /\/(?:audios?|audio-files)\//i.test(value || '');
 const isRemoteUrl = (value) => /^https?:\/\//i.test(value || '');
+const resourceVersion = (url) => {
+  let hash = 0;
+  for (let index = 0; index < url.length; index += 1) {
+    hash = (hash * 31 + url.charCodeAt(index)) % 4294967296;
+  }
+  return hash.toString(16);
+};
 
 const resolvePrivateFileUrl = (value, userId, mediaType) => {
   if (typeof value !== 'string' || !value.trim()) return '';
@@ -192,13 +201,17 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
     const localUri = `${cacheDirectory}/${fileName}`;
     if (await FileSystem.exists(localUri)) return `file://${localUri}`;
 
-    const downloadResult = await FileSystem.fetch(remoteUrl, {
-      path: localUri,
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (downloadResult.status < 200 || downloadResult.status >= 300) {
+    try {
+      const downloadResult = await FileSystem.fetch(remoteUrl, {
+        path: localUri,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (downloadResult.status < 200 || downloadResult.status >= 300) {
+        throw new Error(translate('fileDownloadFailed', { status: downloadResult.status }));
+      }
+    } catch (error) {
       if (await FileSystem.exists(localUri)) await FileSystem.unlink(localUri);
-      throw new Error(translate('fileDownloadFailed', { status: downloadResult.status }));
+      throw error;
     }
     return `file://${localUri}`;
   }, []);
@@ -221,11 +234,20 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
     const sourceModelUrls = memory.model_urls?.length
       ? memory.model_urls
       : (memory.model_url ? [memory.model_url] : []);
-    const [modelUrls, imageUrl, videoUrl, audioUrl] = await Promise.all([
+    const [modelUrls, imageUrl, videoUrl, audioUrl, experience] = await Promise.all([
       Promise.all(sourceModelUrls.map((url, index) => cacheAsset(url, 'model', index))),
       cacheAsset(memory.image_url, 'image'),
       cacheAsset(memory.video_url, 'video'),
       cacheAsset(memory.audio_url, 'audio'),
+      cacheExperience(memory, (url, kind, index) => {
+        const mediaType = ['GLB', 'GLTF', 'OBJ'].includes(kind) ? 'model_3D' : kind;
+        const userId = memory.user_id || memory.user?.id || memory.creator?.id || memory.created_by;
+        return cacheAsset(
+          resolvePrivateFileUrl(url, userId, mediaType),
+          `experience-${kind}-${resourceVersion(url)}`,
+          index,
+        );
+      }),
     ]);
     const cachedMemory = {
       ...memory,
@@ -234,6 +256,12 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
       image_url: imageUrl,
       video_url: videoUrl,
       audio_url: audioUrl,
+      ...(experience ? {
+        interactive: {
+          ...memory.interactive,
+          logic: { ...(memory.interactive?.logic || memory.logic), ...experience },
+        },
+      } : {}),
     };
 
     setMemories((currentMemories) => currentMemories.map((currentMemory) => (
@@ -268,7 +296,9 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
 
         // The server uses model_3D as the canonical 3D asset field.
         const mediaContents = parseJsonValue(item.media_contents, {});
-        const interactive = normalizeInteractive(item.interactive);
+        const interactive = normalizeInteractive(
+          item.interactive ?? (item.logic ? { type: item.type, logic: item.logic } : null),
+        );
         const rawContents = parseJsonValue(item.contents, []);
         const isContentObject = rawContents && typeof rawContents === 'object'
           && !Array.isArray(rawContents)

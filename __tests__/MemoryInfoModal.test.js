@@ -64,3 +64,30 @@ test('authorized nearby viewer retains all media actions and audio controls', ()
   });
   act(() => renderer.unmount());
 });
+
+test('an experience without a legacy model can open in the authorized fallback viewer', () => {
+  const onViewModel = jest.fn();
+  const interactiveMemory = {
+    id: 2,
+    name: 'Experience',
+    lat: 48,
+    lng: 2,
+    type: 'treasure',
+    interactive: { logic: { games: [{ objects: [] }] } },
+  };
+  let renderer;
+  act(() => {
+    renderer = TestRenderer.create(
+      <MemoryInfoModal
+        visible
+        memory={interactiveMemory}
+        canViewContent
+        onViewModel={onViewModel}
+      />,
+    );
+  });
+  expect(JSON.stringify(renderer.toJSON())).toContain('openExperience');
+  act(() => renderer.root.findAllByType('TouchableOpacity')[0].props.onPress());
+  expect(onViewModel).toHaveBeenCalledWith(interactiveMemory);
+  act(() => renderer.unmount());
+});

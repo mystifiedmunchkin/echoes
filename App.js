@@ -34,10 +34,13 @@ import { MemoryInfoModal } from './src/components/MemoryInfoModal';
 import { FullscreenMediaViewer } from './src/components/FullscreenMediaViewer';
 import { AccountModal } from './src/components/AccountModal';
 import ViroModelViewer from './src/components/ViroModelViewer';
+import { hasExperience, readExperience } from './src/experiences/experience';
+import { ExperienceControls } from './src/experiences/ExperienceControls';
 import { useAuth } from './src/hooks/useAuth'
 import { COLORS } from './theme';
 import { useI18n } from './constants/i18n';
 const ViroARView = React.lazy(() => import('./src/components/ViroARView'));
+const ExperienceViewer = React.lazy(() => import('./src/experiences/ExperienceViewer'));
 const MAP_NEIGHBORHOOD_ZOOM = 12;
 const DEFAULT_MAP_CENTER = [1.3553, 44.0175];
 const AR_SESSION_RELEASE_MS = 1500;
@@ -162,6 +165,20 @@ function AppContent() {
   const [selectedMemoryToInspect, setSelectedMemoryToInspect] = useState(null);
   const [modelViewerMemory, setModelViewerMemory] = useState(null);
   const [isPreparingModelViewer, setIsPreparingModelViewer] = useState(false);
+  const [experienceGameIndex, setExperienceGameIndex] = useState(0);
+  const [experienceInteraction, setExperienceInteraction] = useState(null);
+  const arExperience = useMemo(() => readExperience(selectedArMemory), [selectedArMemory]);
+  const viewerExperience = useMemo(() => readExperience(modelViewerMemory), [modelViewerMemory]);
+  const reportExperienceError = useCallback((message) => {
+    Alert.alert(t('experienceError'), message);
+  }, [t]);
+  const selectExperienceGame = useCallback((index) => {
+    setExperienceGameIndex(index);
+    setExperienceInteraction(null);
+  }, []);
+  const handleExperienceEvent = useCallback((event) => {
+    if (event.name === 'press') setExperienceInteraction(event);
+  }, []);
   const modelViewerRequestKey = useRef(0);
   const modelViewerTransitionTimer = useRef(null);
   const [mediaViewer, setMediaViewer] = useState(null);
@@ -216,7 +233,7 @@ function AppContent() {
       Alert.alert(t('contentPreview'), t('contentDiscoveryHint'));
       return;
     }
-    if (!memory?.model_url) return;
+    if (!memory?.model_url && !hasExperience(memory)) return;
 
     const requestKey = ++modelViewerRequestKey.current;
     if (modelViewerTransitionTimer.current) {
@@ -233,6 +250,7 @@ function AppContent() {
       modelViewerTransitionTimer.current = setTimeout(() => {
         if (modelViewerRequestKey.current !== requestKey) return;
         setModelViewerMemory(cachedMemory);
+        selectExperienceGame(0);
         setIsPreparingModelViewer(false);
       }, MODEL_VIEWER_RELEASE_MS);
     } catch (error) {
@@ -243,7 +261,7 @@ function AppContent() {
         error instanceof Error ? error.message : t('modelPreparationError'),
       );
     }
-  }, [cacheMemoryAssets, canViewContent, t]);
+  }, [cacheMemoryAssets, canViewContent, selectExperienceGame, t]);
 
   const closeModelViewer = useCallback(() => {
     const requestKey = ++modelViewerRequestKey.current;
@@ -442,7 +460,12 @@ function AppContent() {
     try {
       const cachedMemory = await cacheMemoryAssets(sourceMemory || memory);
       setSelectedMemoryToPlace({ ...cachedMemory, is_collectible: false });
-      if (!(await openARCamera())) setSelectedMemoryToPlace(null);
+      if (!(await openARCamera())) {
+        setSelectedMemoryToPlace(null);
+      } else if (hasExperience(cachedMemory)) {
+        setSelectedArMemory(cachedMemory);
+        selectExperienceGame(0);
+      }
     } catch (error) {
       setSelectedMemoryToPlace(null);
       Alert.alert(t('modelLoadError'), error.message);
@@ -461,13 +484,14 @@ function AppContent() {
       const cachedMemory = await cacheMemoryAssets(memory);
       setSelectedArMemory(cachedMemory);
       setSelectedMemoryToPlace(cachedMemory);
-      setIsPlacingMode(true);
+      selectExperienceGame(0);
+      setIsPlacingMode(!hasExperience(cachedMemory));
     } catch (error) {
       Alert.alert(t('modelLoadError'), error.message);
     } finally {
       setIsPreparingPlacement(false);
     }
-  }, [arMemories, cacheMemoryAssets, isPreparingPlacement, markPlaceVisited, t]);
+  }, [arMemories, cacheMemoryAssets, isPreparingPlacement, markPlaceVisited, selectExperienceGame, t]);
 
   const openMemoryInfo = useCallback((memory) => {
     if (!memory) return;
@@ -532,7 +556,24 @@ function AppContent() {
   if (isPreparingModelViewer || modelViewerMemory) {
     return (
       <View style={styles.modelViewerScreen} collapsable={false}>
-        {modelViewerMemory ? (
+        {modelViewerMemory && viewerExperience ? (
+          <React.Suspense fallback={<ActivityIndicator color={COLORS.accent} />}>
+            <ExperienceViewer
+              experience={viewerExperience}
+              gameIndex={experienceGameIndex}
+              onEvent={handleExperienceEvent}
+              onError={reportExperienceError}
+              style={styles.fullscreenModelViewer}
+            />
+            <View style={[styles.experiencePanel, { bottom: insets.bottom + 20 }]}>
+              <ExperienceControls experience={viewerExperience} gameIndex={experienceGameIndex}
+                onSelect={selectExperienceGame} mode="viewer" />
+              {experienceInteraction && (
+                <Text style={styles.loaderText}>{experienceInteraction.objectId}</Text>
+              )}
+            </View>
+          </React.Suspense>
+        ) : modelViewerMemory ? (
           <ViroModelViewer
             modelUrl={modelViewerMemory.model_url}
             style={styles.fullscreenModelViewer}
@@ -617,6 +658,10 @@ function AppContent() {
             memoryToPlace={isPlacingMode ? arMemoryToPlace : null}
             arMemories={arMemories}
             nearbyMemories={nearbyMemories}
+            experience={arExperience}
+            experienceGameIndex={experienceGameIndex}
+            onExperienceEvent={handleExperienceEvent}
+            onExperienceError={reportExperienceError}
           />
         </React.Suspense>
 
@@ -671,6 +716,23 @@ function AppContent() {
           </View>
         </View>
 
+        {arExperience && (
+          <View style={[styles.experiencePanel, { top: insets.top + 76 }]}>
+            <ExperienceControls experience={arExperience} gameIndex={experienceGameIndex}
+              onSelect={selectExperienceGame} mode="ar" />
+            {experienceInteraction && (
+              <Text style={styles.loaderText}>{experienceInteraction.objectId}</Text>
+            )}
+            <TouchableOpacity onPress={() => {
+              setSelectedArMemory(null);
+              setSelectedMemoryToPlace(null);
+              setExperienceInteraction(null);
+            }} accessibilityRole="button" accessibilityLabel={t('closeExperience')}>
+              <Text style={styles.cancelPromptText}>{t('closeExperience')}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {(isModelLoading || isPreparingPlacement) && (
           <View style={styles.arCenterOverlay} pointerEvents="box-none">
             {(isModelLoading || isPreparingPlacement) && (
@@ -715,9 +777,9 @@ function AppContent() {
           pointerEvents="box-none"
         >
           <TouchableOpacity
-            style={[styles.bottomAction, (!arMemoryToPlace || isPlacingMode || isPreparingPlacement) && styles.disabledAction]}
+            style={[styles.bottomAction, (!arMemoryToPlace || arExperience || isPlacingMode || isPreparingPlacement) && styles.disabledAction]}
             onPress={() => handleMemorySelected(arMemoryToPlace.id)}
-            disabled={!arMemoryToPlace || isPlacingMode || isPreparingPlacement}
+            disabled={!arMemoryToPlace || !!arExperience || isPlacingMode || isPreparingPlacement}
           >
             <Text style={styles.bottomActionText}>⌄ {t('placeShort')}</Text>
           </TouchableOpacity>
@@ -957,6 +1019,7 @@ function AppContent() {
 }
 
 const styles = StyleSheet.create({
+  experiencePanel: { position: 'absolute', left: 16, right: 16 },
   gestureRoot: { flex: 1 },
   devTapOverlay: {
     ...StyleSheet.absoluteFillObject,

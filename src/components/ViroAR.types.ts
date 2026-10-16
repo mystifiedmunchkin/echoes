@@ -1,5 +1,6 @@
 /** Shared TypeScript contracts for the React-to-Viro AR view boundary. */
 import { ViewProps } from 'react-native';
+import type { Experience, ExperienceEvent } from '../experiences/experience';
 
 export interface InteractiveObject {
   properties?: Record<string, unknown>;
@@ -32,6 +33,9 @@ export interface MemoryRecord {
   video_url?: string;
   audio_url?: string;
   user_id?: number | string;
+  created_by?: number | string;
+  relativePosition?: [number, number, number];
+  isOwn?: boolean;
   interactive?: InteractiveDefinition | null;
 }
 
@@ -66,4 +70,8 @@ export interface ViroARViewProps extends ViewProps {
   onModelLoadingStatus?: (event: ModelLoadingStatusEvent) => void;
   resetPlacedMemoryKey?: number;
   canCollect?: boolean;
+  experience?: Experience | null;
+  experienceGameIndex?: number;
+  onExperienceEvent?: (event: ExperienceEvent) => void;
+  onExperienceError?: (message: string) => void;
 }

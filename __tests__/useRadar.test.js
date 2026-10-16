@@ -11,6 +11,7 @@ jest.mock('react-native-file-access', () => ({
     exists: jest.fn().mockResolvedValue(false),
     mkdir: jest.fn().mockResolvedValue(),
     fetch: jest.fn().mockResolvedValue({ status: 200 }),
+    unlink: jest.fn().mockResolvedValue(),
   },
 }));
 jest.mock('../src/services/auth', () => ({ getAuthToken: jest.fn().mockResolvedValue(null) }));
@@ -33,6 +34,8 @@ function Probe() {
 beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
+  FileSystem.exists.mockResolvedValue(false);
+  FileSystem.fetch.mockResolvedValue({ status: 200 });
   global.fetch = jest.fn().mockResolvedValue({
     ok: true,
     json: async () => [{
@@ -160,4 +163,102 @@ test('awaits a media download and returns a local URI', async () => {
     cached = await download;
   });
   expect(cached.image_url).toBe('file://cache/memory-assets/1-image-0.jpg');
+});
+
+test('prepares private image targets and scene assets before returning the experience', async () => {
+  const memory = {
+    id: 20,
+    user_id: 4,
+    type: 'images',
+    interactive: {
+      logic: {
+        games: [
+          {
+            id: 'poster',
+            assets: [{ id: 'model', type: 'GLB', url: 'butterfly.glb' }],
+            target: { id: 'image', imageUrl: 'poster.jpg', physicalWidth: 0.6 },
+            objects: [{ id: 'butterfly', properties: { asset: 'model' } }],
+          },
+        ],
+      },
+    },
+  };
+  let cached;
+  await act(async () => {
+    cached = await radar.cacheMemoryAssets(memory);
+  });
+  expect(FileSystem.fetch).toHaveBeenCalledWith(
+    'https://echoes.sophiehorner.art/api/private-files/4/model_3D/butterfly.glb',
+    expect.objectContaining({
+      path: expect.stringContaining('20-experience-GLB-'),
+    }),
+  );
+  expect(FileSystem.fetch).toHaveBeenCalledWith(
+    'https://echoes.sophiehorner.art/api/private-files/4/image/poster.jpg',
+    expect.objectContaining({
+      path: expect.stringContaining('20-experience-image-'),
+    }),
+  );
+  expect(cached.interactive.logic.games[0]).toMatchObject({
+    type: 'images',
+    target: {
+      imageUrl: expect.stringMatching(/^file:\/\//),
+      physicalWidth: 0.6,
+    },
+    assets: [{ url: expect.stringMatching(/^file:\/\//) }],
+  });
+});
+
+test('preserves root type and object logic returned directly by the API', async () => {
+  global.fetch.mockResolvedValue({
+    ok: true,
+    json: async () => [
+      {
+        id: 5,
+        latitude: 0,
+        longitude: 0,
+        type: 'treasure',
+        logic: {
+          games: [
+            {
+              id: 'clue',
+              assets: [],
+              objects: [{ id: 'text', properties: { text: 'Clue' } }],
+            },
+          ],
+        },
+      },
+    ],
+  });
+  await act(async () => {
+    await radar.loadNearbyMemories();
+  });
+  let cached;
+  await act(async () => {
+    cached = await radar.cacheMemoryAssets(radar.memories[0]);
+  });
+  expect(cached.type).toBe('treasure');
+  expect(cached.interactive.logic.games[0].type).toBe('treasure');
+});
+
+test('removes a partial file after a rejected download so a retry cannot reuse it', async () => {
+  let partialFileExists = false;
+  FileSystem.exists.mockImplementation(
+    async path => path.endsWith('.jpg') && partialFileExists,
+  );
+  FileSystem.fetch.mockImplementationOnce(async () => {
+    partialFileExists = true;
+    throw new Error('Network interrupted');
+  });
+  await act(async () => {
+    await expect(
+      radar.cacheMemoryAssets({
+        id: 30,
+        image_url: 'https://example.test/poster.jpg',
+      }),
+    ).rejects.toThrow('Network interrupted');
+  });
+  expect(FileSystem.unlink).toHaveBeenCalledWith(
+    'cache/memory-assets/30-image-0.jpg',
+  );
 });
