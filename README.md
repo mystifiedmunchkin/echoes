@@ -15,7 +15,7 @@ This is a new [**React Native**](https://reactnative.dev) project, bootstrapped 
 The mobile runtime provides four separate UX extension points in
 [`src/experiences/ExperienceTemplates.tsx`](src/experiences/ExperienceTemplates.tsx):
 `aiming`, `treasure`, `discovery`, and `images`. These are template foundations,
-not finished games: aiming rules, geolocated quest progression, collection of
+not finished games: scoring/win rules, geolocated quest progression, collection of
 individual keys/clues, scoring and persistence remain to be implemented.
 Existing map proximity restrictions and legacy memory viewers remain unchanged.
 
@@ -81,8 +81,8 @@ Legacy string-encoded fields remain readable for backwards compatibility.
   (`params: [width, height, length]`) or `Sphere` (`params: [radius]`).
   Optional fields: `mass` (positive for dynamic bodies), `restitution`,
   `friction` (both 0..1), `useGravity`, `velocity`.
-  Include static collider objects when needed; detecting an AR plane does not
-  automatically create a physical floor. Dynamic bodies are simulated by Viro.
+  Include static collider objects when needed; only a configured aiming game
+  automatically creates a physical floor. Dynamic bodies are simulated by Viro.
 - `animation` defines relative Y rotation in degrees over `duration`
   milliseconds (positive), looping by default. Media load errors are reported
   to the application. Scene video loops and audio plays when its object mounts.
@@ -100,7 +100,7 @@ Legacy string-encoded fields remain readable for backwards compatibility.
   not automatically downloaded or rewritten.
 - Only one game is active at a time; the overlay allows switching games.
   AR exposes nearby memory droplets until a memory is selected. Non-image
-  scenes start two meters in front of the session origin. Image scenes use the
+  scenes without aiming configuration start two meters in front of the session origin. Image scenes use the
   native image anchor. On Galaxy A, the authorized details modal opens the same
   template in a physics-enabled 3D scene, including for experiences without a
   legacy `model_url`. Image mode then explicitly displays a preview, without
@@ -114,6 +114,120 @@ Legacy string-encoded fields remain readable for backwards compatibility.
   object's ID; it does not award inventory items or scores.
 - Invalid types, target dimensions, references and physics data reject
   preparation with an explicit error rather than silently choosing a template.
+
+### Aiming: server configuration
+
+Add `aiming` to a game of type `aiming` to enable plane preparation and camera-axis
+shooting. Games without this section retain the original objects-only behavior.
+The backend supplies this JSON through the same experience API; this repository
+contains the mobile consumer, not a server editor or backend.
+
+```json
+{
+  "type": "aiming",
+  "logic": {
+    "games": [
+      {
+        "id": "basket-throw",
+        "assets": [
+          { "id": "ball-model", "type": "GLB", "url": "https://example.com/ball.glb" },
+          { "id": "basket-model", "type": "OBJ", "url": "https://example.com/basket.obj" }
+        ],
+        "aiming": {
+          "plane": { "minWidth": 2, "minLength": 3, "stableMs": 1000 },
+          "projectile": {
+            "objectId": "ball",
+            "speed": 5,
+            "spawnDistance": 0.3,
+            "lifetimeMs": 10000,
+            "maxActive": 12
+          },
+          "targets": ["basket"]
+        },
+        "objects": [
+          {
+            "id": "ball",
+            "properties": {
+              "asset": "ball-model",
+              "scale": [1, 1, 1],
+              "collider": { "type": "sphere", "size": [0.2, 0.2, 0.2] },
+              "physics": { "type": "Dynamic", "mass": 0.5, "restitution": 0.4 }
+            }
+          },
+          {
+            "id": "basket",
+            "properties": {
+              "asset": "basket-model",
+              "position": [0, 0.5, 0],
+              "collider": { "type": "basket", "size": [1, 1, 1], "thickness": 0.05 }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+- AR waits for normal tracking and an upward-facing horizontal plane meeting
+  **both** minimum dimensions. During `stableMs` (default 1000 ms), a change of
+  anchor, a displacement over 3 cm, a yaw change over 3 degrees, anchor removal
+  or loss of tracking restarts preparation. This is a pose-stability heuristic,
+  not a guarantee of tracking accuracy.
+- Once ready, the runtime snapshots the plane's center, yaw and measured extents
+  into a fixed world-space static box, 5 cm thick with its upper face at floor
+  height. Later plane updates do not move the floor. Choose a clear physical
+  floor: a sufficiently large tabletop is also a valid horizontal plane to the
+  tracker. The floor is an invisible collider, not a rendered ground mesh.
+- Targets use positions/rotations relative to the locked floor center.
+  Their OBJ geometry should be centered on the configured collider. Targets
+  default to `Static`; optional `physics` can specify `Static`, `Dynamic` or
+  `Kinematic` and the usual physical parameters. All configured targets must
+  reference OBJ assets and a collider. The projectile template must reference
+  a GLB or OBJ asset and a collider; it is not mounted before shooting.
+- Tap the scene to spawn a dynamic projectile from the camera position plus
+  `spawnDistance` along its normalized forward axis. Defaults: distance 0.3 m,
+  speed 5 m/s, lifetime 10000 ms, maximum 12 active projectiles. All are positive
+  finite values; `maxActive` is an integer. The initial rotation follows the
+  camera (author the projectile facing local -Z). The template's position and
+  initial velocity are replaced by the launch pose and velocity.
+  Select a spawn distance outside the projectile and tune speed/size to avoid
+  discrete-physics tunneling. Expired projectiles are unmounted automatically.
+- Tracking loss blocks new shots and requests a fresh camera pose on recovery;
+  the floor remains fixed and existing physics simulation continues. Neither
+  collisions nor basket entry award points in this version.
+- Colliders have an explicit `size: [width, height, length]` in meters,
+  centered on their object's origin. Unlike the generic object contract,
+  configured projectile/target `scale` changes **only the visual model**;
+  collider dimensions stay in meters. `physics.shape` is optional and overridden
+  by `collider`. Rotating animations on these physical objects are rejected;
+  use the object's initial rotation instead.
+
+| Collider | Configuration / implementation |
+| --- | --- |
+| `bounding` | Explicit box dimensions; no automatic OBJ/GLB bounds extraction. |
+| `sphere` | Equal X/Y/Z dimensions; radius is half the width. |
+| `capsule` | Vertical, X = Z and Y >= X; compound approximation using overlapping spheres and a central box. Y = X becomes a sphere. |
+| `diamond` | Octahedron approximation, made of 8 vertical layers with 5 box strips each. |
+| `basket` | Open rectangular basket: bottom and four walls, no lid. Requires positive `thickness` smaller than height and half the width/length. |
+
+Viro supports boxes, spheres and their compounds, not native capsule or convex
+octahedron shapes. The two approximations are intentional and not exact smooth
+surfaces. All five choices work for projectiles and targets independently of the
+visual asset; a visually hollow OBJ needs `basket` rather than a solid bounding
+box for projectiles to enter.
+
+The 3D fallback uses the same physical objects and launch mechanics with an
+immediate synthetic floor centered at `[0, -1, -2]` and the configured minimum
+dimensions; it does not claim to track a real plane.
+Additional callbacks: `planeReady.data` describes the locked floor;
+`shot.objectId` identifies the spawned instance and `shot.data` contains its
+`projectileId`, world position and velocity; `shotBlocked.data.reason` is
+`plane`, `tracking`, `camera` or `limit`. Regular collision events identify the
+projectile instance and the colliding target's tag (or `aiming-floor`).
+Object IDs `aiming-floor` and the `aiming-shot:` prefix are reserved.
+Tracking, contact accuracy, model alignment, and fast/small projectile behavior
+must still be verified on physical ARCore/ARKit devices.
 
 > **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
 

@@ -9,6 +9,7 @@ import {
 } from '@reactvision/react-viro';
 import { ExperienceContent } from './ExperienceTemplates';
 import type { Experience, ExperienceEvent } from './experience';
+import { AimingSceneContext, useAimingScene } from './AimingScene';
 
 interface ViewerProps {
   experience: Experience;
@@ -27,16 +28,27 @@ class ExperienceScene extends ViroScene {
     };
     const props = sceneNavigator?.viroAppProps;
     if (!props) return <ViroScene />;
-    const game = props.experience.games[props.gameIndex];
-    return (
-      <ViroScene physicsWorld={{ gravity: props.experience.gravity }}>
+    return <ViewerContent {...props} />;
+  }
+}
+
+function ViewerContent(props: ViewerProps) {
+  const game = props.experience.games[props.gameIndex];
+  const aimingScene = useAimingScene('viewer');
+  return (
+    <AimingSceneContext.Provider value={aimingScene.value}>
+      <ViroScene
+        physicsWorld={{ gravity: props.experience.gravity }}
+        onCameraTransformUpdate={aimingScene.onCameraTransformUpdate}
+        onClick={aimingScene.onClick}
+      >
         <ViroAmbientLight color="#FFFFFF" intensity={400} />
         <ViroDirectionalLight
           color="#FFFFFF"
           direction={[0, -1, -1]}
           intensity={600}
         />
-        <ViroNode position={[0, 0, -2]}>
+        <ViroNode position={game.aiming ? [0, 0, 0] : [0, 0, -2]}>
           <ExperienceContent
             key={game.id}
             game={game}
@@ -46,8 +58,8 @@ class ExperienceScene extends ViroScene {
           />
         </ViroNode>
       </ViroScene>
-    );
-  }
+    </AimingSceneContext.Provider>
+  );
 }
 
 // Viro's 3D navigator renders a class but declares a scene instance.

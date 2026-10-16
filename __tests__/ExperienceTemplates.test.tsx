@@ -39,6 +39,8 @@ jest.mock('@reactvision/react-viro', () => {
         sceneNavigator: { viroAppProps },
       }),
     ViroARScene: 'ViroARScene',
+    ViroARPlane: 'ViroARPlane',
+    ViroTrackingStateConstants: { TRACKING_NORMAL: 3 },
     Viro3DObject: 'Viro3DObject',
     ViroARImageMarker: 'ViroARImageMarker',
     ViroImage: 'ViroImage',
@@ -261,4 +263,284 @@ test('a replacement target requires a new detection and releases the previous re
     }),
   );
   expect(onError).toHaveBeenCalledWith('Invalid native image');
+});
+
+describe('configured aiming runtime', () => {
+  const aiming = readExperience({
+    type: 'aiming',
+    logic: {
+      games: [
+        {
+          id: 'aim',
+          assets: [
+            { id: 'ball', type: 'GLB', url: 'file://ball.glb' },
+            { id: 'basket', type: 'OBJ', url: 'file://basket.obj' },
+          ],
+          objects: [
+            {
+              id: 'projectile',
+              properties: {
+                asset: 'ball',
+                scale: [2, 2, 2],
+                collider: { type: 'sphere', size: [0.1, 0.1, 0.1] },
+              },
+            },
+            {
+              id: 'target',
+              properties: {
+                asset: 'basket',
+                position: [0, 0.5, -0.5],
+                collider: { type: 'basket', size: [1, 1, 1], thickness: 0.05 },
+              },
+            },
+          ],
+          aiming: {
+            plane: { minWidth: 2, minLength: 3, stableMs: 1000 },
+            projectile: {
+              objectId: 'projectile',
+              speed: 6,
+              maxActive: 1,
+              lifetimeMs: 2000,
+            },
+            targets: ['target'],
+          },
+        },
+      ],
+    },
+  })!;
+  const anchor = {
+    anchorId: 'floor',
+    type: 'plane',
+    alignment: 'HorizontalUpward',
+    position: [1, -1, -3],
+    rotation: [0, 90, 0],
+    center: [0.5, 0, 0.25],
+    width: 2,
+    height: 3,
+  };
+  const camera = {
+    position: [2, 1, 0],
+    rotation: [0, 90, 0],
+    forward: [2, 0, 0],
+  };
+  const scene = () => host('ViroARScene')[0];
+  const floor = () =>
+    host('ViroNode').find(node => node.props.viroTag === 'aiming-floor');
+  const projectiles = () =>
+    host('ViroNode').filter(
+      node =>
+        typeof node.props.viroTag === 'string' &&
+        node.props.viroTag.startsWith('aiming-shot:'),
+    );
+  const mountAR = async () => {
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <ViroARView
+          experience={aiming}
+          onExperienceEvent={onEvent}
+          onExperienceError={onError}
+        />,
+      );
+    });
+  };
+  const detectFloor = () => {
+    act(() => scene().props.onTrackingUpdated(3));
+    act(() => host('ViroARPlane')[0].props.onAnchorFound(anchor));
+    act(() => jest.advanceTimersByTime(1000));
+    act(() => scene().props.onCameraTransformUpdate(camera));
+  };
+
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  test('requires normal tracking, minimum plane dimensions and a stable pose before creating a static world-space floor', async () => {
+    await mountAR();
+    const detector = host('ViroARPlane')[0];
+    expect(detector.props).toMatchObject({
+      minWidth: 2,
+      minHeight: 3,
+      alignment: 'HorizontalUpward',
+    });
+    act(() => detector.props.onAnchorFound(anchor));
+    act(() => jest.advanceTimersByTime(1500));
+    expect(floor()).toBeUndefined();
+    expect(host('Viro3DObject')).toHaveLength(0);
+    act(() => scene().props.onClick());
+    expect(onEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        name: 'shotBlocked',
+        data: { reason: 'plane' },
+      }),
+    );
+    act(() => scene().props.onTrackingUpdated(3));
+    act(() => detector.props.onAnchorUpdated({ ...anchor, width: 1.99 }));
+    act(() => jest.advanceTimersByTime(1000));
+    expect(floor()).toBeUndefined();
+    act(() =>
+      detector.props.onAnchorUpdated({ ...anchor, alignment: 'Vertical' }),
+    );
+    act(() => jest.advanceTimersByTime(1000));
+    expect(floor()).toBeUndefined();
+    act(() => detector.props.onAnchorUpdated(anchor));
+    act(() => jest.advanceTimersByTime(999));
+    expect(floor()).toBeUndefined();
+    act(() =>
+      detector.props.onAnchorUpdated({ ...anchor, position: [1.1, -1, -3] }),
+    );
+    act(() => jest.advanceTimersByTime(999));
+    expect(floor()).toBeUndefined();
+    act(() => jest.advanceTimersByTime(1));
+    expect(floor()!.props.physicsBody).toEqual({
+      type: 'Static',
+      friction: 0.7,
+      restitution: 0.2,
+      shape: { type: 'Box', params: [2, 0.05, 3] },
+    });
+    expect(floor()!.parent!.props.position).toEqual([1.35, -1, -3.5]);
+    expect(floor()!.parent!.props.rotation).toEqual([0, 90, 0]);
+    expect(host('ViroARPlane')).toHaveLength(0);
+    expect(host('Viro3DObject')).toHaveLength(1);
+    expect(onEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'planeReady' }),
+    );
+  });
+
+  test('resets plane stability on anchor removal and tracking loss', async () => {
+    await mountAR();
+    act(() => scene().props.onTrackingUpdated(3));
+    act(() => host('ViroARPlane')[0].props.onAnchorFound(anchor));
+    act(() => jest.advanceTimersByTime(500));
+    act(() => host('ViroARPlane')[0].props.onAnchorRemoved());
+    act(() => jest.advanceTimersByTime(1000));
+    expect(floor()).toBeUndefined();
+    act(() => host('ViroARPlane')[0].props.onAnchorFound(anchor));
+    act(() => jest.advanceTimersByTime(500));
+    act(() => scene().props.onTrackingUpdated(2));
+    act(() => jest.advanceTimersByTime(1500));
+    act(() => scene().props.onTrackingUpdated(3));
+    act(() => jest.advanceTimersByTime(1500));
+    expect(floor()).toBeUndefined();
+    act(() => host('ViroARPlane')[0].props.onAnchorUpdated(anchor));
+    act(() => jest.advanceTimersByTime(1000));
+    expect(floor()).toBeDefined();
+  });
+
+  test('fires the GLB along the normalized camera axis, limits shots and removes expired bodies', async () => {
+    await mountAR();
+    detectFloor();
+    act(() => scene().props.onClick());
+    const shot = projectiles()[0];
+    expect(shot.props.position).toEqual([2.3, 1, 0]);
+    expect(shot.props.physicsBody).toMatchObject({
+      type: 'Dynamic',
+      mass: 1,
+      velocity: [6, 0, 0],
+      shape: { type: 'Sphere', params: [0.05] },
+    });
+    expect(shot.props.scale).toBeUndefined();
+    expect(
+      shot.findAll(node => String(node.type) === 'ViroNode')[1].props.scale,
+    ).toEqual([2, 2, 2]);
+    expect(host('Viro3DObject').map(node => node.props.type)).toEqual([
+      'OBJ',
+      'GLB',
+    ]);
+    act(() => shot.props.onCollision('target', [0, 0, 0], [0, 1, 0]));
+    expect(onEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'collision',
+        objectId: shot.props.viroTag,
+        data: { tag: 'target', point: [0, 0, 0], normal: [0, 1, 0] },
+      }),
+    );
+    act(() => scene().props.onClick());
+    expect(projectiles()).toHaveLength(1);
+    expect(onEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        name: 'shotBlocked',
+        data: { reason: 'limit' },
+      }),
+    );
+    act(() => jest.advanceTimersByTime(2000));
+    expect(projectiles()).toHaveLength(0);
+    act(() => scene().props.onClick());
+    expect(projectiles()).toHaveLength(1);
+    act(() => renderer.unmount());
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('keeps the floor fixed on tracking loss and requires a fresh camera pose before resuming', async () => {
+    await mountAR();
+    detectFloor();
+    const pose = floor()!.parent!.props.position;
+    act(() => scene().props.onTrackingUpdated(2));
+    act(() => scene().props.onClick());
+    expect(projectiles()).toHaveLength(0);
+    expect(onEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: { reason: 'tracking' } }),
+    );
+    expect(floor()!.parent!.props.position).toEqual(pose);
+    act(() => scene().props.onTrackingUpdated(3));
+    act(() => scene().props.onClick());
+    expect(onEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: { reason: 'camera' } }),
+    );
+    act(() => scene().props.onCameraTransformUpdate(camera));
+    act(() =>
+      host('ViroNode')
+        .find(node => node.props.viroTag === 'target')!
+        .props.onClick(),
+    );
+    expect(projectiles()).toHaveLength(1);
+  });
+
+  test('provides an immediate synthetic floor and the same firing mechanics in the 3D fallback', async () => {
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <ExperienceViewer
+          experience={aiming}
+          gameIndex={0}
+          onEvent={onEvent}
+          onError={onError}
+        />,
+      );
+    });
+    expect(host('ViroARPlane')).toHaveLength(0);
+    expect(floor()!.parent!.props.position).toEqual([0, -1, -2]);
+    act(() => host('ViroScene')[0].props.onCameraTransformUpdate(camera));
+    act(() => host('ViroScene')[0].props.onClick());
+    expect(projectiles()).toHaveLength(1);
+  });
+
+  test('switching games discards the previous floor, projectile bodies and expiry timers', async () => {
+    await mountAR();
+    detectFloor();
+    act(() => scene().props.onClick());
+    expect(projectiles()).toHaveLength(1);
+    await act(async () => {
+      renderer.update(
+        <ViroARView
+          experience={{
+            ...aiming,
+            games: [{ ...aiming.games[0], id: 'another-game' }],
+          }}
+          onExperienceEvent={onEvent}
+          onExperienceError={onError}
+        />,
+      );
+    });
+    expect(projectiles()).toHaveLength(0);
+    expect(floor()).toBeUndefined();
+    expect(host('ViroARPlane')).toHaveLength(1);
+    act(() => jest.runAllTicks());
+    expect(jest.getTimerCount()).toBe(0);
+    act(() => scene().props.onClick());
+    expect(onEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        gameId: 'another-game',
+        name: 'shotBlocked',
+        data: { reason: 'plane' },
+      }),
+    );
+  });
 });

@@ -1,3 +1,6 @@
+import { readAiming, readCollider } from './aiming';
+import type { AimingCollider, AimingSettings } from './aiming';
+
 export type ExperienceType = 'aiming' | 'treasure' | 'discovery' | 'images';
 export type Vector3 = [number, number, number];
 export type AssetType = 'GLB' | 'GLTF' | 'OBJ' | 'image' | 'video' | 'audio';
@@ -28,6 +31,7 @@ export interface ExperienceObject {
     rotation?: Vector3;
     scale?: Vector3;
     physics?: PhysicsBody;
+    collider?: AimingCollider;
     animation?: { rotateY: number; duration: number; loop?: boolean };
     [key: string]: unknown;
   };
@@ -47,6 +51,7 @@ export interface ExperienceGame {
   assets: ExperienceAsset[];
   objects: ExperienceObject[];
   target?: ImageTarget;
+  aiming?: AimingSettings;
   [key: string]: unknown;
 }
 
@@ -64,7 +69,10 @@ export interface ExperienceEvent {
     | 'collision'
     | 'targetFound'
     | 'targetUpdated'
-    | 'targetRemoved';
+    | 'targetRemoved'
+    | 'planeReady'
+    | 'shot'
+    | 'shotBlocked';
   data?: unknown;
 }
 
@@ -96,14 +104,21 @@ function unique(ids: string[], path: string) {
   requireValue(new Set(ids).size === ids.length, `${path}: duplicate id`);
 }
 
-function physicsBody(value: unknown, path: string): PhysicsBody {
+function physicsBody(
+  value: unknown,
+  path: string,
+  collider?: AimingCollider,
+): PhysicsBody {
   const source = record(value);
   const { type } = source;
   requireValue(
     type === 'Dynamic' || type === 'Static' || type === 'Kinematic',
     `${path}.type`,
   );
-  const shape = record(source.shape);
+  const shape = record(
+    source.shape ??
+      (collider ? { type: 'Box', params: collider.size } : undefined),
+  );
   requireValue(
     shape.type === 'Box' || shape.type === 'Sphere',
     `${path}.shape.type`,
@@ -232,10 +247,16 @@ export function readExperience(memory: unknown): Experience | null {
             parsed.scale.every(n => n > 0),
             `${objectPath}.scale`,
           );
+        if (type === 'aiming' && properties.collider !== undefined)
+          parsed.collider = readCollider(
+            properties.collider,
+            `${objectPath}.collider`,
+          );
         if (properties.physics !== undefined)
           parsed.physics = physicsBody(
             properties.physics,
             `${objectPath}.physics`,
+            parsed.collider,
           );
         if (properties.animation !== undefined) {
           const animation = record(properties.animation);
@@ -276,7 +297,26 @@ export function readExperience(memory: unknown): Experience | null {
       assets,
       objects,
       target: undefined,
+      aiming: undefined,
     };
+    if (type === 'aiming' && game.aiming !== undefined) {
+      result.aiming = readAiming(game.aiming, objects, `${path}.aiming`);
+      for (const id of [
+        result.aiming.projectile.objectId,
+        ...result.aiming.targets,
+      ]) {
+        const object = objects.find(item => item.id === id)!;
+        const asset = assets.find(item => item.id === object.properties.asset);
+        requireValue(
+          id === result.aiming.projectile.objectId
+            ? asset?.type === 'GLB' || asset?.type === 'OBJ'
+            : asset?.type === 'OBJ',
+          `${path}.aiming: ${id} requires ${
+            id === result.aiming.projectile.objectId ? 'GLB or OBJ' : 'OBJ'
+          }`,
+        );
+      }
+    }
     if (type === 'images') {
       const target = record(game.target);
       const orientation = target.orientation ?? 'Up';
