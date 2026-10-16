@@ -105,7 +105,7 @@ function MemoryARScene({
         {game && (
           <ViroNode
             position={
-              game.type === 'images' || game.aiming ? [0, 0, 0] : [0, 0, -2]
+              game.type === 'images' || game.settings ? [0, 0, 0] : [0, 0, -2]
             }
           >
             <ExperienceContent

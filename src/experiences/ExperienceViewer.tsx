@@ -48,7 +48,7 @@ function ViewerContent(props: ViewerProps) {
           direction={[0, -1, -1]}
           intensity={600}
         />
-        <ViroNode position={game.aiming ? [0, 0, 0] : [0, 0, -2]}>
+        <ViroNode position={game.settings ? [0, 0, 0] : [0, 0, -2]}>
           <ExperienceContent
             key={game.id}
             game={game}

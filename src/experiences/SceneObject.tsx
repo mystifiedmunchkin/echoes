@@ -52,7 +52,7 @@ export function SceneObject({
   if (properties.active === false) return null;
   return (
     <ViroNode
-      viroTag={object.id}
+      viroTag={String(object.id)}
       position={properties.position || [0, 0, 0]}
       rotation={properties.rotation || [0, 0, 0]}
       scale={physicsBody ? undefined : properties.scale || [1, 1, 1]}

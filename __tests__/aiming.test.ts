@@ -2,33 +2,33 @@ import { colliderShape } from '../src/experiences/aiming';
 import { cacheExperience, readExperience } from '../src/experiences/experience';
 
 const projectile = {
-  id: 'ball',
+  id: 1,
   properties: {
-    asset: 'ball-model',
+    asset: 10,
     collider: { type: 'sphere', size: [0.2, 0.2, 0.2] },
     physics: { type: 'Dynamic', mass: 0.5, restitution: 0.4 },
   },
 };
 const target = {
-  id: 'hoop',
+  id: 2,
   properties: {
-    asset: 'hoop-model',
+    asset: 20,
     position: [0, 0.5, 0],
     collider: { type: 'basket', size: [1, 1, 1], thickness: 0.05 },
   },
 };
 const game = {
-  id: 'aim',
+  id: 100,
   type: 'aiming',
   assets: [
-    { id: 'ball-model', type: 'GLB', url: 'https://example.test/ball.glb' },
-    { id: 'hoop-model', type: 'OBJ', url: 'https://example.test/hoop.obj' },
+    { id: 10, name: 'Ball', type: 'GLB', url: 'https://example.test/ball.glb' },
+    { id: 20, name: 'Hoop', type: 'OBJ', url: 'https://example.test/hoop.obj' },
   ],
   objects: [projectile, target],
-  aiming: {
+  settings: {
     plane: { minWidth: 2, minLength: 3 },
-    projectile: { objectId: 'ball' },
-    targets: ['hoop'],
+    projectile: { objectId: 1 },
+    targets: [2],
   },
 };
 const readGame = (value: unknown) =>
@@ -36,19 +36,19 @@ const readGame = (value: unknown) =>
 
 test('reads and defaults a server-configured aiming game without mutating it', () => {
   const parsed = readGame(game)!.games[0];
-  expect(parsed.aiming).toEqual({
+  expect(parsed.settings).toEqual({
     plane: { minWidth: 2, minLength: 3, stableMs: 1000 },
     projectile: {
-      objectId: 'ball',
+      objectId: 1,
       speed: 5,
       spawnDistance: 0.3,
       lifetimeMs: 10000,
       maxActive: 12,
     },
-    targets: ['hoop'],
+    targets: [2],
   });
   expect(parsed.objects[0].properties.physics).toMatchObject({ mass: 0.5 });
-  expect(game.aiming.projectile).toEqual({ objectId: 'ball' });
+  expect(game.settings.projectile).toEqual({ objectId: 1 });
 });
 
 test.each(['GLB', 'OBJ'])('accepts a %s projectile', type => {
@@ -80,58 +80,61 @@ test.each([
 });
 
 test.each(['aiming-floor', 'aiming-shot:reserved'])(
-  'rejects reserved collision ID %s',
+  'rejects non-integer server ID %s',
   id => {
     expect(() =>
       readGame({
         ...game,
         objects: [...game.objects, { id, properties: { text: 'extra' } }],
       }),
-    ).toThrow('IDs are reserved');
+    ).toThrow('objects[2].id');
   },
 );
 
 test.each([
-  { ...game, aiming: null },
-  { ...game, aiming: { ...game.aiming, plane: { minWidth: 0, minLength: 1 } } },
+  { ...game, settings: null },
   {
     ...game,
-    aiming: { ...game.aiming, plane: { minWidth: 1, minLength: NaN } },
+    settings: { ...game.settings, plane: { minWidth: 0, minLength: 1 } },
   },
   {
     ...game,
-    aiming: {
-      ...game.aiming,
+    settings: { ...game.settings, plane: { minWidth: 1, minLength: NaN } },
+  },
+  {
+    ...game,
+    settings: {
+      ...game.settings,
       plane: { minWidth: 1, minLength: 1, stableMs: 0 },
     },
   },
-  { ...game, aiming: { ...game.aiming, targets: [] } },
-  { ...game, aiming: { ...game.aiming, targets: ['hoop', 'hoop'] } },
-  { ...game, aiming: { ...game.aiming, targets: ['ball'] } },
-  { ...game, aiming: { ...game.aiming, targets: ['unknown'] } },
+  { ...game, settings: { ...game.settings, targets: [] } },
+  { ...game, settings: { ...game.settings, targets: [2, 2] } },
+  { ...game, settings: { ...game.settings, targets: [1] } },
+  { ...game, settings: { ...game.settings, targets: [999] } },
   ...['speed', 'spawnDistance', 'lifetimeMs', 'maxActive'].map(key => ({
     ...game,
-    aiming: { ...game.aiming, projectile: { objectId: 'ball', [key]: -1 } },
+    settings: { ...game.settings, projectile: { objectId: 1, [key]: -1 } },
   })),
   {
     ...game,
-    aiming: {
-      ...game.aiming,
-      projectile: { objectId: 'ball', maxActive: 1.5 },
+    settings: {
+      ...game.settings,
+      projectile: { objectId: 1, maxActive: 1.5 },
     },
   },
   {
     ...game,
-    aiming: {
-      ...game.aiming,
-      projectile: { objectId: 'ball', lifetimeMs: 2147483648 },
+    settings: {
+      ...game.settings,
+      projectile: { objectId: 1, lifetimeMs: 2147483648 },
     },
   },
   { ...game, assets: [{ ...game.assets[0], type: 'GLTF' }, game.assets[1]] },
   { ...game, assets: [game.assets[0], { ...game.assets[1], type: 'GLB' }] },
   {
     ...game,
-    objects: [{ ...projectile, properties: { asset: 'ball-model' } }, target],
+    objects: [{ ...projectile, properties: { asset: 10 } }, target],
   },
   {
     ...game,
@@ -263,5 +266,5 @@ test('caches aiming OBJ and GLB assets with existing preparation', async () => {
     game.assets.map(asset => `local:${asset.url}`),
   );
   expect(cache).toHaveBeenCalledTimes(2);
-  expect(result!.games[0].aiming?.targets).toEqual(['hoop']);
+  expect(result!.games[0].settings?.targets).toEqual([2]);
 });

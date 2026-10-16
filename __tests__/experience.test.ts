@@ -5,13 +5,13 @@ import {
 } from '../src/experiences/experience';
 
 const game = {
-  id: 'main',
-  assets: [{ id: 'model', type: 'GLB', url: 'https://example.test/model.glb' }],
+  id: 1,
+  assets: [{ id: 10, type: 'GLB', url: 'https://example.test/model.glb' }],
   objects: [
     {
-      id: 'statue',
+      id: 100,
       properties: {
-        asset: 'model',
+        asset: 10,
         position: [0, 0, 0],
         physics: {
           type: 'Dynamic',
@@ -24,7 +24,7 @@ const game = {
   ],
 };
 const target = {
-  id: 'poster',
+  id: 200,
   imageUrl: 'https://example.test/poster.jpg',
   physicalWidth: 0.5,
 };
@@ -79,17 +79,17 @@ test.each([
   { ...game, type: 'quiz' },
   { ...game, type: 'images', target: { ...target, physicalWidth: 0 } },
   { ...game, type: 'images', target: { ...target, orientation: 'invalid' } },
-  { ...game, objects: [{ id: 'bad', properties: { asset: 'missing' } }] },
+  { ...game, objects: [{ id: 101, properties: { asset: 999 } }] },
   {
     ...game,
     objects: [
-      { id: 'bad', properties: { text: 'bad', position: [0, NaN, 0] } },
+      { id: 101, properties: { text: 'bad', position: [0, NaN, 0] } },
     ],
   },
   {
     ...game,
     objects: [
-      { id: 'bad', properties: { text: 'bad', physics: { type: 'Dynamic' } } },
+      { id: 101, properties: { text: 'bad', physics: { type: 'Dynamic' } } },
     ],
   },
   { ...game, objects: [game.objects[0], game.objects[0]] },

@@ -22,7 +22,7 @@ export function ExperienceControls({
       <Text style={styles.text}>{t(`experience_${game.type}`)}</Text>
       <Text style={styles.text}>
         {t(
-          game.aiming && mode === 'viewer'
+          game.settings && mode === 'viewer'
             ? 'aimingViewerHint'
             : game.type === 'images' && mode === 'viewer'
             ? 'experienceImagesPreview'

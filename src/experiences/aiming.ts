@@ -16,13 +16,13 @@ export interface AimingCollider {
 export interface AimingSettings {
   plane: { minWidth: number; minLength: number; stableMs: number };
   projectile: {
-    objectId: string;
+    objectId: number;
     speed: number;
     spawnDistance: number;
     lifetimeMs: number;
     maxActive: number;
   };
-  targets: string[];
+  targets: number[];
 }
 
 type Part = { type: 'Box' | 'Sphere'; params: number[]; position: number[] };
@@ -102,33 +102,28 @@ export function readAiming(
   const source = record(value);
   const plane = record(source.plane);
   const projectile = record(source.projectile);
-  requireValue(
-    objects.every(
-      object =>
-        object.id !== 'aiming-floor' && !object.id.startsWith('aiming-shot:'),
-    ),
-    `${path}: aiming-floor and aiming-shot: IDs are reserved`,
-  );
   const objectId = projectile.objectId;
   requireValue(
-    typeof objectId === 'string' &&
+    Number.isSafeInteger(objectId) &&
       objects.some(object => object.id === objectId),
     `${path}.projectile.objectId`,
   );
+  const projectileId = objectId as number;
   const targets = source.targets;
   requireValue(
     Array.isArray(targets) &&
       targets.length > 0 &&
       targets.every(
         id =>
-          typeof id === 'string' &&
+          Number.isSafeInteger(id) &&
           id !== objectId &&
           objects.some(object => object.id === id),
       ) &&
       new Set(targets).size === targets.length,
     `${path}.targets`,
   );
-  for (const id of [objectId, ...targets]) {
+  const targetIds = targets as number[];
+  for (const id of [projectileId, ...targetIds]) {
     const object = objects.find(item => item.id === id)!;
     requireValue(
       object.properties.collider !== undefined,
@@ -143,7 +138,7 @@ export function readAiming(
       `${path}: ${id} cannot use a rotation animation with its collider`,
     );
     requireValue(
-      id !== objectId ||
+      id !== projectileId ||
         object.properties.physics?.type === undefined ||
         object.properties.physics.type === 'Dynamic',
       `${path}.projectile: physics must be Dynamic`,
@@ -170,7 +165,7 @@ export function readAiming(
       stableMs,
     },
     projectile: {
-      objectId,
+      objectId: projectileId,
       speed: positive(projectile.speed ?? 5, `${path}.projectile.speed`),
       spawnDistance: positive(
         projectile.spawnDistance ?? 0.3,
@@ -179,7 +174,7 @@ export function readAiming(
       lifetimeMs,
       maxActive,
     },
-    targets,
+    targets: targetIds,
   };
 }
 

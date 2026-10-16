@@ -31,7 +31,7 @@ function Objects(props: TemplateProps) {
 }
 
 export function AimingTemplate(props: TemplateProps) {
-  if (props.game.aiming) return <ConfiguredAimingTemplate {...props} />;
+  if (props.game.settings) return <ConfiguredAimingTemplate {...props} />;
   return (
     <ViroNode viroTag="aiming">
       <Objects {...props} />

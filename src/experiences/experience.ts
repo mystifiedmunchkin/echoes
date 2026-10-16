@@ -6,7 +6,8 @@ export type Vector3 = [number, number, number];
 export type AssetType = 'GLB' | 'GLTF' | 'OBJ' | 'image' | 'video' | 'audio';
 
 export interface ExperienceAsset {
-  id: string;
+  id: number;
+  name?: string;
   type: AssetType;
   url: string;
 }
@@ -22,9 +23,9 @@ export interface PhysicsBody {
 }
 
 export interface ExperienceObject {
-  id: string;
+  id: number;
   properties: {
-    asset?: string;
+    asset?: number;
     text?: string;
     active?: boolean;
     position?: Vector3;
@@ -39,19 +40,19 @@ export interface ExperienceObject {
 }
 
 export interface ImageTarget {
-  id: string;
+  id: number;
   imageUrl: string;
   physicalWidth: number;
   orientation: 'Up' | 'Down' | 'Left' | 'Right';
 }
 
 export interface ExperienceGame {
-  id: string;
+  id: number;
   type: ExperienceType;
   assets: ExperienceAsset[];
   objects: ExperienceObject[];
   target?: ImageTarget;
-  aiming?: AimingSettings;
+  settings?: AimingSettings;
   [key: string]: unknown;
 }
 
@@ -62,8 +63,8 @@ export interface Experience {
 
 export interface ExperienceEvent {
   type: ExperienceType;
-  gameId: string;
-  objectId?: string;
+  gameId: number;
+  objectId?: number;
   name:
     | 'press'
     | 'collision'
@@ -95,12 +96,20 @@ function vector(value: unknown, path: string): Vector3 {
   return [value[0], value[1], value[2]];
 }
 
+function integer(value: unknown, path: string): number {
+  requireValue(
+    typeof value === 'number' && Number.isSafeInteger(value) && value >= 0,
+    path,
+  );
+  return value;
+}
+
 function nonEmptyString(value: unknown, path: string): string {
   requireValue(typeof value === 'string' && value.trim().length > 0, path);
   return value;
 }
 
-function unique(ids: string[], path: string) {
+function unique(ids: number[], path: string) {
   requireValue(new Set(ids).size === ids.length, `${path}: duplicate id`);
 }
 
@@ -171,6 +180,7 @@ export function readExperience(memory: unknown): Experience | null {
   const games = logic.games.map((raw, index): ExperienceGame => {
     const game = record(raw);
     const path = `logic.games[${index}]`;
+    requireValue(game.name === undefined, `${path}.name is not supported`);
     const type = game.type ?? definition.type ?? source.type;
     requireValue(
       type === 'aiming' ||
@@ -194,7 +204,10 @@ export function readExperience(memory: unknown): Experience | null {
         `${assetPath}.type`,
       );
       return {
-        id: nonEmptyString(asset.id, `${assetPath}.id`),
+        id: integer(asset.id, `${assetPath}.id`),
+        ...(asset.name === undefined
+          ? {}
+          : { name: nonEmptyString(asset.name, `${assetPath}.name`) }),
         type: assetType,
         url: nonEmptyString(asset.url, `${assetPath}.url`),
       };
@@ -208,10 +221,14 @@ export function readExperience(memory: unknown): Experience | null {
       (rawObject, objectIndex): ExperienceObject => {
         const object = record(rawObject);
         const objectPath = `${path}.objects[${objectIndex}]`;
+        requireValue(
+          object.name === undefined,
+          `${objectPath}.name is not supported`,
+        );
         const properties = { ...record(object.properties) };
         if (properties.asset !== undefined) {
           requireValue(
-            typeof properties.asset === 'string' &&
+            Number.isSafeInteger(properties.asset) &&
               assets.some(asset => asset.id === properties.asset),
             `${objectPath}.properties.asset`,
           );
@@ -234,7 +251,10 @@ export function readExperience(memory: unknown): Experience | null {
         }
         const parsed: ExperienceObject['properties'] = {
           ...properties,
-          asset: properties.asset,
+          asset:
+            properties.asset === undefined
+              ? undefined
+              : (properties.asset as number),
           text: properties.text,
           active: properties.active,
         };
@@ -278,7 +298,7 @@ export function readExperience(memory: unknown): Experience | null {
         }
         return {
           ...object,
-          id: nonEmptyString(object.id, `${objectPath}.id`),
+          id: integer(object.id, `${objectPath}.id`),
           properties: parsed,
         };
       },
@@ -289,36 +309,40 @@ export function readExperience(memory: unknown): Experience | null {
     );
     const result: ExperienceGame = {
       ...game,
-      id:
-        game.id === undefined
-          ? String(index)
-          : nonEmptyString(game.id, `${path}.id`),
+      id: game.id === undefined ? index : integer(game.id, `${path}.id`),
       type,
       assets,
       objects,
       target: undefined,
-      aiming: undefined,
+      settings:
+        type === 'aiming'
+          ? undefined
+          : (game.settings as AimingSettings | undefined),
     };
-    if (type === 'aiming' && game.aiming !== undefined) {
-      result.aiming = readAiming(game.aiming, objects, `${path}.aiming`);
+    if (type === 'aiming' && game.settings !== undefined) {
+      result.settings = readAiming(game.settings, objects, `${path}.settings`);
       for (const id of [
-        result.aiming.projectile.objectId,
-        ...result.aiming.targets,
+        result.settings.projectile.objectId,
+        ...result.settings.targets,
       ]) {
         const object = objects.find(item => item.id === id)!;
         const asset = assets.find(item => item.id === object.properties.asset);
         requireValue(
-          id === result.aiming.projectile.objectId
+          id === result.settings.projectile.objectId
             ? asset?.type === 'GLB' || asset?.type === 'OBJ'
             : asset?.type === 'OBJ',
-          `${path}.aiming: ${id} requires ${
-            id === result.aiming.projectile.objectId ? 'GLB or OBJ' : 'OBJ'
+          `${path}.settings: ${id} requires ${
+            id === result.settings.projectile.objectId ? 'GLB or OBJ' : 'OBJ'
           }`,
         );
       }
     }
     if (type === 'images') {
       const target = record(game.target);
+      requireValue(
+        target.name === undefined,
+        `${path}.target.name is not supported`,
+      );
       const orientation = target.orientation ?? 'Up';
       requireValue(
         orientation === 'Up' ||
@@ -334,7 +358,7 @@ export function readExperience(memory: unknown): Experience | null {
         `${path}.target.physicalWidth`,
       );
       result.target = {
-        id: nonEmptyString(target.id, `${path}.target.id`),
+        id: integer(target.id, `${path}.target.id`),
         imageUrl: nonEmptyString(target.imageUrl, `${path}.target.imageUrl`),
         physicalWidth: target.physicalWidth,
         orientation,

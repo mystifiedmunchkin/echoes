@@ -34,21 +34,21 @@ Legacy string-encoded fields remain readable for backwards compatibility.
       "gravity": [0, -9.81, 0],
       "games": [
         {
-          "id": "animated-poster",
+          "id": 1,
           "assets": [
-            { "id": "butterfly", "type": "GLB", "url": "https://example.com/butterfly.glb" }
+            { "id": 10, "name": "Papillon", "type": "GLB", "url": "https://example.com/butterfly.glb" }
           ],
           "target": {
-            "id": "poster",
+            "id": 20,
             "imageUrl": "https://example.com/poster.jpg",
             "physicalWidth": 0.6,
             "orientation": "Up"
           },
           "objects": [
             {
-              "id": "butterfly-on-poster",
+              "id": 30,
               "properties": {
-                "asset": "butterfly",
+                "asset": 10,
                 "position": [0, 0, 0],
                 "rotation": [0, 0, 0],
                 "scale": [0.2, 0.2, 0.2],
@@ -68,8 +68,10 @@ Legacy string-encoded fields remain readable for backwards compatibility.
 }
 ```
 
-- IDs are non-empty strings, unique within their game/collection. Game IDs can
-  be omitted (the array index is then used). Asset types: `GLB`, `GLTF`, `OBJ`,
+- All `id` fields are non-negative safe integers, unique within their
+  game/collection. Game IDs can be omitted (the array index is then used).
+  Assets may additionally have an optional non-empty string `name`; `name` is
+  not supported on games, objects or image targets. Asset types: `GLB`, `GLTF`, `OBJ`,
   `image`, `video`, `audio`. Asset IDs referenced by `properties.asset` must exist
   in that game's asset list. An object can instead contain `properties.text`.
   `properties.active: false` hides the object.
@@ -128,36 +130,36 @@ contains the mobile consumer, not a server editor or backend.
   "logic": {
     "games": [
       {
-        "id": "basket-throw",
+        "id": 100,
         "assets": [
-          { "id": "ball-model", "type": "GLB", "url": "https://example.com/ball.glb" },
-          { "id": "basket-model", "type": "OBJ", "url": "https://example.com/basket.obj" }
+          { "id": 101, "name": "Ballon", "type": "GLB", "url": "https://example.com/ball.glb" },
+          { "id": 102, "name": "Panier", "type": "OBJ", "url": "https://example.com/basket.obj" }
         ],
-        "aiming": {
+        "settings": {
           "plane": { "minWidth": 2, "minLength": 3, "stableMs": 1000 },
           "projectile": {
-            "objectId": "ball",
+            "objectId": 103,
             "speed": 5,
             "spawnDistance": 0.3,
             "lifetimeMs": 10000,
             "maxActive": 12
           },
-          "targets": ["basket"]
+          "targets": [104]
         },
         "objects": [
           {
-            "id": "ball",
+            "id": 103,
             "properties": {
-              "asset": "ball-model",
+              "asset": 101,
               "scale": [1, 1, 1],
               "collider": { "type": "sphere", "size": [0.2, 0.2, 0.2] },
               "physics": { "type": "Dynamic", "mass": 0.5, "restitution": 0.4 }
             }
           },
           {
-            "id": "basket",
+            "id": 104,
             "properties": {
-              "asset": "basket-model",
+              "asset": 102,
               "position": [0, 0.5, 0],
               "collider": { "type": "basket", "size": [1, 1, 1], "thickness": 0.05 }
             }
@@ -225,7 +227,8 @@ Additional callbacks: `planeReady.data` describes the locked floor;
 `projectileId`, world position and velocity; `shotBlocked.data.reason` is
 `plane`, `tracking`, `camera` or `limit`. Regular collision events identify the
 projectile instance and the colliding target's tag (or `aiming-floor`).
-Object IDs `aiming-floor` and the `aiming-shot:` prefix are reserved.
+Runtime-generated projectile instance IDs are negative and must not be supplied
+by the server; server IDs are non-negative integers.
 Tracking, contact accuracy, model alignment, and fast/small projectile behavior
 must still be verified on physical ARCore/ARKit devices.
 

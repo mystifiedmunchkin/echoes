@@ -20,7 +20,7 @@ type PlaneAnchor = Parameters<
 >[0];
 
 interface Shot {
-  id: string;
+  id: number;
   position: Vector3;
   rotation: Vector3;
   velocity: Vector3;
@@ -62,7 +62,7 @@ function floorFromAnchor(
 
 export function ConfiguredAimingTemplate(props: TemplateProps) {
   const { game, mode, onEvent } = props;
-  const config = game.aiming!;
+  const config = game.settings!;
   const scene = React.useContext(AimingSceneContext);
   const trackingReady = mode === 'viewer' || scene?.trackingReady === true;
   const [floor, setFloor] = React.useState<Floor | null>(
@@ -87,7 +87,7 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
     (
       name: 'planeReady' | 'shot' | 'shotBlocked',
       data?: unknown,
-      objectId?: string,
+      objectId?: number,
     ) => onEvent?.({ type: 'aiming', gameId: game.id, name, data, objectId }),
     [game.id, onEvent],
   );
@@ -160,7 +160,7 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
       direction[2] * config.projectile.speed,
     ];
     const shot: Shot = {
-      id: `aiming-shot:${game.id}:${++sequence.current}`,
+      id: -++sequence.current,
       position,
       rotation: camera.rotation,
       velocity,
@@ -169,15 +169,7 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
     activeShots.current = [...live, shot];
     setShots(activeShots.current);
     emit('shot', { projectileId: projectile.id, position, velocity }, shot.id);
-  }, [
-    scene,
-    floor,
-    trackingReady,
-    config.projectile,
-    game.id,
-    projectile.id,
-    emit,
-  ]);
+  }, [scene, floor, trackingReady, config.projectile, projectile.id, emit]);
 
   React.useEffect(() => {
     if (!scene) return;

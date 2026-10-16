@@ -67,20 +67,18 @@ const source = {
       gravity: [0, -2, 0],
       games: [
         {
-          id: 'poster-scene',
-          assets: [
-            { id: 'butterfly', type: 'GLB', url: 'file://butterfly.glb' },
-          ],
+          id: 300,
+          assets: [{ id: 301, type: 'GLB', url: 'file://butterfly.glb' }],
           target: {
-            id: 'poster',
+            id: 302,
             imageUrl: 'file://poster.jpg',
             physicalWidth: 0.6,
           },
           objects: [
             {
-              id: 'animated-butterfly',
+              id: 303,
               properties: {
-                asset: 'butterfly',
+                asset: 301,
                 physics: {
                   type: 'Dynamic',
                   shape: { type: 'Sphere', params: [0.1] },
@@ -168,9 +166,7 @@ test.each(['aiming', 'treasure', 'discovery', 'images'] as const)(
     });
     expect(host('ViroARImageMarker')).toHaveLength(0);
     expect(ViroARTrackingTargets.createTargets).not.toHaveBeenCalled();
-    const node = host('ViroNode').find(
-      item => item.props.viroTag === 'animated-butterfly',
-    )!;
+    const node = host('ViroNode').find(item => item.props.viroTag === '303')!;
     expect(node.props.physicsBody).toEqual(
       experience.games[0].objects[0].properties.physics,
     );
@@ -179,8 +175,8 @@ test.each(['aiming', 'treasure', 'discovery', 'images'] as const)(
     act(() => node.props.onClick());
     expect(onEvent).toHaveBeenCalledWith({
       type,
-      gameId: 'poster-scene',
-      objectId: 'animated-butterfly',
+      gameId: 300,
+      objectId: 303,
       name: 'press',
       data: { onClick: { type: 'custom' } },
     });
@@ -271,38 +267,38 @@ describe('configured aiming runtime', () => {
     logic: {
       games: [
         {
-          id: 'aim',
+          id: 400,
           assets: [
-            { id: 'ball', type: 'GLB', url: 'file://ball.glb' },
-            { id: 'basket', type: 'OBJ', url: 'file://basket.obj' },
+            { id: 401, type: 'GLB', url: 'file://ball.glb' },
+            { id: 402, type: 'OBJ', url: 'file://basket.obj' },
           ],
           objects: [
             {
-              id: 'projectile',
+              id: 403,
               properties: {
-                asset: 'ball',
+                asset: 401,
                 scale: [2, 2, 2],
                 collider: { type: 'sphere', size: [0.1, 0.1, 0.1] },
               },
             },
             {
-              id: 'target',
+              id: 404,
               properties: {
-                asset: 'basket',
+                asset: 402,
                 position: [0, 0.5, -0.5],
                 collider: { type: 'basket', size: [1, 1, 1], thickness: 0.05 },
               },
             },
           ],
-          aiming: {
+          settings: {
             plane: { minWidth: 2, minLength: 3, stableMs: 1000 },
             projectile: {
-              objectId: 'projectile',
+              objectId: 403,
               speed: 6,
               maxActive: 1,
               lifetimeMs: 2000,
             },
-            targets: ['target'],
+            targets: [404],
           },
         },
       ],
@@ -330,7 +326,7 @@ describe('configured aiming runtime', () => {
     host('ViroNode').filter(
       node =>
         typeof node.props.viroTag === 'string' &&
-        node.props.viroTag.startsWith('aiming-shot:'),
+        Number(node.props.viroTag) < 0,
     );
   const mountAR = async () => {
     await act(async () => {
@@ -445,12 +441,12 @@ describe('configured aiming runtime', () => {
       'OBJ',
       'GLB',
     ]);
-    act(() => shot.props.onCollision('target', [0, 0, 0], [0, 1, 0]));
+    act(() => shot.props.onCollision(404, [0, 0, 0], [0, 1, 0]));
     expect(onEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'collision',
-        objectId: shot.props.viroTag,
-        data: { tag: 'target', point: [0, 0, 0], normal: [0, 1, 0] },
+        objectId: -1,
+        data: { tag: 404, point: [0, 0, 0], normal: [0, 1, 0] },
       }),
     );
     act(() => scene().props.onClick());
@@ -488,7 +484,7 @@ describe('configured aiming runtime', () => {
     act(() => scene().props.onCameraTransformUpdate(camera));
     act(() =>
       host('ViroNode')
-        .find(node => node.props.viroTag === 'target')!
+        .find(node => node.props.viroTag === '404')!
         .props.onClick(),
     );
     expect(projectiles()).toHaveLength(1);
@@ -522,7 +518,7 @@ describe('configured aiming runtime', () => {
         <ViroARView
           experience={{
             ...aiming,
-            games: [{ ...aiming.games[0], id: 'another-game' }],
+            games: [{ ...aiming.games[0], id: 405 }],
           }}
           onExperienceEvent={onEvent}
           onExperienceError={onError}
@@ -537,7 +533,7 @@ describe('configured aiming runtime', () => {
     act(() => scene().props.onClick());
     expect(onEvent).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        gameId: 'another-game',
+        gameId: 405,
         name: 'shotBlocked',
         data: { reason: 'plane' },
       }),
