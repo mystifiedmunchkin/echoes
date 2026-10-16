@@ -38,9 +38,12 @@ function ViewerContent(props: ViewerProps) {
   return (
     <AimingSceneContext.Provider value={aimingScene.value}>
       <ViroScene
-        physicsWorld={{ gravity: props.experience.gravity }}
+        physicsWorld={{
+          gravity: props.experience.gravity,
+          drawBounds: __DEV__ && !!game.settings,
+        }}
         onCameraTransformUpdate={aimingScene.onCameraTransformUpdate}
-        onClick={aimingScene.onClick}
+        onClickState={aimingScene.onClickState}
       >
         <ViroAmbientLight color="#FFFFFF" intensity={400} />
         <ViroDirectionalLight

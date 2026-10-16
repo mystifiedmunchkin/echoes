@@ -10,8 +10,9 @@ export interface CameraPose {
 
 interface AimingSceneState {
   camera: React.RefObject<CameraPose | null>;
-  fire: React.RefObject<(() => void) | null>;
+  fire: React.RefObject<((heldMs?: number) => void) | null>;
   trackingReady: boolean;
+  onClickState: (state: number) => void;
 }
 
 export const AimingSceneContext = React.createContext<AimingSceneState | null>(
@@ -20,11 +21,25 @@ export const AimingSceneContext = React.createContext<AimingSceneState | null>(
 
 export function useAimingScene(mode: 'ar' | 'viewer') {
   const camera = React.useRef<CameraPose | null>(null);
-  const fire = React.useRef<(() => void) | null>(null);
+  const fire = React.useRef<((heldMs?: number) => void) | null>(null);
+  const charge = React.useRef<{
+    startedAt: number;
+    fire: (heldMs?: number) => void;
+  } | null>(null);
   const [trackingReady, setTrackingReady] = React.useState(mode === 'viewer');
+  const onClickState = React.useCallback((state: number) => {
+    if (state === 1 && !charge.current && fire.current) {
+      charge.current = { startedAt: Date.now(), fire: fire.current };
+    }
+    if (state !== 2) return;
+    const held = charge.current;
+    charge.current = null;
+    if (held && held.fire === fire.current)
+      held.fire(Date.now() - held.startedAt);
+  }, []);
   const value = React.useMemo(
-    () => ({ camera, fire, trackingReady }),
-    [trackingReady],
+    () => ({ camera, fire, trackingReady, onClickState }),
+    [trackingReady, onClickState],
   );
   return {
     value,
@@ -33,9 +48,12 @@ export function useAimingScene(mode: 'ar' | 'viewer') {
     },
     onTrackingUpdated: (state: number) => {
       const ready = state === ViroTrackingStateConstants.TRACKING_NORMAL;
-      if (!ready) camera.current = null;
+      if (!ready) {
+        camera.current = null;
+        charge.current = null;
+      }
       setTrackingReady(ready);
     },
-    onClick: () => fire.current?.(),
+    onClickState,
   };
 }

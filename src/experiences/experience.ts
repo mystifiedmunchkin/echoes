@@ -71,6 +71,7 @@ export interface ExperienceEvent {
     | 'targetFound'
     | 'targetUpdated'
     | 'targetRemoved'
+    | 'planeCandidate'
     | 'planeReady'
     | 'shot'
     | 'shotBlocked';

@@ -19,6 +19,10 @@ import { AimingSceneContext, useAimingScene } from '../experiences/AimingScene';
 // rather than in the material definition if transparencyMode isn't available.
 ViroMaterials.createMaterials({
   planeMaterial: { diffuseColor: '#FFFFFF', lightingModel: 'Lambert' },
+  aimingPlaneIndicator: {
+    diffuseColor: '#29B6F6',
+    lightingModel: 'Constant',
+  },
   blueDroplet: {
     diffuseColor: '#0000FF',
     lightingModel: 'Lambert',
@@ -56,10 +60,13 @@ function MemoryARScene({
     <AimingSceneContext.Provider value={aimingScene.value}>
       <ViroARScene
         anchorDetectionTypes={['PlanesHorizontal', 'PlanesVertical']}
-        physicsWorld={{ gravity: experience?.gravity || [0, -9.81, 0] }}
+        physicsWorld={{
+          gravity: experience?.gravity || [0, -9.81, 0],
+          drawBounds: __DEV__ && !!game?.settings,
+        }}
         onTrackingUpdated={aimingScene.onTrackingUpdated}
         onCameraTransformUpdate={aimingScene.onCameraTransformUpdate}
-        onClick={aimingScene.onClick}
+        onClickState={aimingScene.onClickState}
       >
         <ViroAmbientLight color="#FFFFFF" intensity={500} />
         <ViroDirectionalLight

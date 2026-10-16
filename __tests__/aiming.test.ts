@@ -1,4 +1,8 @@
-import { colliderShape } from '../src/experiences/aiming';
+import {
+  colliderShape,
+  isBottomContact,
+  launchSpeed,
+} from '../src/experiences/aiming';
 import { cacheExperience, readExperience } from '../src/experiences/experience';
 
 const projectile = {
@@ -42,7 +46,7 @@ test('reads and defaults a server-configured aiming game without mutating it', (
       objectId: 1,
       speed: 5,
       spawnDistance: 0.3,
-      lifetimeMs: 10000,
+      lifetimeMs: null,
       maxActive: 12,
     },
     targets: [2],
@@ -208,6 +212,17 @@ test('generates explicit bounds, sphere and an open basket with no top collider'
     type: 'Box',
     params: [1, 2, 3],
   });
+  const boundingTarget = colliderShape(
+    { type: 'bounding', size: [1, 2, 3] },
+    { targetBottom: true },
+  );
+  expect(boundingTarget.type).toBe('Compound');
+  expect(boundingTarget.children).toHaveLength(5);
+  expect(boundingTarget.children![0]).toEqual({
+    type: 'Box',
+    params: [1, 0.05, 3],
+    position: [0, -0.975, 0],
+  });
   expect(colliderShape({ type: 'sphere', size: [0.2, 0.2, 0.2] })).toEqual({
     type: 'Sphere',
     params: [0.1],
@@ -234,6 +249,78 @@ test('generates explicit bounds, sphere and an open basket with no top collider'
     ),
   ).toBe(true);
 });
+
+test('scores only the interior top face of the bottom, not walls, rims or underside', () => {
+  const collider = {
+    type: 'basket' as const,
+    size: [1, 1, 1] as [number, number, number],
+    thickness: 0.05,
+  };
+  const transform = {
+    position: [0, 0, 0] as [number, number, number],
+    rotation: [0, 0, 0] as [number, number, number],
+  };
+  expect(isBottomContact(collider, [0, -0.45, 0], [0, 1, 0], transform)).toBe(
+    true,
+  );
+  expect(
+    isBottomContact(collider, [0, -0.455, 0], [0.1, -0.9, 0.1], transform),
+  ).toBe(true);
+  expect(isBottomContact(collider, [0.45, 0, 0], [1, 0, 0], transform)).toBe(
+    false,
+  );
+  expect(isBottomContact(collider, [0.475, 0.5, 0], [0, 1, 0], transform)).toBe(
+    false,
+  );
+  expect(isBottomContact(collider, [0, -0.5, 0], [0, -1, 0], transform)).toBe(
+    false,
+  );
+  expect(isBottomContact(collider, [0, -0.45, 0], [0, 0, 0], transform)).toBe(
+    false,
+  );
+  expect(isBottomContact(collider, [NaN, -0.45, 0], [0, 1, 0], transform)).toBe(
+    false,
+  );
+});
+
+test('classifies bottom contacts in the current translated and rotated target frame', () => {
+  const collider = {
+    type: 'bounding' as const,
+    size: [1, 1, 1] as [number, number, number],
+  };
+  expect(
+    isBottomContact(collider, [2, 3, 3.55], [0, 0, 1], {
+      position: [2, 3, 4],
+      rotation: [90, 0, 0],
+    }),
+  ).toBe(true);
+  expect(
+    isBottomContact(collider, [2, 3, 3.55], [0, 1, 0], {
+      position: [2, 3, 4],
+      rotation: [90, 0, 0],
+    }),
+  ).toBe(false);
+  expect(
+    isBottomContact(collider, [1.55, 3, 4], [1, 0, 0], {
+      position: [2, 3, 4],
+      rotation: [90, 90, 0],
+    }),
+  ).toBe(true);
+});
+
+test.each([
+  [-100, 6],
+  [0, 6],
+  [500, 7.5],
+  [1000, 9],
+  [2000, 12],
+  [10000, 12],
+])(
+  'scales launch speed linearly and caps charge at two seconds (%s ms)',
+  (heldMs, speed) => {
+    expect(launchSpeed(6, heldMs)).toBe(speed);
+  },
+);
 
 test.each(['capsule', 'diamond'] as const)(
   'builds finite positive compound parts for %s',

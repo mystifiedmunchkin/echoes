@@ -19,7 +19,7 @@ export interface AimingSettings {
     objectId: number;
     speed: number;
     spawnDistance: number;
-    lifetimeMs: number;
+    lifetimeMs: number | null;
     maxActive: number;
   };
   targets: number[];
@@ -31,6 +31,87 @@ export type ColliderShape = {
   params: number[];
   children?: Part[];
 };
+export interface ColliderShapeOptions {
+  targetBottom?: boolean;
+}
+
+export interface BodyTransform {
+  position: Vector3;
+  rotation: Vector3;
+}
+
+export function isBodyTransform(value: unknown): value is BodyTransform {
+  const source = record(value);
+  return [source.position, source.rotation].every(
+    vector =>
+      Array.isArray(vector) &&
+      vector.length === 3 &&
+      vector.every(Number.isFinite),
+  );
+}
+
+export function launchSpeed(speed: number, heldMs: number): number {
+  return speed * (1 + Math.min(2000, Math.max(0, heldMs)) / 2000);
+}
+
+export function basketThickness(collider: AimingCollider): number {
+  return collider.type === 'basket'
+    ? collider.thickness!
+    : Math.min(0.05, ...collider.size.map(size => size / 4));
+}
+
+function inverseRotate(vector: Vector3, rotation: Vector3): Vector3 {
+  let [x, y, z] = vector;
+  const [rx, ry, rz] = rotation.map(angle => (-angle * Math.PI) / 180);
+  [x, y] = [
+    x * Math.cos(rz) - y * Math.sin(rz),
+    x * Math.sin(rz) + y * Math.cos(rz),
+  ];
+  [x, z] = [
+    x * Math.cos(ry) + z * Math.sin(ry),
+    -x * Math.sin(ry) + z * Math.cos(ry),
+  ];
+  [y, z] = [
+    y * Math.cos(rx) - z * Math.sin(rx),
+    y * Math.sin(rx) + z * Math.cos(rx),
+  ];
+  return [x, y, z];
+}
+
+export function isBottomContact(
+  collider: AimingCollider,
+  point: Vector3,
+  normal: Vector3,
+  transform: BodyTransform,
+): boolean {
+  if (
+    ![...point, ...normal, ...transform.position, ...transform.rotation].every(
+      Number.isFinite,
+    )
+  )
+    return false;
+  const localPoint = inverseRotate(
+    [
+      point[0] - transform.position[0],
+      point[1] - transform.position[1],
+      point[2] - transform.position[2],
+    ],
+    transform.rotation,
+  );
+  const localNormal = inverseRotate(normal, transform.rotation);
+  const [width, height, length] = collider.size;
+  const thickness = basketThickness(collider);
+  // Bullet contact points may penetrate slightly into the top face.
+  const tolerance = Math.min(0.01, thickness / 4);
+  return (
+    Math.abs(localNormal[1]) > 0 &&
+    Math.abs(localNormal[1]) >
+      Math.max(Math.abs(localNormal[0]), Math.abs(localNormal[2])) &&
+    Math.abs(localPoint[1] - (-height / 2 + thickness)) <= tolerance &&
+    Math.abs(localPoint[0]) < width / 2 - thickness &&
+    Math.abs(localPoint[2]) < length / 2 - thickness
+  );
+}
 
 function requireValue(condition: unknown, path: string): asserts condition {
   if (!condition) throw new Error(`Invalid experience: ${path}`);
@@ -145,17 +226,17 @@ export function readAiming(
     );
   }
   const stableMs = positive(plane.stableMs ?? 1000, `${path}.plane.stableMs`);
-  const lifetimeMs = positive(
-    projectile.lifetimeMs ?? 10000,
-    `${path}.projectile.lifetimeMs`,
-  );
+  const lifetimeMs =
+    projectile.lifetimeMs === undefined || projectile.lifetimeMs === null
+      ? null
+      : positive(projectile.lifetimeMs, `${path}.projectile.lifetimeMs`);
   const maxActive = positive(
     projectile.maxActive ?? 12,
     `${path}.projectile.maxActive`,
   );
   requireValue(Number.isInteger(maxActive), `${path}.projectile.maxActive`);
   requireValue(
-    stableMs <= 2147483647 && lifetimeMs <= 2147483647,
+    stableMs <= 2147483647 && (lifetimeMs === null || lifetimeMs <= 2147483647),
     `${path}: timer exceeds native limit`,
   );
   return {
@@ -178,15 +259,19 @@ export function readAiming(
   };
 }
 
-export function colliderShape(collider: AimingCollider): ColliderShape {
+export function colliderShape(
+  collider: AimingCollider,
+  options: ColliderShapeOptions = {},
+): ColliderShape {
   const [w, h, l] = collider.size;
-  if (collider.type === 'bounding') return { type: 'Box', params: [w, h, l] };
+  if (collider.type === 'bounding' && !options.targetBottom)
+    return { type: 'Box', params: [w, h, l] };
   if (collider.type === 'sphere') return { type: 'Sphere', params: [w / 2] };
   const children: Part[] = [];
   const box = (params: number[], position: number[]) =>
     children.push({ type: 'Box', params, position });
-  if (collider.type === 'basket') {
-    const t = collider.thickness!;
+  if (collider.type === 'bounding' || collider.type === 'basket') {
+    const t = basketThickness(collider);
     box([w, t, l], [0, -(h - t) / 2, 0]);
     box([t, h - t, l], [-(w - t) / 2, t / 2, 0]);
     box([t, h - t, l], [(w - t) / 2, t / 2, 0]);

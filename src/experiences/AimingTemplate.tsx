@@ -1,8 +1,7 @@
 import * as React from 'react';
-import { ViroARPlane, ViroNode, ViroText } from '@reactvision/react-viro';
-import { translate } from '../../constants/i18n';
+import { ViroARPlane, ViroNode, ViroQuad } from '@reactvision/react-viro';
 import { AimingSceneContext } from './AimingScene';
-import { colliderShape } from './aiming';
+import { colliderShape, launchSpeed } from './aiming';
 import type { ExperienceObject, Vector3 } from './experience';
 import { SceneObject } from './SceneObject';
 import type { TemplateProps } from './ExperienceTemplates';
@@ -24,10 +23,8 @@ interface Shot {
   position: Vector3;
   rotation: Vector3;
   velocity: Vector3;
-  expiresAt: number;
+  expiresAt: number | null;
 }
-
-const hintStyle = { fontSize: 20, color: '#FFFFFF' };
 
 function floorFromAnchor(
   anchor: PlaneAnchor,
@@ -79,13 +76,26 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
   const latestCandidate = React.useRef<Floor | null>(null);
   const [shots, setShots] = React.useState<Shot[]>([]);
   const activeShots = React.useRef<Shot[]>([]);
+  const scoredShots = React.useRef(new Set<number>());
   const sequence = React.useRef(0);
   const projectile = game.objects.find(
     object => object.id === config.projectile.objectId,
   )!;
+  const projectilePhysics = { ...projectile.properties.physics };
+  delete projectilePhysics.velocity;
+  const claimScore = (tag?: string) => {
+    const id = Number(tag);
+    if (
+      !activeShots.current.some(shot => shot.id === id) ||
+      scoredShots.current.has(id)
+    )
+      return false;
+    scoredShots.current.add(id);
+    return true;
+  };
   const emit = React.useCallback(
     (
-      name: 'planeReady' | 'shot' | 'shotBlocked',
+      name: 'planeCandidate' | 'planeReady' | 'shot' | 'shotBlocked',
       data?: unknown,
       objectId?: number,
     ) => onEvent?.({ type: 'aiming', gameId: game.id, name, data, objectId }),
@@ -111,6 +121,7 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
       config.plane.minLength,
     );
     latestCandidate.current = next;
+    emit('planeCandidate', next);
     setCandidate(previous => {
       if (!next || !previous) return next;
       const distance = Math.hypot(
@@ -131,45 +142,58 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
     setCandidate(null);
   }, [trackingReady, floor]);
 
-  const fire = React.useCallback(() => {
-    const camera = scene?.camera.current;
-    const block = (reason: string) => emit('shotBlocked', { reason });
-    if (!floor) return block('plane');
-    if (!trackingReady) return block('tracking');
-    if (
-      !camera ||
-      ![...camera.position, ...camera.forward, ...camera.rotation].every(
-        Number.isFinite,
-      ) ||
-      Math.hypot(...camera.forward) === 0
-    )
-      return block('camera');
-    const now = Date.now();
-    const live = activeShots.current.filter(shot => shot.expiresAt > now);
-    if (live.length >= config.projectile.maxActive) return block('limit');
-    const magnitude = Math.hypot(...camera.forward);
-    const direction = camera.forward.map(n => n / magnitude);
-    const position: Vector3 = [
-      camera.position[0] + direction[0] * config.projectile.spawnDistance,
-      camera.position[1] + direction[1] * config.projectile.spawnDistance,
-      camera.position[2] + direction[2] * config.projectile.spawnDistance,
-    ];
-    const velocity: Vector3 = [
-      direction[0] * config.projectile.speed,
-      direction[1] * config.projectile.speed,
-      direction[2] * config.projectile.speed,
-    ];
-    const shot: Shot = {
-      id: -++sequence.current,
-      position,
-      rotation: camera.rotation,
-      velocity,
-      expiresAt: now + config.projectile.lifetimeMs,
-    };
-    activeShots.current = [...live, shot];
-    setShots(activeShots.current);
-    emit('shot', { projectileId: projectile.id, position, velocity }, shot.id);
-  }, [scene, floor, trackingReady, config.projectile, projectile.id, emit]);
+  const fire = React.useCallback(
+    (heldMs = 0) => {
+      const camera = scene?.camera.current;
+      const block = (reason: string) => emit('shotBlocked', { reason });
+      if (!floor) return block('plane');
+      if (!trackingReady) return block('tracking');
+      if (
+        !camera ||
+        ![...camera.position, ...camera.forward, ...camera.rotation].every(
+          Number.isFinite,
+        ) ||
+        Math.hypot(...camera.forward) === 0
+      )
+        return block('camera');
+      const now = Date.now();
+      const live = activeShots.current.filter(
+        shot => shot.expiresAt === null || shot.expiresAt > now,
+      );
+      if (live.length >= config.projectile.maxActive) return block('limit');
+      const magnitude = Math.hypot(...camera.forward);
+      const direction = camera.forward.map(n => n / magnitude);
+      const position: Vector3 = [
+        camera.position[0] + direction[0] * config.projectile.spawnDistance,
+        camera.position[1] + direction[1] * config.projectile.spawnDistance,
+        camera.position[2] + direction[2] * config.projectile.spawnDistance,
+      ];
+      const speed = launchSpeed(config.projectile.speed, heldMs);
+      const velocity: Vector3 = [
+        direction[0] * speed,
+        direction[1] * speed,
+        direction[2] * speed,
+      ];
+      const shot: Shot = {
+        id: -++sequence.current,
+        position,
+        rotation: camera.rotation,
+        velocity,
+        expiresAt:
+          config.projectile.lifetimeMs === null
+            ? null
+            : now + config.projectile.lifetimeMs,
+      };
+      activeShots.current = [...live, shot];
+      setShots(activeShots.current);
+      emit(
+        'shot',
+        { projectileId: projectile.id, position, velocity, heldMs },
+        shot.id,
+      );
+    },
+    [scene, floor, trackingReady, config.projectile, projectile.id, emit],
+  );
 
   React.useEffect(() => {
     if (!scene) return;
@@ -180,19 +204,19 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
   }, [scene, fire]);
 
   React.useEffect(() => {
-    if (!shots.length) return;
+    if (!shots.length || shots.every(shot => shot.expiresAt === null)) return;
     const timer = setTimeout(() => {
       activeShots.current = activeShots.current.filter(
-        shot => shot.expiresAt > Date.now(),
+        shot => shot.expiresAt === null || shot.expiresAt > Date.now(),
       );
       setShots(activeShots.current);
-    }, Math.max(0, Math.min(...shots.map(shot => shot.expiresAt)) - Date.now()));
+    }, Math.max(0, Math.min(...shots.filter((shot): shot is Shot & { expiresAt: number } => shot.expiresAt !== null).map(shot => shot.expiresAt)) - Date.now()));
     return () => clearTimeout(timer);
   }, [shots]);
 
   const physicalObject = (
     object: ExperienceObject,
-    shot?: Shot,
+    shot?: Pick<Shot, 'id' | 'position' | 'rotation'>,
   ): ExperienceObject => ({
     ...object,
     id: shot?.id ?? object.id,
@@ -216,29 +240,36 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
           onAnchorRemoved={() => {
             latestCandidate.current = null;
             setCandidate(null);
+            emit('planeCandidate');
           }}
         />
       )}
-      {(!floor || !trackingReady) && (
-        <ViroText
-          position={[0, 0, -1]}
-          width={1.5}
-          height={0.4}
-          text={translate(!floor ? 'aimingScanPlane' : 'aimingTrackingLost')}
-          style={hintStyle}
+      {mode === 'ar' && !floor && candidate && (
+        <ViroQuad
+          position={candidate.position}
+          rotation={[90, candidate.rotation[1], 0]}
+          width={candidate.width}
+          height={candidate.length}
+          materials={['aimingPlaneIndicator']}
+          opacity={0.35}
+          onClick={() => {
+            setFloor(candidate);
+            emit('planeReady', candidate);
+          }}
         />
       )}
       {floor && (
         <ViroNode position={floor.position} rotation={floor.rotation}>
           <ViroNode
             viroTag="aiming-floor"
-            position={[0, -0.025, 0]}
+            position={[0, -0.5, 0]}
             physicsBody={{
               type: 'Static',
               friction: 0.7,
-              restitution: 0.2,
-              shape: { type: 'Box', params: [floor.width, 0.05, floor.length] },
+              restitution: 0,
+              shape: { type: 'Box', params: [100, 1, 100] },
             }}
+            onCollision={() => undefined}
           />
           {game.objects
             .filter(object => object.id !== projectile.id)
@@ -248,15 +279,34 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
                   key={object.id}
                   {...props}
                   object={physicalObject(object)}
-                  onPress={fire}
+                  onClickState={scene?.onClickState}
+                  claimScore={claimScore}
+                  scoreOnBottom={
+                    object.properties.collider?.type === 'basket' ||
+                    object.properties.collider?.type === 'bounding'
+                      ? true
+                      : undefined
+                  }
                   physicsBody={{
                     ...object.properties.physics,
                     type: object.properties.physics?.type ?? 'Static',
-                    shape: colliderShape(object.properties.collider!),
+                    mass:
+                      object.properties.physics?.type === 'Dynamic'
+                        ? object.properties.physics.mass ?? 1
+                        : 0,
+                    shape: colliderShape(object.properties.collider!, {
+                      targetBottom:
+                        object.properties.collider!.type === 'bounding',
+                    }),
                   }}
                 />
               ) : (
-                <SceneObject key={object.id} {...props} object={object} />
+                <SceneObject
+                  key={object.id}
+                  {...props}
+                  object={object}
+                  onClickState={scene?.onClickState}
+                />
               ),
             )}
         </ViroNode>
@@ -266,13 +316,14 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
           key={shot.id}
           {...props}
           object={physicalObject(projectile, shot)}
-          onPress={fire}
+          onClickState={scene?.onClickState}
           physicsBody={{
-            ...projectile.properties.physics,
+            ...projectilePhysics,
             type: 'Dynamic',
             mass: projectile.properties.physics?.mass ?? 1,
             shape: colliderShape(projectile.properties.collider!),
-            velocity: shot.velocity,
+            useGravity: projectile.properties.physics?.useGravity ?? true,
+            instantVelocity: shot.velocity,
           }}
         />
       ))}

@@ -87,7 +87,9 @@ Legacy string-encoded fields remain readable for backwards compatibility.
   `Dynamic`, `Static`, or `Kinematic`, with an explicit `Box` shape
   (`params: [width, height, length]`) or `Sphere` (`params: [radius]`).
   Optional fields: `mass` (positive for dynamic bodies), `restitution`,
-  `friction` (both 0..1), `useGravity`, `velocity`.
+  `friction` (both 0..1), `useGravity`, `velocity`. Aiming projectiles receive
+  their initial velocity separately, so their configured `velocity` does not
+  override gravity.
   Include static collider objects when needed; only a configured aiming game
   automatically creates a physical floor. Dynamic bodies are simulated by Viro.
 - `animation` defines relative Y rotation in degrees over `duration`
@@ -118,7 +120,8 @@ Legacy string-encoded fields remain readable for backwards compatibility.
   and object properties are preserved. These declarations are **not executed**
   as scripts or interpreted as game rules. Implement each template's mechanics
   behind these extension points. The shell currently displays the pressed
-  object's ID; it does not award inventory items or scores.
+  object's ID. Configured aiming games also award inventory items and persistent
+  scores for qualifying bottom contacts.
 - Invalid types, target dimensions, references and physics data reject
   preparation with an explicit error rather than silently choosing a template.
 
@@ -159,7 +162,6 @@ contains the mobile consumer, not a server editor or backend.
         "objectId": 103,
         "speed": 5,
         "spawnDistance": 0.3,
-        "lifetimeMs": 10000,
         "maxActive": 12
       },
       "targets": [104]
@@ -196,9 +198,11 @@ contains the mobile consumer, not a server editor or backend.
   anchor, a displacement over 3 cm, a yaw change over 3 degrees, anchor removal
   or loss of tracking restarts preparation. This is a pose-stability heuristic,
   not a guarantee of tracking accuracy.
-- Once ready, the runtime snapshots the plane's center, yaw and measured extents
-  into a fixed world-space static box, 5 cm thick with its upper face at floor
-  height. Later plane updates do not move the floor. Choose a clear physical
+- Once ready, the runtime snapshots the plane's center and yaw into a fixed
+  world-space static box, **100 x 100 m and 1 m deep**, with its upper face at floor
+  height. Its dimensions are independent of the detected plane's extents. This
+  approximates an infinite ground for nearby AR play, but has finite edges 50 m
+  from its center. Later plane updates do not move the floor. Choose a clear physical
   floor: a sufficiently large tabletop is also a valid horizontal plane to the
   tracker. The floor is an invisible collider, not a rendered ground mesh.
 - Targets use positions/rotations relative to the locked floor center.
@@ -207,17 +211,40 @@ contains the mobile consumer, not a server editor or backend.
   `Kinematic` and the usual physical parameters. All configured targets must
   reference GLB, GLTF or OBJ assets and a collider. The projectile is not
   mounted before shooting.
-- Tap the scene to spawn a dynamic projectile from the camera position plus
+- Press and release the scene to spawn a dynamic projectile from the camera position plus
   `spawnDistance` along its normalized forward axis. Defaults: distance 0.3 m,
-  speed 5 m/s, lifetime 10000 ms, maximum 12 active projectiles. All are positive
-  finite values; `maxActive` is an integer. The initial rotation follows the
-  camera (author the projectile facing local -Z). The template's position and
-  initial velocity are replaced by the launch pose and velocity.
+  base speed 5 m/s, gravity enabled, unlimited lifetime, maximum 12 active projectiles.
+  Holding increases the launch speed linearly: base speed for an immediate release,
+  1.5x after 1 second, and a maximum of **2x after 2 seconds**. Longer holds do not
+  increase it further. The camera pose at release determines the launch direction.
+  Scene and object click-state handlers share the same charge, so a release fires
+  only once even when tapping a target. Losing tracking or switching games cancels
+  a pending charge. The same interaction is available in the 3D viewer.
+  An optional `useGravity: false` disables gravity and a positive `lifetimeMs` can
+  restore automatic expiry. The initial rotation follows the camera (author the
+  projectile facing local -Z). The template's position and initial velocity are
+  replaced by the launch pose and velocity. Configured constant `velocity` is
+  omitted from the projectile body so it cannot override the launch or gravity.
+  The ground has zero restitution; its depth reduces tunneling risk but does not
+  guarantee continuous collision detection at arbitrary speeds.
   Select a spawn distance outside the projectile and tune speed/size to avoid
-  discrete-physics tunneling. Expired projectiles are unmounted automatically.
+  discrete-physics tunneling. Finite-lifetime projectiles are unmounted automatically.
 - Tracking loss blocks new shots and requests a fresh camera pose on recovery;
-  the floor remains fixed and existing physics simulation continues. Neither
-  collisions nor basket entry award points in this version.
+  the floor remains fixed and existing physics simulation continues.
+  Collisions do not remove, replace or freeze projectiles: they retain their
+  dynamic bodies, gravity and physical interaction with the walls and bottom.
+  They count toward `maxActive` until expiry or leaving the game, including after
+  an impact. With unlimited lifetime, reaching this limit blocks further shots.
+- A contact on the interior top face of a box/basket bottom awards one point per
+  projectile across all targets in the current game instance. Classification uses
+  the contact position and normal in the body's current native world transform,
+  including moved/rotated targets; wall faces, top rims, the underside and
+  non-projectile bodies do not score. Native transform failures are reported.
+  Scores persist per memory and appear in the menu's Scores tab; a scoring contact
+  also adds the memory to the collection.
+- Development builds of configured aiming scenes enable Viro's
+  `physicsWorld.drawBounds` in AR and the 3D viewer to show actual physical shapes.
+  Release builds do not display these diagnostic bounds.
 - Colliders have an explicit `size: [width, height, length]` in meters,
   centered on their object's origin. Unlike the generic object contract,
   configured projectile/target `scale` changes **only the visual model**;
@@ -227,17 +254,18 @@ contains the mobile consumer, not a server editor or backend.
 
 | Collider   | Configuration / implementation                                                                                                       |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `bounding` | Explicit box dimensions; no automatic OBJ/GLB bounds extraction.                                                                     |
+| `bounding` | Explicit dimensions; no automatic OBJ/GLB bounds extraction. Projectiles use a solid box. Aiming targets use an open compound basket with a bottom and four walls, up to 5 cm thick (reduced for small dimensions). |
 | `sphere`   | Equal X/Y/Z dimensions; radius is half the width.                                                                                    |
 | `capsule`  | Vertical, X = Z and Y >= X; compound approximation using overlapping spheres and a central box. Y = X becomes a sphere.              |
 | `diamond`  | Octahedron approximation, made of 8 vertical layers with 5 box strips each.                                                          |
-| `basket`   | Open rectangular basket: bottom and four walls, no lid. Requires positive `thickness` smaller than height and half the width/length. |
+| `basket`   | Open rectangular basket: bottom and four walls, no lid. Requires positive `thickness` smaller than height and half the width/length. All five parts remain physical; only projectile contacts on the interior top face of the bottom can score. |
 
 Viro supports boxes, spheres and their compounds, not native capsule or convex
 octahedron shapes. The two approximations are intentional and not exact smooth
 surfaces. All five choices work for projectiles and targets independently of the
-visual asset; a visually hollow OBJ needs `basket` rather than a solid bounding
-box for projectiles to enter.
+visual asset; aiming box/basket targets remain open so projectiles can enter.
+Physical dimensions and the visual asset's authored origin must agree; scaling
+the model alone does not resize or recenter its collider.
 
 The 3D fallback uses the same physical objects and launch mechanics with an
 immediate synthetic floor centered at `[0, -1, -2]` and the configured minimum

@@ -26,6 +26,7 @@ import {
   canViewMemoryContent, getMemoryDistance, createARSession,
 } from './src/utils/memoryAccess';
 import { useInventory } from './src/hooks/useInventory';
+import { useScores } from './src/hooks/useScores';
 import { useVisitedPlaces } from './src/hooks/useVisitedPlaces';
 import { useRadar } from './src/hooks/useRadar';
 import CollectionParticle from './src/components/CollectionParticle';
@@ -34,13 +35,13 @@ import { MemoryInfoModal } from './src/components/MemoryInfoModal';
 import { FullscreenMediaViewer } from './src/components/FullscreenMediaViewer';
 import { AccountModal } from './src/components/AccountModal';
 import ViroModelViewer from './src/components/ViroModelViewer';
+import ViroARView from './src/components/ViroARView';
 import { hasExperience, readExperience } from './src/experiences/experience';
 import { ExperienceControls } from './src/experiences/ExperienceControls';
+import ExperienceViewer from './src/experiences/ExperienceViewer';
 import { useAuth } from './src/hooks/useAuth'
 import { COLORS } from './theme';
 import { useI18n } from './constants/i18n';
-const ViroARView = React.lazy(() => import('./src/components/ViroARView'));
-const ExperienceViewer = React.lazy(() => import('./src/experiences/ExperienceViewer'));
 const MAP_NEIGHBORHOOD_ZOOM = 12;
 const DEFAULT_MAP_CENTER = [1.3553, 44.0175];
 const AR_SESSION_RELEASE_MS = 1500;
@@ -98,6 +99,7 @@ function AppContent() {
     collectedMemories, showInventory, setShowInventory,
     handleCollectMemory, clearInventory
   } = useInventory();
+  const { scores, addScore } = useScores();
   const collectionItems = useMemo(() => collectedMemories.map((item) => {
     const sourceMemory = memories.find((memory) => String(memory.id) === String(item.id));
     return sourceMemory?.creatorName && !item.creatorName
@@ -167,6 +169,7 @@ function AppContent() {
   const [isPreparingModelViewer, setIsPreparingModelViewer] = useState(false);
   const [experienceGameIndex, setExperienceGameIndex] = useState(0);
   const [experienceInteraction, setExperienceInteraction] = useState(null);
+  const [aimingPlaneReady, setAimingPlaneReady] = useState(false);
   const arExperience = useMemo(() => readExperience(selectedArMemory), [selectedArMemory]);
   const viewerExperience = useMemo(() => readExperience(modelViewerMemory), [modelViewerMemory]);
   const reportExperienceError = useCallback((message) => {
@@ -175,10 +178,27 @@ function AppContent() {
   const selectExperienceGame = useCallback((index) => {
     setExperienceGameIndex(index);
     setExperienceInteraction(null);
+    setAimingPlaneReady(false);
   }, []);
   const handleExperienceEvent = useCallback((event) => {
     if (event.name === 'press') setExperienceInteraction(event);
-  }, []);
+    if (event.name === 'planeCandidate') setAimingPlaneReady(false);
+    if (event.name === 'planeReady') setAimingPlaneReady(true);
+    if (
+      event.name === 'collision' &&
+      event.data?.scoringContact === true &&
+      Number.isSafeInteger(event.data?.projectileId) &&
+      event.data.projectileId < 0 &&
+      selectedArMemory
+    ) {
+      addScore({ id: selectedArMemory.id, name: selectedArMemory.name });
+      handleCollectMemory({
+        ...selectedArMemory,
+        creatorName:
+          selectedArMemory.creatorName || selectedArMemory.creator_name || '',
+      });
+    }
+  }, [addScore, handleCollectMemory, selectedArMemory]);
   const modelViewerRequestKey = useRef(0);
   const modelViewerTransitionTimer = useRef(null);
   const [mediaViewer, setMediaViewer] = useState(null);
@@ -349,6 +369,7 @@ function AppContent() {
     setIsPlacingMode(false);
     setSelectedMemoryToPlace(null);
     setSelectedArMemory(null);
+    setAimingPlaneReady(false);
     setIsModelLoading(false);
     setIsPreparingPlacement(false);
     setActiveParticle(null);
@@ -557,7 +578,7 @@ function AppContent() {
     return (
       <View style={styles.modelViewerScreen} collapsable={false}>
         {modelViewerMemory && viewerExperience ? (
-          <React.Suspense fallback={<ActivityIndicator color={COLORS.accent} />}>
+          <>
             <ExperienceViewer
               experience={viewerExperience}
               gameIndex={experienceGameIndex}
@@ -572,7 +593,7 @@ function AppContent() {
                 <Text style={styles.loaderText}>{experienceInteraction.objectId}</Text>
               )}
             </View>
-          </React.Suspense>
+          </>
         ) : modelViewerMemory ? (
           <ViroModelViewer
             modelUrl={modelViewerMemory.model_url}
@@ -630,40 +651,31 @@ function AppContent() {
     const arMemoryToPlace = selectedMemoryToPlace || selectedArMemory;
     return (
       <View style={styles.arScreen} collapsable={false}>
-        <React.Suspense
-          fallback={(
-            <View style={styles.arCenterOverlay}>
-              <ActivityIndicator size="small" color={COLORS.accent} />
-              <Text style={styles.loaderText}>{t('loading')}</Text>
-            </View>
-          )}
-        >
-          <ViroARView
-            key={`ar-view-${cameraKey}`}
-            style={styles.viroView}
-            onMemoryCollected={(e) => handleCollectWithAnimation(e.nativeEvent)}
-            onMemorySelected={(e) => handleMemorySelected(e.nativeEvent.id)}
-            onMemoryPlaced={() => {
-              setIsPlacingMode(false);
-              setSelectedMemoryToPlace(null);
-            }}
-            onModelLoadingStatus={(e) => {
-              setIsModelLoading(e.nativeEvent.isLoading);
-              if (e.nativeEvent.error) {
-                Alert.alert(t('modelLoadError'), e.nativeEvent.error);
-              }
-            }}
-            resetPlacedMemoryKey={resetPlacedMemoryKey}
-            canCollect={!!user}
-            memoryToPlace={isPlacingMode ? arMemoryToPlace : null}
-            arMemories={arMemories}
-            nearbyMemories={nearbyMemories}
-            experience={arExperience}
-            experienceGameIndex={experienceGameIndex}
-            onExperienceEvent={handleExperienceEvent}
-            onExperienceError={reportExperienceError}
-          />
-        </React.Suspense>
+        <ViroARView
+          key={`ar-view-${cameraKey}`}
+          style={styles.viroView}
+          onMemoryCollected={(e) => handleCollectWithAnimation(e.nativeEvent)}
+          onMemorySelected={(e) => handleMemorySelected(e.nativeEvent.id)}
+          onMemoryPlaced={() => {
+            setIsPlacingMode(false);
+            setSelectedMemoryToPlace(null);
+          }}
+          onModelLoadingStatus={(e) => {
+            setIsModelLoading(e.nativeEvent.isLoading);
+            if (e.nativeEvent.error) {
+              Alert.alert(t('modelLoadError'), e.nativeEvent.error);
+            }
+          }}
+          resetPlacedMemoryKey={resetPlacedMemoryKey}
+          canCollect={!!user}
+          memoryToPlace={isPlacingMode ? arMemoryToPlace : null}
+          arMemories={arMemories}
+          nearbyMemories={nearbyMemories}
+          experience={arExperience}
+          experienceGameIndex={experienceGameIndex}
+          onExperienceEvent={handleExperienceEvent}
+          onExperienceError={reportExperienceError}
+        />
 
         {/* Animated particle overlaid when a memory is collected. */}
         {activeParticle && (
@@ -718,6 +730,10 @@ function AppContent() {
 
         {arExperience && (
           <View style={[styles.experiencePanel, { top: insets.top + 76 }]}>
+            {arExperience.games[experienceGameIndex]?.type === 'aiming' &&
+              !aimingPlaneReady && (
+                <Text style={styles.placingHint}>{t('aimingScanPlane')}</Text>
+              )}
             <ExperienceControls experience={arExperience} gameIndex={experienceGameIndex}
               onSelect={selectExperienceGame} mode="ar" />
             {experienceInteraction && (
@@ -983,6 +999,7 @@ function AppContent() {
         visible={showMenu}
         onClose={() => setShowMenu(false)}
         places={menuPlaces}
+        scores={scores}
         onSelectPlace={(place) => {
           const memory = memories.find((item) => String(item.id) === String(place.id));
           setShowMenu(false);

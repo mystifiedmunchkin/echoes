@@ -20,7 +20,13 @@ const TABS = [
 
 const PlaceSeparator = () => <View style={styles.separator} />;
 
-export default function MenuModal({ visible, onClose, places, onSelectPlace }) {
+export default function MenuModal({
+  visible,
+  onClose,
+  places,
+  scores,
+  onSelectPlace,
+}) {
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState('places');
 
@@ -44,6 +50,32 @@ export default function MenuModal({ visible, onClose, places, onSelectPlace }) {
   );
 
   const renderContent = () => {
+    if (activeTab === 'scores') {
+      if (!scores || scores.length === 0) {
+        return (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>{t('noScores')}</Text>
+          </View>
+        );
+      }
+      return (
+        <FlatList
+          data={[...scores].sort((a, b) => b.points - a.points)}
+          keyExtractor={item => String(item.id)}
+          renderItem={({ item, index }) => (
+            <View style={styles.scoreRow}>
+              <Text style={styles.scoreRank}>{index + 1}.</Text>
+              <Text style={styles.placeName} numberOfLines={1}>
+                {item.name || t('memoryUnknown')}
+              </Text>
+              <Text style={styles.scoreValue}>{item.points}</Text>
+            </View>
+          )}
+          ItemSeparatorComponent={PlaceSeparator}
+          contentContainerStyle={styles.listContainer}
+        />
+      );
+    }
     if (activeTab !== 'places') {
       return (
         <View style={styles.emptyContainer}>
@@ -223,6 +255,28 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: 'monospace',
     minWidth: 70,
+    textAlign: 'right',
+  },
+  scoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 36,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    gap: 8,
+  },
+  scoreRank: {
+    color: COLORS.textMuted,
+    fontSize: 13,
+    fontFamily: 'monospace',
+    width: 24,
+  },
+  scoreValue: {
+    color: COLORS.accent,
+    fontSize: 16,
+    fontWeight: 'bold',
+    fontFamily: 'monospace',
+    minWidth: 36,
     textAlign: 'right',
   },
   emptyContainer: {
