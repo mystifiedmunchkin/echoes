@@ -4,7 +4,8 @@ This is a new [**React Native**](https://reactnative.dev) project, bootstrapped 
 
 ## Memory discovery
 
-- Map searches are capped at 2,500 m. The map shows both the 2,500 m search circle and the 50 m discovery circle.
+- The nearby endpoint is queried with the current latitude and longitude; the map
+  shows both the 2,500 m search circle and the 50 m discovery circle.
 - Once a GPS position is available, the map displays the native user-location marker with a compass heading indicator (subject to device sensor availability).
 - Before opening AR, the app obtains a fresh GPS fix, fetches nearby memories, filters them to a maximum of 50 m, and downloads their media. An unsuccessful preparation does not open AR.
 - Map and history details show only a title and description for distant memories. Within 50 m, full viewer access is reserved for Samsung Galaxy A devices (Galaxy A names or SM-A model identifiers), where AR is disabled. Other devices discover content in AR.

@@ -353,274 +353,257 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
     [cacheRemoteAsset],
   );
 
-  const fetchMemories = useCallback(
-    async (lat, lng, currentRadius, throwOnError = false) => {
-      setIsLoadingApi(true);
-      setApiError(null);
-      try {
-        const token = await getAuthToken();
-        const response = await fetch(
-          `https://echoes.sophiehorner.art/api/memories-near-me?lat=${lat}&lng=${lng}&radius=${Math.min(
-            currentRadius,
-            MAP_RADIUS_METERS,
-          )}`,
-          {
-            headers: {
-              Accept: 'application/json',
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
+  const fetchMemories = useCallback(async (lat, lng, throwOnError = false) => {
+    setIsLoadingApi(true);
+    setApiError(null);
+    try {
+      const token = await getAuthToken();
+      const response = await fetch(
+        `https://echoes.sophiehorner.art/api/memories-near-me?latitude=${lat}&longitude=${lng}`,
+        {
+          headers: {
+            Accept: 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
+        },
+      );
+
+      if (!response.ok)
+        throw new Error(translate('serverError', { status: response.status }));
+
+      const rawData = await response.json();
+      const dataArray = Array.isArray(rawData)
+        ? rawData
+        : rawData.data || rawData.memories || [];
+
+      const formattedMemories = dataArray.map((item, index) => {
+        const latVal = Number(String(item.latitude ?? NaN).replace(',', '.'));
+        const lngVal = Number(String(item.longitude ?? NaN).replace(',', '.'));
+
+        // The server uses model_3D as the canonical 3D asset field.
+        const mediaContents = parseJsonValue(item.media_contents, {});
+        const interactive = normalizeInteractive(
+          item.interactive ?? item.logic ?? item,
         );
+        const rawContents = parseJsonValue(item.contents, []);
+        const isContentObject =
+          rawContents &&
+          typeof rawContents === 'object' &&
+          !Array.isArray(rawContents) &&
+          [
+            'model_3D',
+            'image',
+            'image_url',
+            'audio',
+            'audio_url',
+            'video',
+            'video_url',
+          ].some(key => Object.prototype.hasOwnProperty.call(rawContents, key));
+        const mediaArray = Array.isArray(rawContents)
+          ? rawContents
+          : isContentObject
+          ? [rawContents]
+          : Object.values(rawContents || {});
+        const mediaContentsArray = Array.isArray(mediaContents)
+          ? mediaContents
+          : [];
+        const userId =
+          item.user_id || item.user?.id || item.creator?.id || item.created_by;
+        const normalizeContent = (content, contentIndex) => {
+          const source = content && typeof content === 'object' ? content : {};
+          const modelUrl = extractMediaUrl(source.model_3D);
+          const imageUrl = extractMediaUrl(source.image || source.image_url);
+          const audioUrl = extractMediaUrl(source.audio || source.audio_url);
+          const videoUrl = extractMediaUrl(source.video || source.video_url);
 
-        if (!response.ok)
-          throw new Error(
-            translate('serverError', { status: response.status }),
-          );
-
-        const rawData = await response.json();
-        const dataArray = Array.isArray(rawData)
-          ? rawData
-          : rawData.data || rawData.memories || [];
-
-        const formattedMemories = dataArray.map((item, index) => {
-          const latVal = Number(String(item.latitude ?? NaN).replace(',', '.'));
-          const lngVal = Number(
-            String(item.longitude ?? NaN).replace(',', '.'),
-          );
-
-          // The server uses model_3D as the canonical 3D asset field.
-          const mediaContents = parseJsonValue(item.media_contents, {});
-          const interactive = normalizeInteractive(
-            item.interactive ?? item.logic ?? item,
-          );
-          const rawContents = parseJsonValue(item.contents, []);
-          const isContentObject =
-            rawContents &&
-            typeof rawContents === 'object' &&
-            !Array.isArray(rawContents) &&
-            [
-              'model_3D',
-              'image',
-              'image_url',
-              'audio',
-              'audio_url',
-              'video',
-              'video_url',
-            ].some(key =>
-              Object.prototype.hasOwnProperty.call(rawContents, key),
-            );
-          const mediaArray = Array.isArray(rawContents)
-            ? rawContents
-            : isContentObject
-            ? [rawContents]
-            : Object.values(rawContents || {});
-          const mediaContentsArray = Array.isArray(mediaContents)
-            ? mediaContents
-            : [];
-          const userId =
-            item.user_id ||
-            item.user?.id ||
-            item.creator?.id ||
-            item.created_by;
-          const normalizeContent = (content, contentIndex) => {
-            const source =
-              content && typeof content === 'object' ? content : {};
-            const modelUrl = extractMediaUrl(source.model_3D);
-            const imageUrl = extractMediaUrl(source.image || source.image_url);
-            const audioUrl = extractMediaUrl(source.audio || source.audio_url);
-            const videoUrl = extractMediaUrl(source.video || source.video_url);
-
-            return {
-              ...source,
-              index: contentIndex,
-              model_3D: modelUrl
-                ? resolvePrivateFileUrl(modelUrl, userId, 'model_3D')
-                : null,
-              image: imageUrl
-                ? resolvePrivateFileUrl(imageUrl, userId, 'image')
-                : null,
-              audio: audioUrl
-                ? resolvePrivateFileUrl(audioUrl, userId, 'audio')
-                : null,
-              video: videoUrl
-                ? resolvePrivateFileUrl(videoUrl, userId, 'video')
-                : null,
-            };
+          return {
+            ...source,
+            index: contentIndex,
+            model_3D: modelUrl
+              ? resolvePrivateFileUrl(modelUrl, userId, 'model_3D')
+              : null,
+            image: imageUrl
+              ? resolvePrivateFileUrl(imageUrl, userId, 'image')
+              : null,
+            audio: audioUrl
+              ? resolvePrivateFileUrl(audioUrl, userId, 'audio')
+              : null,
+            video: videoUrl
+              ? resolvePrivateFileUrl(videoUrl, userId, 'video')
+              : null,
           };
-          const contents = mediaArray.map(normalizeContent);
-          const contentImageUrls = contents
-            .map(content => content.image)
-            .filter(Boolean);
-          const contentAudioUrls = contents
-            .map(content => content.audio)
-            .filter(Boolean);
-          const contentVideoUrls = contents
-            .map(content => content.video)
-            .filter(Boolean);
-          const findMediaUrls = (keys, mediaType) => {
-            const directMatches = keys.flatMap(key =>
-              extractMediaUrls(mediaContents[key]),
-            );
-            const contentMatches = [
-              ...mediaContentsArray,
-              ...mediaArray,
-            ].flatMap(content => {
+        };
+        const contents = mediaArray.map(normalizeContent);
+        const contentImageUrls = contents
+          .map(content => content.image)
+          .filter(Boolean);
+        const contentAudioUrls = contents
+          .map(content => content.audio)
+          .filter(Boolean);
+        const contentVideoUrls = contents
+          .map(content => content.video)
+          .filter(Boolean);
+        const findMediaUrls = (keys, mediaType) => {
+          const directMatches = keys.flatMap(key =>
+            extractMediaUrls(mediaContents[key]),
+          );
+          const contentMatches = [...mediaContentsArray, ...mediaArray].flatMap(
+            content => {
               const contentType = String(
                 content?.type || content?.mime_type || '',
               ).toLowerCase();
               if (contentType.includes(mediaType))
                 return extractMediaUrls(content);
               return keys.flatMap(key => extractMediaUrls(content?.[key]));
-            });
-            return [...directMatches, ...contentMatches].filter(Boolean);
-          };
-          const contentModelUrls = contents
-            .map(content => content.model_3D)
-            .filter(Boolean);
-          const explicitModelUrls = extractMediaUrls(item.model_3D);
-          const modelCandidates = [
-            ...explicitModelUrls,
-            ...contentModelUrls,
-            ...findMediaUrls(['model_3D'], 'model'),
-          ];
-          const modelUrls = [
-            ...new Set(
-              modelCandidates
-                .map(value => resolvePrivateFileUrl(value, userId, 'model_3D'))
-                .filter(is3DReference),
-            ),
-          ];
-          const explicitModelUrl = modelUrls[0] || '';
-          const inferredMediaType = String(
-            item.media_type ||
-              item.mime_type ||
-              item.content_type ||
-              item.type ||
-              '',
-          ).toLowerCase();
-          const inferredVideo =
-            inferredMediaType.includes('video') ||
-            isVideoReference(explicitModelUrl);
-          const inferredImage =
-            !inferredVideo &&
-            !isAudioReference(explicitModelUrl) &&
-            !is3DReference(explicitModelUrl);
-          const imageUrl =
-            extractMediaUrl(item.image_url) ||
-            extractMediaUrl(item.image) ||
-            contentImageUrls[0] ||
-            findMediaUrls(['image', 'images', 'image_url'], 'image')[0] ||
-            (isImageReference(explicitModelUrl) || inferredImage
-              ? explicitModelUrl
-              : '');
-          const videoUrl =
-            extractMediaUrl(item.video_url) ||
-            extractMediaUrl(item.video) ||
-            contentVideoUrls[0] ||
-            findMediaUrls(['video', 'videos', 'video_url'], 'video')[0] ||
-            (inferredVideo ? explicitModelUrl : '');
-          const audioUrl =
-            extractMediaUrl(item.audio_url) ||
-            extractMediaUrl(item.audio) ||
-            contentAudioUrls[0] ||
-            findMediaUrls(['audio', 'audios', 'audio_url'], 'audio')[0];
-          const resolvedImageCandidate = resolvePrivateFileUrl(
-            imageUrl,
-            userId,
-            'image',
+            },
           );
-          const resolvedVideoCandidate = resolvePrivateFileUrl(
-            videoUrl,
-            userId,
-            'video',
-          );
-          const resolvedAudioUrl = resolvePrivateFileUrl(
-            audioUrl,
-            userId,
-            'audio',
-          );
-          const resolvedImageUrl = isVideoReference(resolvedImageCandidate)
-            ? ''
-            : resolvedImageCandidate;
-          const resolvedVideoUrl =
-            resolvedVideoCandidate ||
-            (isVideoReference(resolvedImageCandidate)
-              ? resolvedImageCandidate
-              : '');
-          const audioUrls = [
-            ...new Set(
-              [
-                audioUrl,
-                ...contents.map(content => content.audio).filter(Boolean),
-              ]
-                .map(value => resolvePrivateFileUrl(value, userId, 'audio'))
-                .filter(Boolean),
-            ),
-          ];
-          const videoUrls = [
-            ...new Set(
-              [
-                videoUrl,
-                ...contents.map(content => content.video).filter(Boolean),
-              ]
-                .map(value => resolvePrivateFileUrl(value, userId, 'video'))
-                .filter(Boolean),
-            ),
-          ];
-          const effectiveModelUrls = modelUrls;
-          const effectiveModelUrl = effectiveModelUrls[0] || '';
-
-          return {
-            ...item,
-            id: item.id || index,
-            name: item.title || item.name || translate('memoryDefault'),
-            title: item.title || item.name || translate('memoryDefault'),
-            description: item.description || '',
-            creatorName: formatCreatorName(
-              item.user_name,
-              item.user,
-              item.creator,
-              item.created_by,
-              item.creator_name,
-              item.username,
-              item.name_user,
-            ),
-            lat: latVal,
-            lng: lngVal,
-            latitude: latVal,
-            longitude: lngVal,
-            interactive,
-            interactive_json: JSON.stringify(interactive),
-            contents,
-            model_url: effectiveModelUrl,
-            model_urls: effectiveModelUrls,
-            image_url: resolvedImageUrl,
-            video_url: resolvedVideoUrl,
-            video_urls: videoUrls,
-            audio_url: resolvedAudioUrl,
-            audio_urls: audioUrls,
-            allow_manual_placement: item.allow_manual_placement ?? true,
-            is_collectible: item.is_collectible ?? true,
-          };
-        });
-
-        const validMemories = formattedMemories.filter(
-          m =>
-            Number.isFinite(m.lat) &&
-            Number.isFinite(m.lng) &&
-            m.interactive?.logic?.games?.length > 0,
+          return [...directMatches, ...contentMatches].filter(Boolean);
+        };
+        const contentModelUrls = contents
+          .map(content => content.model_3D)
+          .filter(Boolean);
+        const explicitModelUrls = extractMediaUrls(item.model_3D);
+        const modelCandidates = [
+          ...explicitModelUrls,
+          ...contentModelUrls,
+          ...findMediaUrls(['model_3D'], 'model'),
+        ];
+        const modelUrls = [
+          ...new Set(
+            modelCandidates
+              .map(value => resolvePrivateFileUrl(value, userId, 'model_3D'))
+              .filter(is3DReference),
+          ),
+        ];
+        const explicitModelUrl = modelUrls[0] || '';
+        const inferredMediaType = String(
+          item.media_type ||
+            item.mime_type ||
+            item.content_type ||
+            item.type ||
+            '',
+        ).toLowerCase();
+        const inferredVideo =
+          inferredMediaType.includes('video') ||
+          isVideoReference(explicitModelUrl);
+        const inferredImage =
+          !inferredVideo &&
+          !isAudioReference(explicitModelUrl) &&
+          !is3DReference(explicitModelUrl);
+        const imageUrl =
+          extractMediaUrl(item.image_url) ||
+          extractMediaUrl(item.image) ||
+          contentImageUrls[0] ||
+          findMediaUrls(['image', 'images', 'image_url'], 'image')[0] ||
+          (isImageReference(explicitModelUrl) || inferredImage
+            ? explicitModelUrl
+            : '');
+        const videoUrl =
+          extractMediaUrl(item.video_url) ||
+          extractMediaUrl(item.video) ||
+          contentVideoUrls[0] ||
+          findMediaUrls(['video', 'videos', 'video_url'], 'video')[0] ||
+          (inferredVideo ? explicitModelUrl : '');
+        const audioUrl =
+          extractMediaUrl(item.audio_url) ||
+          extractMediaUrl(item.audio) ||
+          contentAudioUrls[0] ||
+          findMediaUrls(['audio', 'audios', 'audio_url'], 'audio')[0];
+        const resolvedImageCandidate = resolvePrivateFileUrl(
+          imageUrl,
+          userId,
+          'image',
         );
-        setMemories(validMemories);
-        return validMemories;
-      } catch (err) {
-        setApiError(err.message || translate('networkUnavailable'));
-        if (throwOnError) throw err;
-      } finally {
-        setIsLoadingApi(false);
-      }
-    },
-    [],
-  );
+        const resolvedVideoCandidate = resolvePrivateFileUrl(
+          videoUrl,
+          userId,
+          'video',
+        );
+        const resolvedAudioUrl = resolvePrivateFileUrl(
+          audioUrl,
+          userId,
+          'audio',
+        );
+        const resolvedImageUrl = isVideoReference(resolvedImageCandidate)
+          ? ''
+          : resolvedImageCandidate;
+        const resolvedVideoUrl =
+          resolvedVideoCandidate ||
+          (isVideoReference(resolvedImageCandidate)
+            ? resolvedImageCandidate
+            : '');
+        const audioUrls = [
+          ...new Set(
+            [
+              audioUrl,
+              ...contents.map(content => content.audio).filter(Boolean),
+            ]
+              .map(value => resolvePrivateFileUrl(value, userId, 'audio'))
+              .filter(Boolean),
+          ),
+        ];
+        const videoUrls = [
+          ...new Set(
+            [
+              videoUrl,
+              ...contents.map(content => content.video).filter(Boolean),
+            ]
+              .map(value => resolvePrivateFileUrl(value, userId, 'video'))
+              .filter(Boolean),
+          ),
+        ];
+        const effectiveModelUrls = modelUrls;
+        const effectiveModelUrl = effectiveModelUrls[0] || '';
+
+        return {
+          ...item,
+          id: item.id || index,
+          name: item.title || item.name || translate('memoryDefault'),
+          title: item.title || item.name || translate('memoryDefault'),
+          description: item.description || '',
+          creatorName: formatCreatorName(
+            item.user_name,
+            item.user,
+            item.creator,
+            item.created_by,
+            item.creator_name,
+            item.username,
+            item.name_user,
+          ),
+          lat: latVal,
+          lng: lngVal,
+          latitude: latVal,
+          longitude: lngVal,
+          interactive,
+          interactive_json: JSON.stringify(interactive),
+          contents,
+          model_url: effectiveModelUrl,
+          model_urls: effectiveModelUrls,
+          image_url: resolvedImageUrl,
+          video_url: resolvedVideoUrl,
+          video_urls: videoUrls,
+          audio_url: resolvedAudioUrl,
+          audio_urls: audioUrls,
+          allow_manual_placement: item.allow_manual_placement ?? true,
+          is_collectible: item.is_collectible ?? true,
+        };
+      });
+
+      const validMemories = formattedMemories.filter(
+        m =>
+          Number.isFinite(m.lat) &&
+          Number.isFinite(m.lng) &&
+          m.interactive?.logic?.games?.length > 0,
+      );
+      setMemories(validMemories);
+      return validMemories;
+    } catch (err) {
+      setApiError(err.message || translate('networkUnavailable'));
+      if (throwOnError) throw err;
+    } finally {
+      setIsLoadingApi(false);
+    }
+  }, []);
 
   const loadNearbyMemories = useCallback(async () => {
     const currentLoc = await Location.getCurrentPositionAsync({
@@ -630,12 +613,7 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
       throw new Error(translate('gpsLocationUnavailable'));
     const origin = currentLoc.coords;
     setLocation(origin);
-    const nearby = await fetchMemories(
-      origin.latitude,
-      origin.longitude,
-      MAP_RADIUS_METERS,
-      true,
-    );
+    const nearby = await fetchMemories(origin.latitude, origin.longitude, true);
     return { location: origin, memories: nearby };
   }, [fetchMemories]);
 
@@ -682,11 +660,7 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
           ? prev
           : currentLoc.coords,
       );
-      fetchMemories(
-        currentLoc.coords.latitude,
-        currentLoc.coords.longitude,
-        radius,
-      );
+      fetchMemories(currentLoc.coords.latitude, currentLoc.coords.longitude);
       return true;
     }
 
@@ -712,8 +686,7 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
   const updateRadius = newRadius => {
     const limitedRadius = Math.min(newRadius, MAP_RADIUS_METERS);
     setRadius(limitedRadius);
-    if (location)
-      fetchMemories(location.latitude, location.longitude, limitedRadius);
+    if (location) fetchMemories(location.latitude, location.longitude);
   };
 
   const openSettings = () => Linking.openSettings();
@@ -732,6 +705,6 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
     requestGpsPermission,
     openSettings,
     refreshData: () =>
-      location && fetchMemories(location.latitude, location.longitude, radius),
+      location && fetchMemories(location.latitude, location.longitude),
   };
 }
