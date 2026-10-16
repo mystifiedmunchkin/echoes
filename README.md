@@ -202,11 +202,11 @@ contains the mobile consumer, not a server editor or backend.
   floor: a sufficiently large tabletop is also a valid horizontal plane to the
   tracker. The floor is an invisible collider, not a rendered ground mesh.
 - Targets use positions/rotations relative to the locked floor center.
-  Their OBJ geometry should be centered on the configured collider. Targets
+  Their GLB, GLTF or OBJ geometry should be centered on the configured collider. Targets
   default to `Static`; optional `physics` can specify `Static`, `Dynamic` or
   `Kinematic` and the usual physical parameters. All configured targets must
-  reference OBJ assets and a collider. The projectile template must reference
-  a GLB or OBJ asset and a collider; it is not mounted before shooting.
+  reference GLB, GLTF or OBJ assets and a collider. The projectile is not
+  mounted before shooting.
 - Tap the scene to spawn a dynamic projectile from the camera position plus
   `spawnDistance` along its normalized forward axis. Defaults: distance 0.3 m,
   speed 5 m/s, lifetime 10000 ms, maximum 12 active projectiles. All are positive

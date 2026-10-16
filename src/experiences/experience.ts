@@ -328,12 +328,10 @@ export function readExperience(memory: unknown): Experience | null {
         const object = objects.find(item => item.id === id)!;
         const asset = assets.find(item => item.id === object.properties.asset);
         requireValue(
-          id === result.settings.projectile.objectId
-            ? asset?.type === 'GLB' || asset?.type === 'OBJ'
-            : asset?.type === 'OBJ',
-          `${path}.settings: ${id} requires ${
-            id === result.settings.projectile.objectId ? 'GLB or OBJ' : 'OBJ'
-          }`,
+          asset?.type === 'GLB' ||
+            asset?.type === 'GLTF' ||
+            asset?.type === 'OBJ',
+          `${path}.settings: ${id} requires a GLB, GLTF or OBJ asset`,
         );
       }
     }

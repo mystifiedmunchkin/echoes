@@ -60,6 +60,15 @@ test.each(['GLB', 'OBJ'])('accepts a %s projectile', type => {
   ).not.toBeNull();
 });
 
+test.each(['GLB', 'GLTF', 'OBJ'])('accepts a %s target', type => {
+  expect(
+    readGame({
+      ...game,
+      assets: [game.assets[0], { ...game.assets[1], type }],
+    }),
+  ).not.toBeNull();
+});
+
 test.each([
   { type: 'capsule', size: [0.2, 0.6, 0.2] },
   { type: 'bounding', size: [0.2, 0.4, 0.6] },
@@ -130,8 +139,6 @@ test.each([
       projectile: { objectId: 1, lifetimeMs: 2147483648 },
     },
   },
-  { ...game, assets: [{ ...game.assets[0], type: 'GLTF' }, game.assets[1]] },
-  { ...game, assets: [game.assets[0], { ...game.assets[1], type: 'GLB' }] },
   {
     ...game,
     objects: [{ ...projectile, properties: { asset: 10 } }, target],
