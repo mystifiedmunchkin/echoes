@@ -19,68 +19,66 @@ not finished games: scoring/win rules, geolocated quest progression, collection 
 individual keys/clues, scoring and persistence remain to be implemented.
 Existing map proximity restrictions and legacy memory viewers remain unchanged.
 
-The API returns **JSON objects**, not JSON-encoded strings. Use
-`interactive.logic` or response-level `logic`. Each game must contain its own
-required `type`; root-level and `interactive.type` values are ignored and do
-not provide a fallback. All templates use the same `assets` / `objects`
-structure.
+The nearby endpoint returns a **direct JSON list of interactive games**, not
+legacy `memory` records and not JSON-encoded strings. Each game carries its
+own GPS coordinates and required `type`; there is no root-level type fallback.
+`title` and `description` are game metadata. All templates use the same
+`assets` / `objects` structure.
 Legacy string-encoded fields remain readable for backwards compatibility.
 
 ```json
-{
-  "id": 42,
-  "interactive": {
-    "logic": {
-      "gravity": [0, -9.81, 0],
-      "games": [
-        {
-          "id": 1,
-          "type": "images",
-          "assets": [
-            {
-              "id": 10,
-              "name": "Papillon",
-              "type": "GLB",
-              "url": "https://example.com/butterfly.glb"
-            }
-          ],
-          "target": {
-            "id": 20,
-            "imageUrl": "https://example.com/poster.jpg",
-            "physicalWidth": 0.6,
-            "orientation": "Up"
+[
+  {
+    "id": 1,
+    "latitude": 44.0,
+    "longitude": 1.0,
+    "title": "Papillon animé",
+    "description": "Une expérience interactive",
+    "type": "images",
+    "assets": [
+      {
+        "id": 10,
+        "name": "Papillon",
+        "type": "GLB",
+        "url": "https://example.com/butterfly.glb"
+      }
+    ],
+    "target": {
+      "id": 20,
+      "imageUrl": "https://example.com/poster.jpg",
+      "physicalWidth": 0.6,
+      "orientation": "Up"
+    },
+    "objects": [
+      {
+        "id": 30,
+        "properties": {
+          "asset": 10,
+          "position": [0, 0, 0],
+          "rotation": [0, 0, 0],
+          "scale": [0.2, 0.2, 0.2],
+          "physics": {
+            "type": "Kinematic",
+            "shape": { "type": "Sphere", "params": [0.1] }
           },
-          "objects": [
-            {
-              "id": 30,
-              "properties": {
-                "asset": 10,
-                "position": [0, 0, 0],
-                "rotation": [0, 0, 0],
-                "scale": [0.2, 0.2, 0.2],
-                "physics": {
-                  "type": "Kinematic",
-                  "shape": { "type": "Sphere", "params": [0.1] }
-                },
-                "animation": { "rotateY": 360, "duration": 3000, "loop": true }
-              },
-              "actions": { "onClick": { "type": "customAction" } }
-            }
-          ]
-        }
-      ]
-    }
+          "animation": { "rotateY": 360, "duration": 3000, "loop": true }
+        },
+        "actions": { "onClick": { "type": "customAction" } }
+      }
+    ]
   }
-}
+]
 ```
 
 - All `id` fields are non-negative safe integers, unique within their
-  game/collection. Game IDs can be omitted (the array index is then used).
+  game/collection. The game `id`, `latitude`, `longitude`, `title`,
+  `description` and `type` are supplied directly by the server.
   Assets may additionally have an optional non-empty string `name`; `name` is
   not supported on games, objects or image targets. Asset types: `GLB`, `GLTF`, `OBJ`,
   `image`, `video`, `audio`. Asset IDs referenced by `properties.asset` must exist
   in that game's asset list. An object can instead contain `properties.text`.
-  `properties.active: false` hides the object.
+  `properties.active: false` hides the object. A response without a valid
+  interactive game is ignored.
 - Positions and physical dimensions use meters; rotations use degrees.
   `scale` must contain three positive numbers. All vectors contain three finite
   numbers. Scenes default to gravity `[0, -9.81, 0]`.
@@ -132,64 +130,64 @@ The backend supplies this JSON through the same experience API; this repository
 contains the mobile consumer, not a server editor or backend.
 
 ```json
-{
-  "logic": {
-    "games": [
+[
+  {
+    "id": 100,
+    "latitude": 44.0,
+    "longitude": 1.0,
+    "title": "Lancer dans le panier",
+    "description": "Visez puis touchez l'écran pour lancer.",
+    "type": "aiming",
+    "assets": [
       {
-        "id": 100,
-        "type": "aiming",
-        "assets": [
-          {
-            "id": 101,
-            "name": "Ballon",
-            "type": "GLB",
-            "url": "https://example.com/ball.glb"
-          },
-          {
-            "id": 102,
-            "name": "Panier",
-            "type": "OBJ",
-            "url": "https://example.com/basket.obj"
+        "id": 101,
+        "name": "Ballon",
+        "type": "GLB",
+        "url": "https://example.com/ball.glb"
+      },
+      {
+        "id": 102,
+        "name": "Panier",
+        "type": "OBJ",
+        "url": "https://example.com/basket.obj"
+      }
+    ],
+    "settings": {
+      "plane": { "minWidth": 2, "minLength": 3, "stableMs": 1000 },
+      "projectile": {
+        "objectId": 103,
+        "speed": 5,
+        "spawnDistance": 0.3,
+        "lifetimeMs": 10000,
+        "maxActive": 12
+      },
+      "targets": [104]
+    },
+    "objects": [
+      {
+        "id": 103,
+        "properties": {
+          "asset": 101,
+          "scale": [1, 1, 1],
+          "collider": { "type": "sphere", "size": [0.2, 0.2, 0.2] },
+          "physics": { "type": "Dynamic", "mass": 0.5, "restitution": 0.4 }
+        }
+      },
+      {
+        "id": 104,
+        "properties": {
+          "asset": 102,
+          "position": [0, 0.5, 0],
+          "collider": {
+            "type": "basket",
+            "size": [1, 1, 1],
+            "thickness": 0.05
           }
-        ],
-        "settings": {
-          "plane": { "minWidth": 2, "minLength": 3, "stableMs": 1000 },
-          "projectile": {
-            "objectId": 103,
-            "speed": 5,
-            "spawnDistance": 0.3,
-            "lifetimeMs": 10000,
-            "maxActive": 12
-          },
-          "targets": [104]
-        },
-        "objects": [
-          {
-            "id": 103,
-            "properties": {
-              "asset": 101,
-              "scale": [1, 1, 1],
-              "collider": { "type": "sphere", "size": [0.2, 0.2, 0.2] },
-              "physics": { "type": "Dynamic", "mass": 0.5, "restitution": 0.4 }
-            }
-          },
-          {
-            "id": 104,
-            "properties": {
-              "asset": 102,
-              "position": [0, 0.5, 0],
-              "collider": {
-                "type": "basket",
-                "size": [1, 1, 1],
-                "thickness": 0.05
-              }
-            }
-          }
-        ]
+        }
       }
     ]
   }
-}
+]
 ```
 
 - AR waits for normal tracking and an upward-facing horizontal plane meeting
