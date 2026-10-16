@@ -127,6 +127,9 @@ Legacy string-encoded fields remain readable for backwards compatibility.
 
 ### Aiming: server configuration
 
+See [Aiming architecture: API, JSON and Mermaid diagrams](docs/jeux-adresse.md)
+for the request flow, a complete payload example and the internal game lifecycle.
+
 Add `settings` to a game whose own `type` is `aiming` to enable plane preparation
 and camera-axis shooting. Games without this section retain the original
 objects-only behavior.
