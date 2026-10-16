@@ -29,9 +29,10 @@ const target = {
   physicalWidth: 0.5,
 };
 const memory = (type = 'discovery') => ({
-  type,
   interactive: {
-    logic: { games: [{ ...game, ...(type === 'images' ? { target } : {}) }] },
+    logic: {
+      games: [{ ...game, type, ...(type === 'images' ? { target } : {}) }],
+    },
   },
 });
 
@@ -47,15 +48,15 @@ test.each(['aiming', 'treasure', 'discovery', 'images'])(
   },
 );
 
-test('supports root logic, definition type, per-game overrides and custom settings', () => {
+test('requires type inside each game and preserves custom settings', () => {
   expect(
-    readExperience({ type: 'treasure', logic: { games: [game] } })?.games[0]
-      .type,
+    readExperience({
+      type: 'treasure',
+      logic: { games: [{ ...game, type: 'treasure' }] },
+    })?.games[0].type,
   ).toBe('treasure');
   const result = readExperience({
-    type: 'aiming',
     interactive: {
-      type: 'treasure',
       logic: {
         gravity: [0, 0, 0],
         games: [{ ...game, type: 'discovery', settings: { custom: true } }],
@@ -67,6 +68,17 @@ test('supports root logic, definition type, per-game overrides and custom settin
     settings: { custom: true },
   });
   expect(result?.gravity).toEqual([0, 0, 0]);
+});
+
+test('rejects a root or definition type when a game type is missing', () => {
+  expect(() =>
+    readExperience({ type: 'treasure', logic: { games: [game] } }),
+  ).toThrow('logic.games[0].type');
+  expect(() =>
+    readExperience({
+      interactive: { type: 'treasure', logic: { games: [game] } },
+    }),
+  ).toThrow('logic.games[0].type');
 });
 
 test('keeps ordinary memories outside the experience runtime', () => {
@@ -82,9 +94,7 @@ test.each([
   { ...game, objects: [{ id: 101, properties: { asset: 999 } }] },
   {
     ...game,
-    objects: [
-      { id: 101, properties: { text: 'bad', position: [0, NaN, 0] } },
-    ],
+    objects: [{ id: 101, properties: { text: 'bad', position: [0, NaN, 0] } }],
   },
   {
     ...game,

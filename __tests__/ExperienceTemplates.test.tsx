@@ -68,6 +68,7 @@ const source = {
       games: [
         {
           id: 300,
+          type: 'images',
           assets: [{ id: 301, type: 'GLB', url: 'file://butterfly.glb' }],
           target: {
             id: 302,
@@ -268,6 +269,7 @@ describe('configured aiming runtime', () => {
       games: [
         {
           id: 400,
+          type: 'aiming',
           assets: [
             { id: 401, type: 'GLB', url: 'file://ball.glb' },
             { id: 402, type: 'OBJ', url: 'file://basket.obj' },

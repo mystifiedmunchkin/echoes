@@ -181,7 +181,7 @@ export function readExperience(memory: unknown): Experience | null {
     const game = record(raw);
     const path = `logic.games[${index}]`;
     requireValue(game.name === undefined, `${path}.name is not supported`);
-    const type = game.type ?? definition.type ?? source.type;
+    const type = game.type;
     requireValue(
       type === 'aiming' ||
         type === 'treasure' ||

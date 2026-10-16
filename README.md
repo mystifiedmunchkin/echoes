@@ -19,24 +19,30 @@ not finished games: scoring/win rules, geolocated quest progression, collection 
 individual keys/clues, scoring and persistence remain to be implemented.
 Existing map proximity restrictions and legacy memory viewers remain unchanged.
 
-The API returns **JSON objects**, not JSON-encoded strings. Use a response-level
-`type` and `interactive.logic`, or response-level `logic`. A definition-level
-`interactive.type` overrides the response type, and each game's optional `type`
-overrides both. All templates use the same `assets` / `objects` structure.
+The API returns **JSON objects**, not JSON-encoded strings. Use
+`interactive.logic` or response-level `logic`. Each game must contain its own
+required `type`; root-level and `interactive.type` values are ignored and do
+not provide a fallback. All templates use the same `assets` / `objects`
+structure.
 Legacy string-encoded fields remain readable for backwards compatibility.
 
 ```json
 {
   "id": 42,
-  "type": "images",
   "interactive": {
     "logic": {
       "gravity": [0, -9.81, 0],
       "games": [
         {
           "id": 1,
+          "type": "images",
           "assets": [
-            { "id": 10, "name": "Papillon", "type": "GLB", "url": "https://example.com/butterfly.glb" }
+            {
+              "id": 10,
+              "name": "Papillon",
+              "type": "GLB",
+              "url": "https://example.com/butterfly.glb"
+            }
           ],
           "target": {
             "id": 20,
@@ -132,8 +138,18 @@ contains the mobile consumer, not a server editor or backend.
       {
         "id": 100,
         "assets": [
-          { "id": 101, "name": "Ballon", "type": "GLB", "url": "https://example.com/ball.glb" },
-          { "id": 102, "name": "Panier", "type": "OBJ", "url": "https://example.com/basket.obj" }
+          {
+            "id": 101,
+            "name": "Ballon",
+            "type": "GLB",
+            "url": "https://example.com/ball.glb"
+          },
+          {
+            "id": 102,
+            "name": "Panier",
+            "type": "OBJ",
+            "url": "https://example.com/basket.obj"
+          }
         ],
         "settings": {
           "plane": { "minWidth": 2, "minLength": 3, "stableMs": 1000 },
@@ -161,7 +177,11 @@ contains the mobile consumer, not a server editor or backend.
             "properties": {
               "asset": 102,
               "position": [0, 0.5, 0],
-              "collider": { "type": "basket", "size": [1, 1, 1], "thickness": 0.05 }
+              "collider": {
+                "type": "basket",
+                "size": [1, 1, 1],
+                "thickness": 0.05
+              }
             }
           }
         ]
@@ -205,13 +225,13 @@ contains the mobile consumer, not a server editor or backend.
   by `collider`. Rotating animations on these physical objects are rejected;
   use the object's initial rotation instead.
 
-| Collider | Configuration / implementation |
-| --- | --- |
-| `bounding` | Explicit box dimensions; no automatic OBJ/GLB bounds extraction. |
-| `sphere` | Equal X/Y/Z dimensions; radius is half the width. |
-| `capsule` | Vertical, X = Z and Y >= X; compound approximation using overlapping spheres and a central box. Y = X becomes a sphere. |
-| `diamond` | Octahedron approximation, made of 8 vertical layers with 5 box strips each. |
-| `basket` | Open rectangular basket: bottom and four walls, no lid. Requires positive `thickness` smaller than height and half the width/length. |
+| Collider   | Configuration / implementation                                                                                                       |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `bounding` | Explicit box dimensions; no automatic OBJ/GLB bounds extraction.                                                                     |
+| `sphere`   | Equal X/Y/Z dimensions; radius is half the width.                                                                                    |
+| `capsule`  | Vertical, X = Z and Y >= X; compound approximation using overlapping spheres and a central box. Y = X becomes a sphere.              |
+| `diamond`  | Octahedron approximation, made of 8 vertical layers with 5 box strips each.                                                          |
+| `basket`   | Open rectangular basket: bottom and four walls, no lid. Requires positive `thickness` smaller than height and half the width/length. |
 
 Viro supports boxes, spheres and their compounds, not native capsule or convex
 octahedron shapes. The two approximations are intentional and not exact smooth
