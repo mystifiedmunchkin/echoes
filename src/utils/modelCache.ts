@@ -1,5 +1,6 @@
 import { Dirs, FileSystem } from 'react-native-file-access';
 import { translate } from '../../constants/i18n';
+import { ensureDirectory } from './ensureDirectory';
 
 export async function getLocalModelUri(remoteUrl: string): Promise<string> {
   const modelUrl = remoteUrl.trim();
@@ -21,7 +22,7 @@ export async function getLocalModelUri(remoteUrl: string): Promise<string> {
 
   try {
     const modelsDir = `${Dirs.CacheDir}/models`;
-    if (!(await FileSystem.exists(modelsDir))) await FileSystem.mkdir(modelsDir);
+    await ensureDirectory(modelsDir);
 
     const fileName = parsedUrl.pathname.split('/').pop() || `model_${Date.now()}.glb`;
     const targetPath = `${modelsDir}/${fileName}`;

@@ -353,6 +353,51 @@ test.each(['capsule', 'diamond'] as const)(
   },
 );
 
+test('reduces a capsule with no straight section to a sphere', () => {
+  expect(colliderShape({ type: 'capsule', size: [0.2, 0.2, 0.2] })).toEqual({
+    type: 'Sphere',
+    params: [0.1],
+  });
+});
+
+test('centers capsule end caps at half the straight section length', () => {
+  const shape = colliderShape({ type: 'capsule', size: [0.2, 0.6, 0.2] });
+  const spheres = shape.children!.filter(part => part.type === 'Sphere');
+  expect(spheres[0].position[1]).toBeCloseTo(-0.2);
+  expect(spheres[spheres.length - 1].position[1]).toBeCloseTo(0.2);
+  for (const sphere of spheres) {
+    expect(sphere.params).toEqual([0.1]);
+    expect(sphere.position[0]).toBe(0);
+    expect(sphere.position[2]).toBe(0);
+  }
+  for (let i = 1; i < spheres.length; i++) {
+    expect(spheres[i].position[1] - spheres[i - 1].position[1]).toBeLessThanOrEqual(
+      0.2,
+    );
+  }
+});
+
+test('builds a diamond that tapers symmetrically towards its top and bottom', () => {
+  const shape = colliderShape({ type: 'diamond', size: [0.2, 0.4, 0.6] });
+  expect(shape.children).toHaveLength(40);
+  for (let layer = 0; layer < 4; layer++) {
+    const lower = shape.children!.slice(layer * 5, (layer + 1) * 5);
+    const upper = shape.children!.slice((7 - layer) * 5, (8 - layer) * 5);
+    for (let strip = 0; strip < 5; strip++) {
+      expect(lower[strip].type).toBe('Box');
+      lower[strip].params.forEach((value, axis) => {
+        expect(value).toBeCloseTo(upper[strip].params[axis]);
+      });
+      expect(lower[strip].position[1]).toBeCloseTo(-upper[strip].position[1]);
+    }
+    if (layer < 3) {
+      expect(lower[2].params[0]).toBeLessThan(
+        shape.children![(layer + 1) * 5 + 2].params[0],
+      );
+    }
+  }
+});
+
 test('caches aiming OBJ and GLB assets with existing preparation', async () => {
   const cache = jest.fn(async (url: string) => `local:${url}`);
   const result = await cacheExperience({ logic: { games: [game] } }, cache);

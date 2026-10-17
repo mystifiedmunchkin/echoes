@@ -1,0 +1,71 @@
+classDiagram
+    Memory "1" --> "1" Interactive : interactive
+    Interactive "1" --> "1" Logic : logic
+    Logic "1" --> "1..*" Game : games
+    Game "1" --> "1..*" Asset : assets
+    Game "1" --> "1..*" SceneObject : objects
+    Game "1" --> "1" AimingSettings : settings
+    AimingSettings "1" --> "1" PlaneSettings : plane
+    AimingSettings "1" --> "1" ProjectileSettings : projectile
+    SceneObject "1" --> "1" ObjectProperties : properties
+    ObjectProperties "1" --> "1" Collider : collider
+    ObjectProperties "1" --> "0..1" PhysicsBody : physics
+    ObjectProperties ..> Asset : asset references Asset.id
+    ProjectileSettings ..> SceneObject : objectId references SceneObject.id
+    AimingSettings ..> SceneObject : targets references target IDs
+
+    class Memory {
+        number id
+        string title
+        number latitude
+        number longitude
+    }
+    class Logic {
+        Vector3 gravity
+    }
+    class Game {
+        number id
+        string type = aiming
+    }
+    class Asset {
+        number id
+        string name
+        string type
+        string url
+    }
+    class AimingSettings {
+        number[] targets
+    }
+    class PlaneSettings {
+        number minWidth
+        number minLength
+        number stableMs
+    }
+    class ProjectileSettings {
+        number objectId
+        number speed
+        number spawnDistance
+        number lifetimeMs_or_null
+        number maxActive
+    }
+    class SceneObject {
+        number id
+    }
+    class ObjectProperties {
+        number asset
+        Vector3 position
+        Vector3 rotation
+        Vector3 scale
+    }
+    class Collider {
+        string type
+        Vector3 size
+        number thickness
+    }
+    class PhysicsBody {
+        string type
+        number mass
+        number restitution
+        number friction
+        boolean useGravity
+    }

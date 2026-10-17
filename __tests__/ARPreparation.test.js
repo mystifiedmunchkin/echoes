@@ -1,14 +1,16 @@
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { Alert } from 'react-native';
+import { Alert, BackHandler } from 'react-native';
 import DeviceInfo from 'react-native-device-info';
 import App from '../App';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ExperienceControls } from '../src/experiences/ExperienceControls';
 
 jest.mock('react-native', () => ({
   View: 'View', Text: 'Text', ActivityIndicator: 'ActivityIndicator',
   TouchableOpacity: 'TouchableOpacity',
   StyleSheet: { create: (styles) => styles, absoluteFillObject: {} },
-  BackHandler: { addEventListener: () => ({ remove: jest.fn() }) },
+  BackHandler: { addEventListener: jest.fn(() => ({ remove: jest.fn() })) },
   Alert: { alert: jest.fn() },
 }));
 jest.mock('react-native-safe-area-context', () => ({
@@ -29,19 +31,26 @@ jest.mock('@maplibre/maplibre-react-native', () => ({
 }));
 jest.mock('../src/hooks/useRadar', () => ({ useRadar: () => mockRadar }));
 jest.mock('../src/hooks/useAuth', () => ({
-  useAuth: () => ({ user: null }),
+  useAuth: () => mockAuth,
+}));
+jest.mock('../src/services/auth', () => ({
+  getAuthToken: async () => mockAuth.token,
+  getStoredUser: async () => mockAuth.user,
+}));
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn().mockResolvedValue(null),
+  setItem: jest.fn().mockResolvedValue(),
+  multiSet: jest.fn().mockResolvedValue(),
 }));
 jest.mock('../src/hooks/useInventory', () => ({
   useInventory: () => ({
     collectedMemories: [], showInventory: false,
-    setShowInventory: jest.fn(), handleCollectMemory: jest.fn(), clearInventory: jest.fn(),
+    setShowInventory: jest.fn(), handleCollectMemory: jest.fn().mockResolvedValue(), clearInventory: jest.fn().mockResolvedValue(),
   }),
-}));
-jest.mock('../src/hooks/useVisitedPlaces', () => ({
-  useVisitedPlaces: () => ({ visitedPlaces: [], markPlaceVisited: jest.fn() }),
 }));
 jest.mock('../constants/i18n', () => ({
   useI18n: () => ({ t: (key) => key }),
+  translate: key => key,
 }));
 jest.mock('../src/components/InventoryModal', () => 'InventoryModal');
 jest.mock('../src/components/MenuModal', () => 'MenuModal');
@@ -70,9 +79,14 @@ const mockRadar = {
   cacheMemoryAssets: jest.fn(), loadNearbyMemories: jest.fn(),
 };
 let renderer;
+let mockAuth;
+const originalFetch = global.fetch;
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  mockAuth = { user: null, token: null };
+  AsyncStorage.getItem.mockResolvedValue(null);
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 204 });
   DeviceInfo.getManufacturerSync.mockReturnValue('Google');
   DeviceInfo.getModel.mockReturnValue('Pixel 8');
   mockRadar.memories = [];
@@ -86,6 +100,7 @@ beforeEach(async () => {
 afterEach(() => {
   act(() => renderer.unmount());
   jest.useRealTimers();
+  global.fetch = originalFetch;
 });
 
 test('shows the native user marker with a compass heading indicator', () => {
@@ -144,11 +159,12 @@ test('selecting an experience routes to its template without entering legacy pla
       logic: {
         games: [
           {
-            id: 'poster',
+            id: 100,
+            type: 'images',
             assets: [],
             objects: [],
             target: {
-              id: 'target',
+              id: 200,
               imageUrl: 'file://poster.jpg',
               physicalWidth: 0.5,
             },
@@ -195,10 +211,11 @@ test('Galaxy A opens an experience without a model URL in the fallback scene', a
       logic: {
         games: [
           {
-            id: 'content',
+            id: 100,
+            type: 'discovery',
             assets: [],
             objects: [
-              { id: 'info', properties: { text: 'Place information' } },
+              { id: 101, properties: { text: 'Place information' } },
             ],
           },
         ],
@@ -220,4 +237,124 @@ test('Galaxy A opens an experience without a model URL in the fallback scene', a
   expect(
     renderer.root.findByType('ExperienceViewer').props.experience.games[0].type,
   ).toBe('discovery');
+});
+
+const progressMemory = () => ({
+  ...memoryAt(10),
+  interactive: {
+    logic: {
+      games: [
+        {
+          id: 100, type: 'aiming',
+          assets: [{ id: 10, type: 'GLB', url: 'file://ball.glb' }],
+          objects: [
+            { id: 1, properties: { asset: 10, collider: { type: 'sphere', size: [0.1, 0.1, 0.1] } } },
+            { id: 2, properties: { asset: 10, collectible: true, collider: { type: 'basket', size: [1, 1, 1], thickness: 0.05 } } },
+          ],
+          settings: {
+            plane: { minWidth: 1, minLength: 1 },
+            projectile: { objectId: 1 }, targets: [2],
+          },
+        },
+        {
+          id: 101, type: 'discovery', assets: [],
+          objects: [{ id: 2, properties: { text: 'Key', collectible: true } }],
+        },
+      ],
+    },
+  },
+});
+
+async function openProgressExperience() {
+  mockAuth = { user: { id: 1 }, token: 'test-token' };
+  const memory = progressMemory();
+  mockRadar.loadNearbyMemories.mockResolvedValue({ location: origin, memories: [memory] });
+  mockRadar.cacheMemoryAssets.mockImplementation(async item => item);
+  await act(async () => {
+    renderer.unmount();
+    renderer = TestRenderer.create(<App />);
+  });
+  await act(async () => {
+    await renderer.root.findByProps({ accessibilityLabel: 'scanAr' }).props.onPress();
+  });
+  await act(async () => {
+    await renderer.root.findByType('ViroARView').props.onMemorySelected({ nativeEvent: { id: 10 } });
+  });
+}
+
+test('POSTs on game switch and close, including final scores and deduplicated named object IDs', async () => {
+  await openProgressExperience();
+  const event = { type: 'aiming', gameId: 100, objectId: 2, name: 'collect' };
+  await act(async () => {
+    const onEvent = renderer.root.findByType('ViroARView').props.onExperienceEvent;
+    onEvent(event);
+    onEvent(event);
+    onEvent({ ...event, objectId: 1 }); // Not collectible.
+    onEvent({
+      type: 'aiming', gameId: 100, objectId: 2, name: 'collision',
+      data: { scoringContact: true, projectileId: -1 },
+    });
+  });
+  expect(global.fetch).not.toHaveBeenCalled();
+  await act(async () => {
+    renderer.root.findByType(ExperienceControls).props.onSelect(1);
+  });
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
+    scores: [{ location_id: 10, game_type: 'aiming', score: 1 }],
+    visited_location_ids: [10],
+    collected_items: [{ location_id: 10, game_id: 100, item_id: 2, quantity: 1 }],
+  });
+  await act(async () => {
+    renderer.root.findByType(ExperienceControls).props.onSelect(1);
+    renderer.root.findByType('ViroARView').props.onExperienceEvent({
+      type: 'discovery', gameId: 101, objectId: 2, name: 'collect',
+    });
+  });
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    renderer.root.findByProps({ accessibilityLabel: 'closeExperience' }).props.onPress();
+  });
+  expect(global.fetch).toHaveBeenCalledTimes(2);
+  expect(JSON.parse(global.fetch.mock.calls[1][1].body).collected_items).toEqual([
+    { location_id: 10, game_id: 100, item_id: 2, quantity: 1 },
+    { location_id: 10, game_id: 101, item_id: 2, quantity: 1 },
+  ]);
+  await act(async () => {
+    renderer.root.findByProps({ accessibilityLabel: 'closeCamera' }).props.onPress();
+  });
+  expect(global.fetch).toHaveBeenCalledTimes(2);
+});
+
+test.each(['button', 'hardware'])('closing the AR camera via %s sends the active game progress', async method => {
+  await openProgressExperience();
+  await act(async () => {
+    if (method === 'hardware') BackHandler.addEventListener.mock.calls.at(-1)[1]();
+    else renderer.root.findByProps({ accessibilityLabel: 'closeCamera' }).props.onPress();
+  });
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+});
+
+test.each(['button', 'hardware'])('closing the fallback experience via %s sends its progress', async method => {
+  jest.useFakeTimers();
+  mockAuth = { user: { id: 1 }, token: 'test-token' };
+  DeviceInfo.getManufacturerSync.mockReturnValue('samsung');
+  DeviceInfo.getModel.mockReturnValue('Galaxy A55');
+  const memory = progressMemory();
+  mockRadar.memories = [memory];
+  mockRadar.cacheMemoryAssets.mockImplementation(async item => item);
+  await act(async () => {
+    renderer.unmount();
+    renderer = TestRenderer.create(<App />);
+  });
+  await act(async () => {
+    await renderer.root.findByType('MemoryInfoModal').props.onViewModel(memory);
+    jest.advanceTimersByTime(500);
+  });
+  expect(global.fetch).not.toHaveBeenCalled();
+  await act(async () => {
+    if (method === 'hardware') BackHandler.addEventListener.mock.calls.at(-1)[1]();
+    else renderer.root.findByProps({ accessibilityLabel: 'closeModelViewer' }).props.onPress();
+  });
+  expect(global.fetch).toHaveBeenCalledTimes(1);
 });

@@ -75,6 +75,7 @@ Base API : `https://echoes.sophiehorner.art`.
 | Decouverte des lieux | `GET /api/memories-near-me?latitude={lat}&longitude={lng}` | Retourne les memoires et leurs definitions interactives. |
 | Telechargement des assets | `GET {asset.url}` | URL distante resolue par le client ; contenu mis en cache localement. |
 | Fichiers prives | `GET /api/private-files/{userId}/model_3D/{filename}` | Forme construite pour les references 3D privees ; une URL deja complete peut aussi etre utilisee. |
+| Progression utilisateur | `POST /api/progress` | Bearer token ; totaux absolus des scores, lieux visites et objets collectes, a la fermeture ou au changement de jeu. |
 
 Les requetes de lecture utilisent le token stocke lorsqu'il existe. Les URL
 externes d'assets restent possibles : tous les telechargements ne visent donc pas
@@ -93,10 +94,51 @@ Le chargement accepte les enveloppes suivantes :
 Un tableau directement a la racine est egalement accepte. La normalisation
 accepte plusieurs variantes des definitions interactives, dont certains champs
 serialises en chaines JSON. L'exemple ci-dessous utilise des objets JSON natifs.
+Les memoires sont dedupliquees par ID avant d'alimenter la carte et les marqueurs
+AR : `1` et `"1"` designent la meme memoire. La premiere occurrence valide est
+conservee et les IDs repetes sont signales par un avertissement dans les logs.
+Deux lieux avec des IDs distincts restent distincts, meme aux memes coordonnees.
+Les telechargements paralleles attendent une creation partagee du dossier de
+cache, notamment au premier lancement. Une erreur reelle de creation est propagee
+a la preparation AR ; elle n'est pas masquee. Le cache des modeles utilise le meme
+mecanisme pour son propre dossier.
 
-**Il n'existe pas, dans ce client, de requete API pour envoyer les impacts, les
-scores ou la collection.** Ces mises a jour sont locales. Le code du backend et
-son eventuel editeur de jeux ne font pas partie de ce depot.
+Les impacts individuels ne sont pas envoyes. Les totaux locaux sont envoyes a
+`POST /api/progress`, avec `Authorization: Bearer {token}` et un corps JSON :
+
+```json
+{
+  "scores": [
+    { "location_id": 12, "game_type": "aiming", "score": 125 }
+  ],
+  "visited_location_ids": [12, 15],
+  "collected_items": [
+    { "location_id": 12, "game_id": 100, "item_id": 3, "quantity": 1 }
+  ]
+}
+```
+
+Les valeurs sont absolues : renvoyer le meme payload ne doit pas incrementer
+les totaux serveur. Le score est groupe par lieu et type de jeu ; le contrat
+des scores ne contient pas de `game_id`. Pour la collection, `item_id` correspond
+a `logic.games[].objects[].id`. Le triplet lieu/jeu/objet est unique et sa
+quantite reste 1. Le backend doit accepter ces trois identifiants nommes.
+
+Une fermeture d'experience, de camera ou de viewer, ou un changement de jeu,
+declenche l'envoi pour le compte connecte. Les ecritures locales sont terminees
+avant le snapshot ; les envois sont serialises sans bloquer le jeu suivant.
+Un echec affiche une erreur, conserve les donnees et permet leur renvoi au
+prochain changement ou fermeture de jeu. Pas d'envoi a chaque impact, au simple
+passage en arriere-plan ni de synchronisation automatique au demarrage.
+
+La progression est isolee par compte dans `@progress:user:{userId}`. L'ancien
+historique (`@experience_scores`, `@visited_places`, `@collected_memories`) est
+attribue une seule fois au premier compte connecte ; `@progress_legacy_owner`
+empeche de l'importer dans un autre compte. Les anciens souvenirs restent dans
+l'inventaire local, mais ne sont pas convertis artificiellement en objets.
+Un invite conserve une progression locale distincte et n'envoie rien.
+Le client ne recupere ni ne fusionne encore la progression depuis le serveur.
+Le code du backend et son eventuel editeur de jeux ne font pas partie de ce depot.
 
 ## 2. Structure JSON d'un jeu d'adresse
 
@@ -158,6 +200,7 @@ classDiagram
     }
     class ObjectProperties {
         number asset
+        boolean collectible
         Vector3 position
         Vector3 rotation
         Vector3 scale
@@ -291,7 +334,7 @@ Les URL `example.test` sont des placeholders a remplacer par de vraies ressource
 | `plane.stableMs` | Delai de stabilite avant verrouillage automatique ; un tap sur l'indicateur peut aussi verrouiller le plane. |
 | `projectile.speed` | Vitesse de base, en m/s ; la charge du geste applique ensuite un multiplicateur de 1 a 2. |
 | `projectile.spawnDistance` | Distance devant la camera au moment du relachement, en metres. |
-| `projectile.lifetimeMs` | `null` ou absent : pas d'expiration ; sinon duree de vie positive en millisecondes. |
+| `projectile.lifetimeMs` | Champ valide pour compatibilite, mais actuellement ignore par le runtime : tous les projectiles ont une duree illimitee, meme si le serveur envoie `1000`. |
 | `projectile.maxActive` | Nombre maximal de projectiles physiques presents, y compris ceux ayant deja touche un obstacle. |
 | `position` / `rotation` des cibles | Position en metres et rotation en degres, relatives au sol verrouille. |
 | `collider.size` | Dimensions physiques explicites, independantes de la taille native du modele 3D. |
@@ -306,6 +349,62 @@ Les colliders acceptes sont `sphere`, `bounding`, `basket`, `capsule` et
 et quatre parois physiques. Seules ces deux familles de cibles ont actuellement
 la regle de score de fond. Les autres formes restent physiques sans attribution
 automatique de score.
+
+### Configurer `capsule` et `diamond`
+
+Ces formes sont utilisables pour un projectile ou une cible, en AR comme dans le
+viewer 3D. Les dimensions `[X, Y, Z]` sont en metres, dans le repere local de
+l'objet ; `rotation` oriente le corps complet. `scale` ne modifie que le modele
+visible, pas ces dimensions physiques.
+
+Capsule verticale de 20 cm de diametre et 60 cm de hauteur totale :
+
+```json
+{
+  "collider": { "type": "capsule", "size": [0.2, 0.6, 0.2] }
+}
+```
+
+`X` doit etre egal a `Z` et `Y >= X`. La partie droite mesure `Y - X`.
+Le collider est un `Compound` de spheres superposees et d'une boite centrale.
+Lorsque `Y = X`, il devient une sphere.
+
+Diamant (octaedre) de 20 cm de large, 40 cm de haut et 60 cm de profondeur :
+
+```json
+{
+  "collider": { "type": "diamond", "size": [0.2, 0.4, 0.6] }
+}
+```
+
+Le collider est un `Compound` de 8 couches de 5 boites, plus etroit vers le haut
+et le bas. Le pont Viro utilise n'expose pas de capsule ni d'octaedre natifs :
+ces deux formes sont des approximations, pas des surfaces lisses exactes.
+Les collisions restent actives apres impact et ne suppriment pas le projectile.
+Comme indique plus haut, leur utilisation comme cible n'ajoute pas de regle de
+score automatique.
+
+### Configurer un objet collectible
+
+Le serveur doit envoyer le booleen dans les proprietes de l'objet :
+
+```json
+{
+  "id": 3,
+  "properties": {
+    "asset": 10,
+    "collectible": true
+  }
+}
+```
+
+Le jeu parent doit posseder un `id` explicite ; l'ID du lieu est celui de la
+memoire. L'absence de `collectible` ou sa valeur `false` desactive la collecte.
+Les chaines `"true"` et `"false"` sont refusees. Un appui de 600 ms declenche la
+collecte, annule le lancer charge et conserve le modele visible. Relacher avant
+ce delai, perdre le tracking ou demonter l'objet annule l'appui long.
+Pour un projectile lance, l'ID collecte reste celui de l'objet serveur, jamais
+l'ID negatif genere pour le tir. Un compte connecte est requis pour collecter.
 
 ## 3. Cycle interne : preparation, lancer, physique et score
 
@@ -360,19 +459,23 @@ flowchart TD
         ScoreEvent --> Sim
     end
 
-    subgraph Scoring["Application et stockage local"]
+    subgraph Scoring["Application et progression par compte"]
         ScoreEvent --> App["App.handleExperienceEvent"]
-        App --> Memory{"Memoire AR selectionnee<br/>et ID de projectile valide ?"}
-        Memory -->|Oui| Score["+1 point pour la memoire : useScores"]
-        Memory -->|Oui| Inventory["useInventory : ajouter la memoire si absente"]
-        Score --> ScoreStore["AsyncStorage : @experience_scores"]
-        Inventory --> InventoryStore["AsyncStorage : @collected_memories"]
+        App --> Memory{"Lieu actif AR ou viewer<br/>et ID de projectile valide ?"}
+        Memory -->|Oui| Score["+1 point par lieu et type : useProgress"]
+        Memory -->|En AR| Inventory["Ajouter le souvenir a l'inventaire historique"]
+        Score --> ScoreStore["AsyncStorage : @progress:user:{userId}"]
+        Inventory --> ScoreStore
         Score --> Menu["Menu : onglet Scores"]
+        Object["Objet avec properties.collectible = true"] --> HoldObject["Appui long 600 ms<br/>Annuler le tir charge"]
+        HoldObject --> CollectObject["Collecter une seule fois<br/>location_id + game_id + item_id"]
+        CollectObject --> ScoreStore
+        ScoreStore --> EndGame["Fermer l'experience / camera / viewer<br/>ou changer de jeu"]
+        EndGame --> Post["POST /api/progress<br/>Totaux absolus, token du compte verifie"]
+        Post -->|Echec| Retry["Afficher l'erreur et garder les donnees<br/>Renvoyer a la prochaine fin de jeu"]
     end
 
-    Sim --> Life{"Expiration configuree atteinte ?"}
-    Life -->|Non| Sim
-    Life -->|Oui| Remove["Retirer le projectile et liberer une place"]
+    Sim -.-> Unlimited["Duree illimitee imposee par le client<br/>Aucun timer de suppression, meme si lifetimeMs est configure"]
     Sim -->|Quitter ou changer de jeu| Reset["Demonter terrain et projectiles<br/>Reinitialiser les IDs et la deduplication du jeu"]
 ```
 
@@ -394,12 +497,13 @@ flowchart TD
   rapporte qu'un point, meme s'il touche plusieurs fois ou plusieurs cibles.
 - Une nouvelle instance du jeu recommence ses IDs de tir ; les totaux enregistres
   par memoire restent persistants sur cet appareil.
-- Le viewer 3D partage le mecanisme de lancer et de collision. L'enregistrement
-  applicatif des points et de la collection depend toutefois de la presence d'une
-  memoire AR selectionnee dans `App`, ce n'est pas une synchronisation serveur.
+- Le viewer 3D partage le mecanisme de lancer, de collision, de score et de
+  collecte d'objets. Ses fermetures et changements de jeu synchronisent aussi
+  les totaux du compte connecte.
 - Avec une duree de vie illimitee, atteindre `maxActive` bloque les nouveaux tirs
   jusqu'a la sortie du jeu. Un projectile pose au sol compte toujours dans cette limite.
-- En developpement, les contours physiques sont affiches avec `drawBounds`.
+- Les contours physiques sont actuellement masques avec `drawBounds: false`,
+  en AR et dans le viewer 3D, y compris en developpement. Les collisions restent actives.
   Les schemas decrivent le code ; ils ne remplacent pas une verification des
   collisions et du rendu sur appareil.
 
@@ -418,5 +522,6 @@ flowchart TD
 | Scene AR et affichage diagnostique des colliders | [ViroARView.tsx](../src/components/ViroARView.tsx) |
 | Scene 3D de remplacement | [ExperienceViewer.tsx](../src/experiences/ExperienceViewer.tsx) |
 | Reception des evenements et integration avec la memoire selectionnee | [App.js](../App.js) |
-| Persistance des scores et de la collection | [useScores.js](../src/hooks/useScores.js), [useInventory.js](../src/hooks/useInventory.js) |
+| Persistance par compte, scores, visites, collection et file d'envoi | [useProgress.js](../src/hooks/useProgress.js) |
+| Payload, migration historique et POST de progression | [progress.ts](../src/services/progress.ts) |
 | Affichage des scores | [MenuModal.js](../src/components/MenuModal.js) |

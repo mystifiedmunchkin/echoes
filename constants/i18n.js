@@ -4,6 +4,9 @@ import { useCallback, useMemo } from 'react';
 
 const translations = {
   fr: {
+    progressError: 'Progression non synchronisée',
+    progressAuthenticationRequired: 'Reconnectez-vous pour synchroniser votre progression. Les données restent enregistrées sur cet appareil.',
+    collectibleHint: 'Maintenez un objet collectible pendant 0,6 s pour le collectionner.',
     openExperience: 'OUVRIR L’EXPÉRIENCE',
     closeExperience: 'Fermer l’expérience',
     experienceError: 'Impossible de charger l’expérience',
@@ -139,6 +142,9 @@ const translations = {
     visitedPlacesSaveError: 'Erreur d’enregistrement des lieux visités',
   },
   en: {
+    progressError: 'Progress not synchronized',
+    progressAuthenticationRequired: 'Sign in again to synchronize your progress. Your data remains saved on this device.',
+    collectibleHint: 'Hold a collectible object for 0.6 s to collect it.',
     openExperience: 'OPEN EXPERIENCE',
     closeExperience: 'Close experience',
     experienceError: 'Unable to load experience',

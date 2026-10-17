@@ -26,7 +26,7 @@ export default function InventoryModal({ visible, onClose, items, onClear, onRep
         </Text>
       </View>
 
-      <View style={styles.actionsRow}>
+      {!item.isGameObject && <View style={styles.actionsRow}>
         {/* Button for returning the object to the real world. */}
         <TouchableOpacity
           style={styles.replaceButton}
@@ -34,7 +34,7 @@ export default function InventoryModal({ visible, onClose, items, onClear, onRep
         >
           <Text style={styles.replaceButtonText}>📍 {t('replaceHere')}</Text>
         </TouchableOpacity>
-      </View>
+      </View>}
     </View>
   );
 

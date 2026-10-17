@@ -13,6 +13,7 @@ jest.mock('react-native-file-access', () => ({
   Dirs: { DocumentDir: 'cache' },
   FileSystem: {
     exists: jest.fn().mockResolvedValue(false),
+    isDir: jest.fn().mockResolvedValue(true),
     mkdir: jest.fn().mockResolvedValue(),
     fetch: jest.fn().mockResolvedValue({ status: 200 }),
     unlink: jest.fn().mockResolvedValue(),
@@ -82,6 +83,42 @@ test('refreshes GPS and downloads the nearby records with a 2500 m request cap',
   expect(result.memories).toHaveLength(1);
   expect(result.memories[0]).toMatchObject({ id: 1, lat: 0, lng: 0 });
   expect(FileSystem.fetch).not.toHaveBeenCalled();
+});
+
+test('deduplicates nearby memory IDs before exposing map and AR records', async () => {
+  const memory = {
+    id: 1,
+    title: 'First record',
+    latitude: 0,
+    longitude: 0,
+    type: 'discovery',
+    assets: [],
+    objects: [{ id: 1, properties: { text: 'Hello' } }],
+  };
+  global.fetch.mockResolvedValue({
+    ok: true,
+    json: async () => [
+      memory,
+      { ...memory, title: 'Repeated record' },
+      { ...memory, id: '1', title: 'String ID alias' },
+      { ...memory, id: 0, title: 'Zero ID' },
+      { ...memory, id: 2, title: 'Different place at the same coordinates' },
+    ],
+  });
+  const warning = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    let result;
+    await act(async () => { result = await radar.loadNearbyMemories(); });
+    expect(result.memories.map(item => item.id)).toEqual([1, 0, 2]);
+    expect(radar.memories.map(item => item.id)).toEqual([1, 0, 2]);
+    expect(result.memories[0].name).toBe('First record');
+    expect(warning).toHaveBeenCalledWith(
+      'Duplicate memory IDs in nearby API response; keeping the first record:',
+      ['1'],
+    );
+  } finally {
+    warning.mockRestore();
+  }
 });
 
 test('normalizes interactive games, object properties, and JSON actions', async () => {
@@ -257,6 +294,37 @@ test('awaits a media download and returns a local URI', async () => {
     cached = await download;
   });
   expect(cached.image_url).toBe('file://cache/memory-assets/1-image-0.jpg');
+});
+
+test('prepares the cache folder once before parallel first-launch downloads', async () => {
+  let releaseDirectory;
+  let downloads;
+  FileSystem.mkdir.mockImplementationOnce(() => new Promise(resolve => {
+    releaseDirectory = resolve;
+  }));
+  await act(async () => {
+    downloads = Promise.all([
+      radar.cacheMemoryAssets({
+        id: 1,
+        image_url: 'https://example.test/photo.jpg',
+        video_url: 'https://example.test/clip.mp4',
+      }),
+      radar.cacheMemoryAssets({
+        id: 2,
+        model_url: 'https://example.test/model.glb',
+      }),
+    ]);
+  });
+  expect(FileSystem.mkdir).toHaveBeenCalledTimes(1);
+  expect(FileSystem.fetch).not.toHaveBeenCalled();
+  let cached;
+  await act(async () => {
+    releaseDirectory();
+    cached = await downloads;
+  });
+  expect(FileSystem.fetch).toHaveBeenCalledTimes(3);
+  expect(cached[0].image_url).toBe('file://cache/memory-assets/1-image-0.jpg');
+  expect(cached[1].model_url).toBe('file://cache/memory-assets/2-model-0.glb');
 });
 
 test('prepares private image targets and scene assets before returning the experience', async () => {

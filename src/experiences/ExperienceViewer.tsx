@@ -40,7 +40,7 @@ function ViewerContent(props: ViewerProps) {
       <ViroScene
         physicsWorld={{
           gravity: props.experience.gravity,
-          drawBounds: __DEV__ && !!game.settings,
+          drawBounds: false,
         }}
         onCameraTransformUpdate={aimingScene.onCameraTransformUpdate}
         onClickState={aimingScene.onClickState}

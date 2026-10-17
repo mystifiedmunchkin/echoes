@@ -9,15 +9,17 @@ This is a new [**React Native**](https://reactnative.dev) project, bootstrapped 
 - Once a GPS position is available, the map displays the native user-location marker with a compass heading indicator (subject to device sensor availability).
 - Before opening AR, the app obtains a fresh GPS fix, fetches nearby memories, filters them to a maximum of 50 m, and downloads their media. An unsuccessful preparation does not open AR.
 - Map and history details show only a title and description for distant memories. Within 50 m, full viewer access is reserved for Samsung Galaxy A devices (Galaxy A names or SM-A model identifiers), where AR is disabled. Other devices discover content in AR.
-- Collected items can still be placed again from the collection.
+- Legacy collected memories can still be placed again from the collection.
+  Individual game objects appear in the inventory without a placement action.
 
 ## Customizable experiences
 
 The mobile runtime provides four separate UX extension points in
 [`src/experiences/ExperienceTemplates.tsx`](src/experiences/ExperienceTemplates.tsx):
 `aiming`, `treasure`, `discovery`, and `images`. These are template foundations,
-not finished games: scoring/win rules, geolocated quest progression, collection of
-individual keys/clues, scoring and persistence remain to be implemented.
+not finished games: general victory rules and geolocated quest progression remain
+to be implemented. Aiming scores, long-press object collection and authenticated
+progress synchronization are implemented.
 Existing map proximity restrictions and legacy memory viewers remain unchanged.
 
 The nearby endpoint returns a **direct JSON list of interactive games**, not
@@ -223,31 +225,45 @@ contains the mobile consumer, not a server editor or backend.
   Scene and object click-state handlers share the same charge, so a release fires
   only once even when tapping a target. Losing tracking or switching games cancels
   a pending charge. The same interaction is available in the 3D viewer.
-  An optional `useGravity: false` disables gravity and a positive `lifetimeMs` can
-  restore automatic expiry. The initial rotation follows the camera (author the
+  An optional `useGravity: false` disables gravity. Projectile lifetime is
+  currently forced to unlimited in the runtime, even if the server sends a
+  positive `lifetimeMs` (older game definitions may still contain `1000`).
+  The field remains validated for compatibility but does not schedule removal.
+  The initial rotation follows the camera (author the
   projectile facing local -Z). The template's position and initial velocity are
   replaced by the launch pose and velocity. Configured constant `velocity` is
   omitted from the projectile body so it cannot override the launch or gravity.
   The ground has zero restitution; its depth reduces tunneling risk but does not
   guarantee continuous collision detection at arbitrary speeds.
   Select a spawn distance outside the projectile and tune speed/size to avoid
-  discrete-physics tunneling. Finite-lifetime projectiles are unmounted automatically.
+  discrete-physics tunneling.
 - Tracking loss blocks new shots and requests a fresh camera pose on recovery;
   the floor remains fixed and existing physics simulation continues.
   Collisions do not remove, replace or freeze projectiles: they retain their
   dynamic bodies, gravity and physical interaction with the walls and bottom.
-  They count toward `maxActive` until expiry or leaving the game, including after
-  an impact. With unlimited lifetime, reaching this limit blocks further shots.
+  They count toward `maxActive` until leaving the game, including after an impact.
+  Reaching this limit blocks further shots.
 - A contact on the interior top face of a box/basket bottom awards one point per
   projectile across all targets in the current game instance. Classification uses
   the contact position and normal in the body's current native world transform,
   including moved/rotated targets; wall faces, top rims, the underside and
   non-projectile bodies do not score. Native transform failures are reported.
-  Scores persist per memory and appear in the menu's Scores tab; a scoring contact
-  also adds the memory to the collection.
-- Development builds of configured aiming scenes enable Viro's
-  `physicsWorld.drawBounds` in AR and the 3D viewer to show actual physical shapes.
-  Release builds do not display these diagnostic bounds.
+  Scores persist per account, location and game type and appear in the menu's
+  Scores tab; in AR, a scoring contact also adds the memory to the legacy collection.
+- Collider debug outlines are currently disabled with `physicsWorld.drawBounds: false`
+  in both AR and the 3D viewer, including development builds. Physical collisions
+  remain enabled.
+- Configured projectiles emit targeted `[AimingPhysics]` diagnostic logs in
+  both debug and release builds while investigating disappearing models.
+  These record mount/unmount, the effective unlimited lifetime and the server's
+  separate `configuredLifetimeMs`, model loading, and the first
+  contact with each body tag. Native world transforms of the body and model,
+  model bounds and floor height are sampled at contact and 250/1000/3000 ms
+  afterwards. Sampling does not change position, velocity, colliders or scores;
+  pending samples are cancelled on unmount. Non-finite values are preserved as
+  strings in logs rather than converted to JSON `null`. Native query failures
+  are logged explicitly. Read with `adb logcat -s ReactNativeJS` and filter for
+  `AimingPhysics`; no model URLs or authentication data are logged.
 - Colliders have an explicit `size: [width, height, length]` in meters,
   centered on their object's origin. Unlike the generic object contract,
   configured projectile/target `scale` changes **only the visual model**;
@@ -273,6 +289,47 @@ the model alone does not resize or recenter its collider.
 The 3D fallback uses the same physical objects and launch mechanics with an
 immediate synthetic floor centered at `[0, -1, -2]` and the configured minimum
 dimensions; it does not claim to track a real plane.
+
+### Collection and progress API
+
+Set `properties.collectible: true` on a game object to enable collection after
+a 600 ms press. The field must be a boolean; omission means not collectible.
+A collectible requires an explicit game ID. A collection gesture cancels any
+charged shot, and is cancelled by release before 600 ms, tracking loss or unmount.
+Collecting a spawned projectile uses its server object ID, not its negative runtime ID.
+Objects stay visible and physical after collection.
+
+On game switch, experience close or camera/viewer close, authenticated players
+send `POST /api/progress` with the same Bearer token as the other authenticated
+requests. The payload contains absolute totals, not increments:
+
+```json
+{
+  "scores": [{ "location_id": 12, "game_type": "aiming", "score": 125 }],
+  "visited_location_ids": [12, 15],
+  "collected_items": [
+    { "location_id": 12, "game_id": 100, "item_id": 3, "quantity": 1 }
+  ]
+}
+```
+
+`item_id` is the ID of `logic.games[].objects[]`; all three IDs are needed
+to disambiguate objects. Collection is unique per location/game/object.
+Scores aggregate by location and game type, since the score API does not accept
+a game ID. Both AR and the Galaxy A fallback participate; merely backgrounding
+the app does not finish a game. No victory event is inferred.
+
+Progress is saved under `@progress:user:{userId}` (guests use a separate local
+key and do not upload). At first authenticated load, historical scores, visits
+and memory inventory are attributed once to that account; a migration owner key
+prevents another account from claiming them. Historical memory entries remain
+local inventory items, not fabricated object IDs in `collected_items`.
+No server progress retrieval/merge endpoint is implemented.
+
+Writes include late contacts/collections before an exit; uploads are serialized
+without blocking gameplay. Failed uploads display an error and retain the local
+totals for the next game-end upload. Requests time out after 15 seconds.
+Queued requests recheck the account and token before sending.
 Additional callbacks: `planeReady.data` describes the locked floor;
 `shot.objectId` identifies the spawned instance and `shot.data` contains its
 `projectileId`, world position and velocity; `shotBlocked.data.reason` is

@@ -10,6 +10,7 @@ import {
 } from '@reactvision/react-viro';
 import { translate } from '../../constants/i18n';
 import { isBodyTransform, isBottomContact } from './aiming';
+import { AimingSceneContext } from './AimingScene';
 import type { ExperienceEvent, ExperienceObject, Vector3 } from './experience';
 import type { TemplateProps } from './ExperienceTemplates';
 
@@ -24,8 +25,11 @@ export function SceneObject({
   claimScore,
   onCollision: onCollisionCallback,
   physicsBody,
+  projectileDiagnostics,
+  sourceObjectId,
 }: Omit<TemplateProps, 'mode'> & {
   object: ExperienceObject;
+  sourceObjectId?: number;
   onPress?: () => void;
   onClickState?: React.ComponentProps<typeof ViroNode>['onClickState'];
   scoreOnBottom?: boolean;
@@ -34,16 +38,116 @@ export function SceneObject({
   physicsBody?: React.ComponentProps<typeof ViroNode>['physicsBody'] & {
     instantVelocity?: Vector3;
   };
+  projectileDiagnostics?: {
+    floorY: number;
+    expiresAt: number | null;
+    lifetimeMs: number | null;
+    configuredLifetimeMs: number | null;
+  };
 }) {
   const { properties } = object;
+  const aimingScene = React.useContext(AimingSceneContext);
+  const trackingReady = aimingScene?.trackingReady;
+  const collectionTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearCollectionTimer = React.useCallback(() => {
+    if (collectionTimer.current !== null) clearTimeout(collectionTimer.current);
+    collectionTimer.current = null;
+  }, []);
+  React.useEffect(() => {
+    if (trackingReady === false) clearCollectionTimer();
+    return clearCollectionTimer;
+  }, [trackingReady, object.id, properties.collectible, clearCollectionTimer]);
+  const handleClickState: NonNullable<React.ComponentProps<typeof ViroNode>['onClickState']> =
+    (...args) => {
+      const [state] = args;
+      onClickState?.(...args);
+      if (state === 1 && trackingReady !== false && collectionTimer.current === null) {
+        collectionTimer.current = setTimeout(() => {
+          collectionTimer.current = null;
+          aimingScene?.cancelCharge();
+          onEvent?.({
+            type: game.type,
+            gameId: game.id,
+            objectId: sourceObjectId ?? object.id,
+            name: 'collect',
+          });
+        }, 600);
+      } else if (state === 2) {
+        clearCollectionTimer();
+      }
+    };
   const node = React.useRef<ViroNode | null>(null);
+  const model = React.useRef<Viro3DObject | null>(null);
+  const diagnosticState = React.useRef({
+    config: projectileDiagnostics,
+    contacts: new Set<string>(),
+    timers: new Set<ReturnType<typeof setTimeout>>(),
+  });
+  const logProjectile = (phase: string, data: unknown) => {
+    console.info(
+      '[AimingPhysics]',
+      JSON.stringify(
+        { gameId: game.id, shotId: object.id, phase, data },
+        (_key, value) =>
+          typeof value === 'number' && !Number.isFinite(value)
+            ? String(value)
+            : value,
+      ),
+    );
+  };
   const mounted = React.useRef(true);
   React.useEffect(() => {
     mounted.current = true;
+    const { config, timers } = diagnosticState.current;
+    if (config)
+      logProjectile('mounted', {
+        ...config,
+        position: properties.position,
+        scale: properties.scale,
+        physicsBody,
+      });
     return () => {
       mounted.current = false;
+      timers.forEach(clearTimeout);
+      timers.clear();
+      if (config)
+        logProjectile('unmounted', {
+          expiresAt: config.expiresAt,
+          now: Date.now(),
+        });
     };
+    // A mounted shot retains its launch configuration across score/UI updates.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const snapshotProjectile = async (phase: string) => {
+    const config = diagnosticState.current.config;
+    if (!config || !mounted.current || !node.current || !model.current) return;
+    try {
+      const [bodyTransform, modelTransform, modelBounds] = await Promise.all([
+        node.current.getTransformAsync(),
+        model.current.getTransformAsync(),
+        model.current.getBoundingBoxAsync(),
+      ]);
+      if (!mounted.current) return;
+      logProjectile(phase, {
+        floorY: config.floorY,
+        bodyTransform,
+        modelTransform,
+        modelBounds,
+      });
+    } catch (diagnosticError) {
+      if (!mounted.current) return;
+      console.warn('[AimingPhysics] native snapshot failed', {
+        gameId: game.id,
+        shotId: object.id,
+        phase,
+        error:
+          diagnosticError instanceof Error
+            ? diagnosticError.message
+            : String(diagnosticError),
+      });
+    }
+  };
   const asset = game.assets.find(item => item.id === properties.asset);
   const animation = properties.animation;
   const animationName = `echoes-animation-${React.useId()}`;
@@ -73,6 +177,19 @@ export function SceneObject({
     point?: Vector3,
     normal?: Vector3,
   ) => {
+    const diagnostics = diagnosticState.current;
+    if (diagnostics.config && !diagnostics.contacts.has(tag ?? 'untagged')) {
+      diagnostics.contacts.add(tag ?? 'untagged');
+      logProjectile('contact', { tag, point, normal });
+      snapshotProjectile('contact-now');
+      for (const delay of [250, 1000, 3000]) {
+        const timer = setTimeout(() => {
+          diagnostics.timers.delete(timer);
+          snapshotProjectile(`contact+${delay}ms`);
+        }, delay);
+        diagnostics.timers.add(timer);
+      }
+    }
     let scoringContact = false;
     if (scoreOnBottom && properties.collider && point && normal) {
       try {
@@ -123,7 +240,7 @@ export function SceneObject({
       onCollision={(tag?: string, point?: Vector3, normal?: Vector3) => {
         onCollision(tag, point, normal);
       }}
-      onClickState={onClickState}
+      onClickState={properties.collectible === true ? handleClickState : onClickState}
     >
       <ViroNode scale={physicsBody ? properties.scale : undefined}>
         {asset &&
@@ -131,9 +248,24 @@ export function SceneObject({
             asset.type === 'GLTF' ||
             asset.type === 'OBJ') && (
             <Viro3DObject
+              ref={model}
               source={{ uri: asset.url }}
               type={asset.type}
               onError={error}
+              onLoadStart={
+                projectileDiagnostics
+                  ? () => {
+                      logProjectile('model-load-start', {});
+                    }
+                  : undefined
+              }
+              onLoadEnd={
+                projectileDiagnostics
+                  ? () => {
+                      snapshotProjectile('model-loaded');
+                    }
+                  : undefined
+              }
             />
           )}
         {asset?.type === 'image' && (

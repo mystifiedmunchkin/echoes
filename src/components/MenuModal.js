@@ -61,12 +61,13 @@ export default function MenuModal({
       return (
         <FlatList
           data={[...scores].sort((a, b) => b.points - a.points)}
-          keyExtractor={item => String(item.id)}
+          keyExtractor={item => `${item.id}:${item.gameType || 'aiming'}`}
           renderItem={({ item, index }) => (
             <View style={styles.scoreRow}>
               <Text style={styles.scoreRank}>{index + 1}.</Text>
               <Text style={styles.placeName} numberOfLines={1}>
                 {item.name || t('memoryUnknown')}
+                {item.gameType ? ` — ${t(`experience_${item.gameType}`)}` : ''}
               </Text>
               <Text style={styles.scoreValue}>{item.points}</Text>
             </View>

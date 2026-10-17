@@ -62,7 +62,7 @@ function MemoryARScene({
         anchorDetectionTypes={['PlanesHorizontal', 'PlanesVertical']}
         physicsWorld={{
           gravity: experience?.gravity || [0, -9.81, 0],
-          drawBounds: __DEV__ && !!game?.settings,
+          drawBounds: false,
         }}
         onTrackingUpdated={aimingScene.onTrackingUpdated}
         onCameraTransformUpdate={aimingScene.onCameraTransformUpdate}

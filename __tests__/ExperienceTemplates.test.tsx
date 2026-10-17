@@ -5,6 +5,7 @@ import { ExperienceContent } from '../src/experiences/ExperienceTemplates';
 import ExperienceViewer from '../src/experiences/ExperienceViewer';
 import ViroARView from '../src/components/ViroARView';
 import { readExperience } from '../src/experiences/experience';
+import { colliderShape } from '../src/experiences/aiming';
 
 jest.mock('../constants/i18n', () => ({ translate: (key: string) => key }));
 
@@ -330,6 +331,10 @@ describe('configured aiming runtime', () => {
     act(() => node.props.onClickState(3));
   };
   const getBodyTransform = jest.fn();
+  const getModelTransform = jest.fn();
+  const getModelBounds = jest.fn();
+  let diagnosticLog: jest.SpyInstance;
+  let diagnosticWarning: jest.SpyInstance;
   const bottomPoint = [0.75, -0.95, -3.5];
   const floor = () =>
     host('ViroNode').find(node => node.props.viroTag === 'aiming-floor');
@@ -351,6 +356,11 @@ describe('configured aiming runtime', () => {
           createNodeMock: element =>
             element.type === 'ViroNode'
               ? { getTransformAsync: getBodyTransform }
+              : element.type === 'Viro3DObject'
+              ? {
+                  getTransformAsync: getModelTransform,
+                  getBoundingBoxAsync: getModelBounds,
+                }
               : null,
         },
       );
@@ -365,12 +375,112 @@ describe('configured aiming runtime', () => {
 
   beforeEach(() => {
     jest.useFakeTimers();
+    diagnosticLog = jest.spyOn(console, 'info').mockImplementation(() => {});
+    diagnosticWarning = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => {});
     getBodyTransform.mockResolvedValue({
       position: [0.75, -0.5, -3.5],
       rotation: [0, 90, 0],
     });
+    getModelTransform.mockResolvedValue({
+      position: [0.75, -0.5, -3.5],
+      rotation: [0, 90, 0],
+      scale: [2, 2, 2],
+    });
+    getModelBounds.mockResolvedValue({
+      boundingBox: {
+        minX: 0.7,
+        maxX: 0.8,
+        minY: -0.55,
+        maxY: -0.45,
+        minZ: -3.55,
+        maxZ: -3.45,
+      },
+    });
   });
-  afterEach(() => jest.useRealTimers());
+  afterEach(() => {
+    act(() => renderer.unmount());
+    diagnosticLog.mockRestore();
+    diagnosticWarning.mockRestore();
+    jest.useRealTimers();
+  });
+
+  test('samples native body/model transforms after contact without removing or replacing the shot', async () => {
+    await mountAR();
+    detectFloor();
+    tap();
+    const shot = projectiles()[0];
+    const originalBody = shot.props.physicsBody;
+    await act(async () =>
+      shot.props.onCollision('aiming-floor', [0, -1, 0], [0, 1, 0]),
+    );
+    await act(async () =>
+      shot.props.onCollision('aiming-floor', [0, -1, 0], [0, 1, 0]),
+    );
+    act(() => jest.runAllTicks());
+    expect(jest.getTimerCount()).toBe(3);
+    getBodyTransform.mockResolvedValue({
+      position: [0, -2, 0],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+    });
+    getModelTransform.mockResolvedValue({
+      position: [0, -2, 0],
+      rotation: [0, 0, 0],
+      scale: [NaN, 2, 2],
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(3000);
+    });
+    const entries = diagnosticLog.mock.calls
+      .filter(([prefix]) => prefix === '[AimingPhysics]')
+      .map(([, json]) => JSON.parse(json));
+    expect(entries.filter(entry => entry.phase === 'contact')).toHaveLength(1);
+    expect(entries.map(entry => entry.phase)).toEqual(
+      expect.arrayContaining([
+        'mounted',
+        'contact-now',
+        'contact+250ms',
+        'contact+1000ms',
+        'contact+3000ms',
+      ]),
+    );
+    expect(
+      entries.find(entry => entry.phase === 'contact+3000ms').data,
+    ).toMatchObject({
+      floorY: -1,
+      bodyTransform: { position: [0, -2, 0] },
+      modelTransform: { scale: ['NaN', 2, 2] },
+    });
+    expect(projectiles()[0]).toBe(shot);
+    expect(projectiles()[0].props.physicsBody).toBe(originalBody);
+    act(() => renderer.unmount());
+    act(() => jest.runAllTicks());
+    expect(jest.getTimerCount()).toBe(0);
+    expect(diagnosticLog).toHaveBeenLastCalledWith(
+      '[AimingPhysics]',
+      expect.stringContaining('"phase":"unmounted"'),
+    );
+  });
+
+  test('reports diagnostic native query failures and cancels pending samples on unmount', async () => {
+    await mountAR();
+    detectFloor();
+    tap();
+    getModelBounds.mockRejectedValueOnce(new Error('Bounds unavailable'));
+    await act(async () =>
+      projectiles()[0].props.onCollision('404', bottomPoint, [0, 1, 0]),
+    );
+    expect(diagnosticWarning).toHaveBeenCalledWith(
+      '[AimingPhysics] native snapshot failed',
+      expect.objectContaining({ error: 'Bounds unavailable' }),
+    );
+    act(() => jest.runAllTicks());
+    expect(jest.getTimerCount()).toBe(3);
+    act(() => renderer.unmount());
+    expect(jest.getTimerCount()).toBe(0);
+  });
 
   test('requires normal tracking, minimum plane dimensions and a stable pose before creating a static world-space floor', async () => {
     await mountAR();
@@ -443,6 +553,162 @@ describe('configured aiming runtime', () => {
     act(() => host('ViroARPlane')[0].props.onAnchorUpdated(anchor));
     act(() => jest.advanceTimersByTime(1000));
     expect(floor()).toBeDefined();
+  });
+
+  test.each([
+    ['ar', 'capsule'],
+    ['ar', 'diamond'],
+    ['viewer', 'capsule'],
+    ['viewer', 'diamond'],
+  ] as const)(
+    'wires %s %s colliders to projectile and target bodies and preserves them after contact',
+    async (mode, type) => {
+      const collider = { type, size: [0.2, 0.6, 0.2] as [number, number, number] };
+      const configured = readExperience({
+        logic: {
+          games: aiming.games.map(game => ({
+            ...game,
+            objects: game.objects.map(object => ({
+              ...object,
+              properties: { ...object.properties, collider },
+            })),
+          })),
+        },
+      })!;
+      if (mode === 'ar') {
+        await mountAR(configured);
+        detectFloor();
+      } else {
+        await act(async () => {
+          renderer = TestRenderer.create(
+            <ExperienceViewer
+              experience={configured}
+              gameIndex={0}
+              onEvent={onEvent}
+              onError={onError}
+            />,
+          );
+        });
+        act(() => host('ViroScene')[0].props.onCameraTransformUpdate(camera));
+      }
+      tap(mode === 'ar' ? scene() : host('ViroScene')[0]);
+      const shot = projectiles()[0];
+      const targetNode = host('ViroNode').find(
+        node => node.props.viroTag === '404',
+      )!;
+      const shape = colliderShape(collider);
+      expect(shape.type).toBe('Compound');
+      expect(shape.children!.some(part => part.type === 'Sphere')).toBe(
+        type === 'capsule',
+      );
+      expect(shot.props.physicsBody).toMatchObject({
+        type: 'Dynamic',
+        useGravity: true,
+        shape,
+      });
+      expect(targetNode.props.physicsBody).toMatchObject({
+        type: 'Static',
+        shape,
+      });
+      await act(async () => {
+        targetNode.props.onCollision('-1', [0, 0, 0], [0, 1, 0]);
+      });
+      expect(onEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'collision',
+          objectId: 404,
+          data: { tag: '-1', point: [0, 0, 0], normal: [0, 1, 0] },
+        }),
+      );
+      act(() => jest.advanceTimersByTime(3000));
+      expect(projectiles()[0]).toBe(shot);
+      expect(projectiles()[0].props.physicsBody.shape).toEqual(shape);
+      expect(onError).not.toHaveBeenCalled();
+    },
+  );
+
+  test('collects only after a long press, cancels the charged shot and uses the server ID for projectiles', async () => {
+    const configured = readExperience({
+      logic: {
+        games: aiming.games.map(game => ({
+          ...game,
+          objects: game.objects.map(object => ({
+            ...object, properties: { ...object.properties, collectible: true },
+          })),
+        })),
+      },
+    })!;
+    await mountAR(configured);
+    detectFloor();
+    const targetNode = host('ViroNode').find(node => node.props.viroTag === '404')!;
+    act(() => {
+      scene().props.onClickState(1);
+      targetNode.props.onClickState(1);
+      jest.advanceTimersByTime(599);
+    });
+    expect(onEvent.mock.calls.filter(([event]) => event.name === 'collect')).toHaveLength(0);
+    act(() => jest.advanceTimersByTime(1));
+    expect(onEvent).toHaveBeenCalledWith({
+      type: 'aiming', gameId: 400, objectId: 404, name: 'collect',
+    });
+    act(() => {
+      scene().props.onClickState(2);
+      targetNode.props.onClickState(2);
+      jest.advanceTimersByTime(1000);
+    });
+    expect(projectiles()).toHaveLength(0);
+    expect(onEvent.mock.calls.filter(([event]) => event.name === 'collect')).toHaveLength(1);
+    act(() => {
+      targetNode.props.onClickState(1);
+      jest.advanceTimersByTime(100);
+      targetNode.props.onClickState(2);
+    });
+    expect(projectiles()).toHaveLength(1);
+    act(() => {
+      projectiles()[0].props.onClickState(1);
+      jest.advanceTimersByTime(600);
+      projectiles()[0].props.onClickState(2);
+    });
+    expect(onEvent).toHaveBeenCalledWith({
+      type: 'aiming', gameId: 400, objectId: 403, name: 'collect',
+    });
+  });
+
+  test('cancels collection on tracking loss and unmount', async () => {
+    const configured = readExperience({
+      logic: {
+        games: aiming.games.map(game => ({
+          ...game,
+          objects: game.objects.map(object => ({
+            ...object, properties: { ...object.properties, collectible: true },
+          })),
+        })),
+      },
+    })!;
+    await mountAR(configured);
+    detectFloor();
+    const targetNode = host('ViroNode').find(node => node.props.viroTag === '404')!;
+    act(() => {
+      targetNode.props.onClickState(1);
+      jest.advanceTimersByTime(300);
+      scene().props.onTrackingUpdated(2);
+    });
+    act(() => jest.advanceTimersByTime(600));
+    expect(onEvent.mock.calls.filter(([event]) => event.name === 'collect')).toHaveLength(0);
+    act(() => {
+      targetNode.props.onClickState(2);
+      targetNode.props.onClickState(1);
+      jest.advanceTimersByTime(600);
+    });
+    expect(onEvent.mock.calls.filter(([event]) => event.name === 'collect')).toHaveLength(0);
+    act(() => {
+      scene().props.onTrackingUpdated(3);
+      targetNode.props.onClickState(1);
+      jest.advanceTimersByTime(300);
+      renderer.unmount();
+    });
+    act(() => jest.advanceTimersByTime(600));
+    expect(onEvent.mock.calls.filter(([event]) => event.name === 'collect')).toHaveLength(0);
   });
 
   test('fires the GLB along the normalized camera axis, limits shots and keeps unlimited bodies', async () => {
@@ -626,7 +892,7 @@ describe('configured aiming runtime', () => {
       expect(
         onEvent.mock.calls.filter(([event]) => event.name === 'shot'),
       ).toHaveLength(1);
-      expect(scene().props.physicsWorld.drawBounds).toBe(true);
+      expect(scene().props.physicsWorld.drawBounds).toBe(false);
     },
   );
 
@@ -701,7 +967,7 @@ describe('configured aiming runtime', () => {
     );
   });
 
-  test('preserves explicit finite lifetime and ignores configured constant launch velocity', async () => {
+  test('keeps projectiles indefinitely despite a server lifetime of 1000 ms and ignores constant launch velocity', async () => {
     const game = aiming.games[0];
     await mountAR({
       ...aiming,
@@ -725,7 +991,7 @@ describe('configured aiming runtime', () => {
           ),
           settings: {
             ...game.settings!,
-            projectile: { ...game.settings!.projectile, lifetimeMs: 100 },
+            projectile: { ...game.settings!.projectile, lifetimeMs: 1000 },
           },
         },
       ],
@@ -733,15 +999,27 @@ describe('configured aiming runtime', () => {
     detectFloor();
     tap();
     expect(projectiles()[0].props.physicsBody.velocity).toBeUndefined();
-    act(() => jest.advanceTimersByTime(99));
+    const shot = projectiles()[0];
+    await act(async () => shot.props.onCollision('aiming-floor', [0, -1, 0], [0, 1, 0]));
+    act(() => jest.advanceTimersByTime(999));
     expect(projectiles()).toHaveLength(1);
     act(() => jest.advanceTimersByTime(1));
-    expect(projectiles()).toHaveLength(0);
+    expect(projectiles()).toHaveLength(1);
+    await act(async () => { jest.advanceTimersByTime(60000); });
+    expect(projectiles()[0]).toBe(shot);
+    expect(projectiles()[0].props.physicsBody.type).toBe('Dynamic');
+    expect(diagnosticLog).toHaveBeenCalledWith(
+      '[AimingPhysics]',
+      expect.stringContaining('"expiresAt":null,"lifetimeMs":null,"configuredLifetimeMs":1000'),
+    );
     tap();
     expect(projectiles()).toHaveLength(1);
+    expect(onEvent).toHaveBeenLastCalledWith(expect.objectContaining({
+      name: 'shotBlocked', data: { reason: 'limit' },
+    }));
   });
 
-  test('switching games discards the previous floor, projectile bodies and expiry timers', async () => {
+  test('switching games discards the previous floor and projectile bodies', async () => {
     await mountAR();
     detectFloor();
     tap();

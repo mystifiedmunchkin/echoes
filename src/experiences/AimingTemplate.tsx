@@ -23,7 +23,6 @@ interface Shot {
   position: Vector3;
   rotation: Vector3;
   velocity: Vector3;
-  expiresAt: number | null;
 }
 
 function floorFromAnchor(
@@ -156,10 +155,7 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
         Math.hypot(...camera.forward) === 0
       )
         return block('camera');
-      const now = Date.now();
-      const live = activeShots.current.filter(
-        shot => shot.expiresAt === null || shot.expiresAt > now,
-      );
+      const live = activeShots.current;
       if (live.length >= config.projectile.maxActive) return block('limit');
       const magnitude = Math.hypot(...camera.forward);
       const direction = camera.forward.map(n => n / magnitude);
@@ -179,10 +175,6 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
         position,
         rotation: camera.rotation,
         velocity,
-        expiresAt:
-          config.projectile.lifetimeMs === null
-            ? null
-            : now + config.projectile.lifetimeMs,
       };
       activeShots.current = [...live, shot];
       setShots(activeShots.current);
@@ -202,17 +194,6 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
       scene.fire.current = null;
     };
   }, [scene, fire]);
-
-  React.useEffect(() => {
-    if (!shots.length || shots.every(shot => shot.expiresAt === null)) return;
-    const timer = setTimeout(() => {
-      activeShots.current = activeShots.current.filter(
-        shot => shot.expiresAt === null || shot.expiresAt > Date.now(),
-      );
-      setShots(activeShots.current);
-    }, Math.max(0, Math.min(...shots.filter((shot): shot is Shot & { expiresAt: number } => shot.expiresAt !== null).map(shot => shot.expiresAt)) - Date.now()));
-    return () => clearTimeout(timer);
-  }, [shots]);
 
   const physicalObject = (
     object: ExperienceObject,
@@ -316,7 +297,14 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
           key={shot.id}
           {...props}
           object={physicalObject(projectile, shot)}
+          sourceObjectId={projectile.id}
           onClickState={scene?.onClickState}
+          projectileDiagnostics={{
+            floorY: floor!.position[1],
+            expiresAt: null,
+            lifetimeMs: null,
+            configuredLifetimeMs: config.projectile.lifetimeMs,
+          }}
           physicsBody={{
             ...projectilePhysics,
             type: 'Dynamic',

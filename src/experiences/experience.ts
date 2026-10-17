@@ -28,6 +28,7 @@ export interface ExperienceObject {
     asset?: number;
     text?: string;
     active?: boolean;
+    collectible?: boolean;
     position?: Vector3;
     rotation?: Vector3;
     scale?: Vector3;
@@ -67,6 +68,7 @@ export interface ExperienceEvent {
   objectId?: number;
   name:
     | 'press'
+    | 'collect'
     | 'collision'
     | 'targetFound'
     | 'targetUpdated'
@@ -250,6 +252,12 @@ export function readExperience(memory: unknown): Experience | null {
             `${objectPath}.properties.active`,
           );
         }
+        if (properties.collectible !== undefined) {
+          requireValue(
+            typeof properties.collectible === 'boolean',
+            `${objectPath}.properties.collectible`,
+          );
+        }
         const parsed: ExperienceObject['properties'] = {
           ...properties,
           asset:
@@ -258,6 +266,7 @@ export function readExperience(memory: unknown): Experience | null {
               : (properties.asset as number),
           text: properties.text,
           active: properties.active,
+          collectible: properties.collectible,
         };
         for (const key of ['position', 'rotation', 'scale'] as const) {
           if (properties[key] !== undefined)
@@ -308,6 +317,9 @@ export function readExperience(memory: unknown): Experience | null {
       objects.map(object => object.id),
       `${path}.objects`,
     );
+    if (objects.some(object => object.properties.collectible === true)) {
+      integer(game.id, `${path}.id required for collectible objects`);
+    }
     const result: ExperienceGame = {
       ...game,
       id: game.id === undefined ? index : integer(game.id, `${path}.id`),

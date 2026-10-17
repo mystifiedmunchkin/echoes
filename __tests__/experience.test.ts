@@ -87,6 +87,52 @@ test('keeps ordinary memories outside the experience runtime', () => {
   expect(readExperience({ interactive: { logic: { games: [] } } })).toBeNull();
 });
 
+test.each([true, false])('accepts the explicit collectible boolean %s', collectible => {
+  const definition = memory();
+  const parsed = readExperience({
+    interactive: {
+      logic: {
+        games: definition.interactive.logic.games.map(item => ({
+          ...item,
+          objects: item.objects.map(object => ({
+            ...object, properties: { ...object.properties, collectible },
+          })),
+        })),
+      },
+    },
+  });
+  expect(parsed?.games[0].objects[0].properties.collectible).toBe(collectible);
+});
+
+test.each(['true', 1, null])('rejects non-boolean collectible %s', collectible => {
+  const definition = memory();
+  expect(() => readExperience({
+    interactive: {
+      logic: {
+        games: definition.interactive.logic.games.map(item => ({
+          ...item,
+          objects: item.objects.map(object => ({
+            ...object, properties: { ...object.properties, collectible },
+          })),
+        })),
+      },
+    },
+  })).toThrow('properties.collectible');
+});
+
+test('requires a server game ID for collectible objects instead of using an array index', () => {
+  const definition = memory();
+  const withoutId = { ...definition.interactive.logic.games[0], id: undefined };
+  expect(() => readExperience({
+    logic: {
+      games: [{
+        ...withoutId,
+        objects: [{ id: 1, properties: { text: 'Key', collectible: true } }],
+      }],
+    },
+  })).toThrow('id required for collectible objects');
+});
+
 test.each([
   { ...game, type: 'quiz' },
   { ...game, type: 'images', target: { ...target, physicalWidth: 0 } },

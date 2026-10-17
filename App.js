@@ -25,9 +25,7 @@ import {
   MAP_RADIUS_METERS, DISCOVERY_RADIUS_METERS, isGalaxyADevice,
   canViewMemoryContent, getMemoryDistance, createARSession,
 } from './src/utils/memoryAccess';
-import { useInventory } from './src/hooks/useInventory';
-import { useScores } from './src/hooks/useScores';
-import { useVisitedPlaces } from './src/hooks/useVisitedPlaces';
+import { useProgress } from './src/hooks/useProgress';
 import { useRadar } from './src/hooks/useRadar';
 import CollectionParticle from './src/components/CollectionParticle';
 import { MemoryAudioPlayer } from './src/components/MemoryAudioPlayer';
@@ -95,20 +93,25 @@ function AppContent() {
   const [selectedArMemory, setSelectedArMemory] = useState(null);
 
   // --- Inventory management ---
+  const [showInventory, setShowInventory] = useState(false);
+  const { user, token, signIn, signUp, signOut } = useAuth();
   const {
-    collectedMemories, showInventory, setShowInventory,
-    handleCollectMemory, clearInventory
-  } = useInventory();
-  const { scores, addScore } = useScores();
-  const collectionItems = useMemo(() => collectedMemories.map((item) => {
+    scores, addScore, visitedPlaces, markPlaceVisited, collectedItems,
+    collectObject, clearCollectedItems: clearCollection, finishGame,
+    collectedMemories, handleCollectMemory,
+  } = useProgress(user, token);
+  const collectionItems = useMemo(() => [...collectedMemories.map((item) => {
     const sourceMemory = memories.find((memory) => String(memory.id) === String(item.id));
     return sourceMemory?.creatorName && !item.creatorName
       ? { ...item, creatorName: sourceMemory.creatorName }
       : item;
-  }), [collectedMemories, memories]);
+  }), ...collectedItems.map(item => ({
+    ...item,
+    id: `${item.location_id}:${item.game_id}:${item.item_id}`,
+    isGameObject: true,
+  }))], [collectedMemories, memories, collectedItems]);
 
   // --- Places/games already seen by the player, listed in the menu ---
-  const { visitedPlaces, markPlaceVisited } = useVisitedPlaces();
   const [showMenu, setShowMenu] = useState(false);
   const menuPlaces = useMemo(() => {
     const collectedIds = new Set(collectedMemories.map((item) => String(item.id)));
@@ -123,7 +126,6 @@ function AppContent() {
   }, [collectedMemories, visitedPlaces]);
 
   // --- Authentication and account management ---
-  const { user, signIn, signUp, signOut } = useAuth();
   const [showAccount, setShowAccount] = useState(false);
   const requireAuthentication = useCallback(() => {
     if (user) return true;
@@ -172,6 +174,21 @@ function AppContent() {
   const [aimingPlaneReady, setAimingPlaneReady] = useState(false);
   const arExperience = useMemo(() => readExperience(selectedArMemory), [selectedArMemory]);
   const viewerExperience = useMemo(() => readExperience(modelViewerMemory), [modelViewerMemory]);
+  const activeGame = (viewerExperience || arExperience)?.games[experienceGameIndex];
+  const activeMemory = viewerExperience ? modelViewerMemory : selectedArMemory;
+  const gameSession = useRef(null);
+  useEffect(() => {
+    const previous = gameSession.current;
+    const current = activeGame && activeMemory
+      ? { locationId: activeMemory.id, gameId: activeGame.id, userId: user?.id, finishGame }
+      : null;
+    if (
+      previous &&
+      previous.userId === user?.id &&
+      (previous.locationId !== current?.locationId || previous.gameId !== current?.gameId)
+    ) previous.finishGame();
+    gameSession.current = current;
+  }, [activeGame, activeMemory, finishGame, user?.id]);
   const reportExperienceError = useCallback((message) => {
     Alert.alert(t('experienceError'), message);
   }, [t]);
@@ -181,6 +198,19 @@ function AppContent() {
     setAimingPlaneReady(false);
   }, []);
   const handleExperienceEvent = useCallback((event) => {
+    const experience = viewerExperience || arExperience;
+    const memory = viewerExperience ? modelViewerMemory : selectedArMemory;
+    const game = experience?.games[experienceGameIndex];
+    if (!game || event.gameId !== game.id || event.type !== game.type) return;
+    if (event.name === 'collect') {
+      const object = game.objects.find(item => item.id === event.objectId);
+      if (object?.properties.collectible !== true || !requireAuthentication()) return;
+      const asset = game.assets.find(item => item.id === object.properties.asset);
+      collectObject({
+        location_id: memory.id, game_id: game.id, item_id: object.id,
+        name: asset?.name || object.properties.text || `${memory.name || ''} #${object.id}`,
+      });
+    }
     if (event.name === 'press') setExperienceInteraction(event);
     if (event.name === 'planeCandidate') setAimingPlaneReady(false);
     if (event.name === 'planeReady') setAimingPlaneReady(true);
@@ -189,16 +219,18 @@ function AppContent() {
       event.data?.scoringContact === true &&
       Number.isSafeInteger(event.data?.projectileId) &&
       event.data.projectileId < 0 &&
-      selectedArMemory
+      memory
     ) {
-      addScore({ id: selectedArMemory.id, name: selectedArMemory.name });
-      handleCollectMemory({
-        ...selectedArMemory,
-        creatorName:
-          selectedArMemory.creatorName || selectedArMemory.creator_name || '',
-      });
+      addScore({ id: memory.id, name: memory.name, gameType: event.type });
+      if (selectedArMemory) {
+        handleCollectMemory({
+          ...selectedArMemory,
+          creatorName: selectedArMemory.creatorName || selectedArMemory.creator_name || '',
+        });
+      }
     }
-  }, [addScore, handleCollectMemory, selectedArMemory]);
+  }, [addScore, arExperience, collectObject, experienceGameIndex, modelViewerMemory,
+    handleCollectMemory, requireAuthentication, selectedArMemory, viewerExperience]);
   const modelViewerRequestKey = useRef(0);
   const modelViewerTransitionTimer = useRef(null);
   const [mediaViewer, setMediaViewer] = useState(null);
@@ -270,6 +302,7 @@ function AppContent() {
       modelViewerTransitionTimer.current = setTimeout(() => {
         if (modelViewerRequestKey.current !== requestKey) return;
         setModelViewerMemory(cachedMemory);
+        markPlaceVisited(cachedMemory);
         selectExperienceGame(0);
         setIsPreparingModelViewer(false);
       }, MODEL_VIEWER_RELEASE_MS);
@@ -281,7 +314,7 @@ function AppContent() {
         error instanceof Error ? error.message : t('modelPreparationError'),
       );
     }
-  }, [cacheMemoryAssets, canViewContent, selectExperienceGame, t]);
+  }, [cacheMemoryAssets, canViewContent, markPlaceVisited, selectExperienceGame, t]);
 
   const closeModelViewer = useCallback(() => {
     const requestKey = ++modelViewerRequestKey.current;
@@ -302,6 +335,15 @@ function AppContent() {
       }
     }, MODEL_VIEWER_RELEASE_MS);
   }, [modelViewerMemory]);
+
+  useEffect(() => {
+    if (!modelViewerMemory) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      closeModelViewer();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [closeModelViewer, modelViewerMemory]);
 
   const openMediaViewer = useCallback(async (memory, type) => {
     if (!canViewContent(memory)) {
@@ -589,6 +631,8 @@ function AppContent() {
             <View style={[styles.experiencePanel, { bottom: insets.bottom + 20 }]}>
               <ExperienceControls experience={viewerExperience} gameIndex={experienceGameIndex}
                 onSelect={selectExperienceGame} mode="viewer" />
+              {viewerExperience.games[experienceGameIndex]?.objects.some(object => object.properties.collectible) &&
+                <Text style={styles.loaderText}>{t('collectibleHint')}</Text>}
               {experienceInteraction && (
                 <Text style={styles.loaderText}>{experienceInteraction.objectId}</Text>
               )}
@@ -736,6 +780,8 @@ function AppContent() {
               )}
             <ExperienceControls experience={arExperience} gameIndex={experienceGameIndex}
               onSelect={selectExperienceGame} mode="ar" />
+            {arExperience.games[experienceGameIndex]?.objects.some(object => object.properties.collectible) &&
+              <Text style={styles.loaderText}>{t('collectibleHint')}</Text>}
             {experienceInteraction && (
               <Text style={styles.loaderText}>{experienceInteraction.objectId}</Text>
             )}
@@ -820,7 +866,7 @@ function AppContent() {
           visible={showInventory}
           onClose={() => setShowInventory(false)}
           items={collectionItems}
-          onClear={clearInventory}
+          onClear={clearCollection}
           onReplace={handleReplaceFromInventory}
         />
         <AccountModal
@@ -991,7 +1037,7 @@ function AppContent() {
         visible={showInventory}
         onClose={() => setShowInventory(false)}
         items={collectionItems}
-        onClear={clearInventory}
+        onClear={clearCollection}
         onReplace={handleReplaceFromInventory}
       />
 

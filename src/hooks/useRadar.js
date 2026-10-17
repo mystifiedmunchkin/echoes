@@ -10,6 +10,7 @@ import * as Location from '../services/geolocation';
 import { translate } from '../../constants/i18n';
 import { MAP_RADIUS_METERS } from '../utils/memoryAccess';
 import { cacheExperience } from '../experiences/experience';
+import { ensureDirectory } from '../utils/ensureDirectory';
 
 const PRIVATE_FILES_BASE_URL =
   'https://echoes.sophiehorner.art/api/private-files';
@@ -251,9 +252,7 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
     if (!isRemoteUrl(remoteUrl)) return remoteUrl;
 
     const cacheDirectory = `${Dirs.DocumentDir}/memory-assets`;
-    if (!(await FileSystem.exists(cacheDirectory))) {
-      await FileSystem.mkdir(cacheDirectory);
-    }
+    await ensureDirectory(cacheDirectory);
     const localUri = `${cacheDirectory}/${fileName}`;
     if (await FileSystem.exists(localUri)) return `file://${localUri}`;
 
@@ -557,7 +556,7 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
 
         return {
           ...item,
-          id: item.id || index,
+          id: item.id ?? index,
           name: item.title || item.name || translate('memoryDefault'),
           title: item.title || item.name || translate('memoryDefault'),
           description: item.description || '',
@@ -595,8 +594,25 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
           Number.isFinite(m.lng) &&
           m.interactive?.logic?.games?.length > 0,
       );
-      setMemories(validMemories);
-      return validMemories;
+      const uniqueMemories = new Map();
+      const duplicateIds = new Set();
+      for (const memory of validMemories) {
+        const id = String(memory.id);
+        if (uniqueMemories.has(id)) {
+          duplicateIds.add(id);
+        } else {
+          uniqueMemories.set(id, memory);
+        }
+      }
+      if (duplicateIds.size) {
+        console.warn(
+          'Duplicate memory IDs in nearby API response; keeping the first record:',
+          [...duplicateIds],
+        );
+      }
+      const memoriesById = [...uniqueMemories.values()];
+      setMemories(memoriesById);
+      return memoriesById;
     } catch (err) {
       setApiError(err.message || translate('networkUnavailable'));
       if (throwOnError) throw err;
