@@ -221,7 +221,10 @@ function AppContent() {
       event.data.projectileId < 0 &&
       memory
     ) {
-      addScore({ id: memory.id, name: memory.name, gameType: event.type });
+      addScore({
+        id: memory.id, name: memory.name, gameType: event.type,
+        points: event.data.points ?? 1,
+      });
       if (selectedArMemory) {
         handleCollectMemory({
           ...selectedArMemory,

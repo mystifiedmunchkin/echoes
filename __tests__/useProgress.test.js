@@ -78,9 +78,24 @@ test('separates score types and disambiguates repeated object IDs between locati
     progress.collectObject({ location_id: 12, game_id: 2, item_id: 3 });
     progress.collectObject({ location_id: 15, game_id: 1, item_id: 3 });
   });
+
   expect(progress.scores.map(item => item.points)).toEqual([1, 5]);
   expect(progress.collectedItems).toHaveLength(3);
   expect(global.fetch).not.toHaveBeenCalled();
+});
+
+test('persists and uploads radial impact points rather than the number of impacts', async () => {
+  await mount();
+  await act(async () => {
+    progress.addScore({ id: 12, gameType: 'aiming', points: 10 });
+    progress.addScore({ id: 12, gameType: 'aiming', points: 6 });
+    progress.finishGame();
+  });
+  expect(progress.scores[0].points).toBe(16);
+  expect(JSON.parse(AsyncStorage.storage.get(progressKey(1))).scores[0].points).toBe(16);
+  expect(JSON.parse(global.fetch.mock.calls[0][1].body).scores).toEqual([
+    { location_id: 12, game_type: 'aiming', score: 16 },
+  ]);
 });
 
 test('keeps data after an upload failure and retries the absolute totals at the next game end', async () => {

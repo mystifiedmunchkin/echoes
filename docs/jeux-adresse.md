@@ -182,6 +182,10 @@ classDiagram
     }
     class AimingSettings {
         number[] targets
+        number reward_optional
+        boolean freeze_optional
+        integer multiplier_optional
+        boolean fall_optional
     }
     class PlaneSettings {
         number minWidth
@@ -209,6 +213,9 @@ classDiagram
         string type
         Vector3 size
         number thickness
+        number base_diamond
+        number middle_diamond
+        number height_diamond
     }
     class PhysicsBody {
         string type
@@ -221,6 +228,7 @@ classDiagram
 
 `position`, `rotation`, `scale`, `physics` et plusieurs parametres sont
 facultatifs. `thickness` est obligatoire uniquement pour un collider `basket`.
+Pour `diamond`, `base`, `middle` et `height` sont obligatoires et remplacent `size`.
 Le diagramme montre le sous-ensemble utile au jeu d'adresse configure, pas tous
 les champs disponibles pour les autres types d'experiences.
 
@@ -330,6 +338,10 @@ Les URL `example.test` sont des placeholders a remplacer par de vraies ressource
 | `objects[].id` | Identifiant d'un objet modele ; distinct des identifiants des tirs crees au runtime. |
 | `settings.projectile.objectId` | Objet utilise comme modele pour chaque lancer. Il n'est pas affiche avant le premier tir. |
 | `settings.targets` | Identifiants des objets physiques servant de cibles. |
+| `settings.reward` | ID facultatif d'un asset du meme jeu, affiche lors de la validation du score. |
+| `settings.freeze` | Booleen facultatif : immobiliser le projectile au premier impact eligible. |
+| `settings.multiplier` | Entier strictement positif facultatif : score maximal au centre, 1 par defaut. |
+| `settings.fall` | Booleen facultatif : attendre le renversement des cibles Dynamic pour valider le score. |
 | `plane.minWidth`, `plane.minLength` | Dimensions minimales du plane detecte, en metres ; pas la taille du sol physique final. |
 | `plane.stableMs` | Delai de stabilite avant verrouillage automatique ; un tap sur l'indicateur peut aussi verrouiller le plane. |
 | `projectile.speed` | Vitesse de base, en m/s ; la charge du geste applique ensuite un multiplicateur de 1 a 2. |
@@ -337,7 +349,7 @@ Les URL `example.test` sont des placeholders a remplacer par de vraies ressource
 | `projectile.lifetimeMs` | Champ valide pour compatibilite, mais actuellement ignore par le runtime : tous les projectiles ont une duree illimitee, meme si le serveur envoie `1000`. |
 | `projectile.maxActive` | Nombre maximal de projectiles physiques presents, y compris ceux ayant deja touche un obstacle. |
 | `position` / `rotation` des cibles | Position en metres et rotation en degres, relatives au sol verrouille. |
-| `collider.size` | Dimensions physiques explicites, independantes de la taille native du modele 3D. |
+| `collider.size` | Dimensions physiques explicites, independantes de la taille native du modele 3D ; remplacees par `base`, `middle`, `height` pour `diamond`. |
 | `scale` | Pour les projectiles et cibles configures, modifie seulement le visuel, pas le collider. |
 
 Le sol **100 x 100 x 1 m**, la charge maximale **2 s**, le multiplicateur maximal
@@ -345,15 +357,92 @@ Le sol **100 x 100 x 1 m**, la charge maximale **2 s**, le multiplicateur maxima
 Ils ne sont pas des parametres JSON serveur.
 
 Les colliders acceptes sont `sphere`, `bounding`, `basket`, `capsule` et
-`diamond`. Une cible `bounding` ou `basket` est ouverte en haut et possede un fond
+`diamond`. Sans regles d'impact, une cible `bounding` ou `basket` est ouverte en haut et possede un fond
 et quatre parois physiques. Seules ces deux familles de cibles ont actuellement
 la regle de score de fond. Les autres formes restent physiques sans attribution
 automatique de score.
 
+### Regles d'impact : contrat serveur/client
+
+Les quatre champs sont directement dans `settings`, pas dans `projectile` ni
+dans les proprietes d'une cible. Ils s'appliquent aux cibles de ce jeu `aiming`.
+Exemple de flechettes (ajouter l'asset 105 au tableau `assets`) :
+
+```json
+{
+  "plane": { "minWidth": 2, "minLength": 3 },
+  "projectile": { "objectId": 103 },
+  "targets": [104],
+  "reward": 105,
+  "freeze": true,
+  "multiplier": 10,
+  "fall": false
+}
+```
+
+- Sans aucun de ces quatre champs, le comportement historique reste inchange :
+  `bounding` ouvert et `basket`, score de fond uniquement, un point par tir.
+- La presence d'au moins un champ, meme `freeze: false` ou `fall: false`, active
+  les nouvelles regles. `bounding` devient une boite pleine, adaptee aux cibles
+  de flechettes et aux quilles. Toutes les formes peuvent scorer sur contact ;
+  `basket` conserve obligatoirement la condition de fond interieur.
+- `reward` reference un asset existant du meme jeu (modele, image, video ou
+  audio), prepare et mis en cache comme les autres assets. Il est ajoute sans
+  collider au point d'impact, seulement lorsque le score est valide. Le visuel
+  initial de la cible reste present. La recompense reste jusqu'a la sortie du
+  jeu ; ce n'est pas un objet d'inventaire. Si le champ est absent, aucun asset
+  supplementaire n'est affiche.
+- `freeze: true` remplace le corps du projectile par un corps Static, sans
+  gravite ni vitesse, a sa pose native au contact eligible. Le projectile reste
+  visible et compte toujours dans `maxActive`. Par defaut il continue sa course.
+- `multiplier` est le score maximal au centre du collider. Le point et la normale
+  sont convertis dans le repere actuel de la cible (rotation incluse). L'axe
+  principal de la normale est ignore pour ne pas penaliser la profondeur ;
+  la distance radiale dans les deux axes restants est normalisee par les
+  demi-dimensions du collider. Ainsi `r = min(1, hypot(u, v))` et
+  `points = 1 + round((multiplier - 1) * (1 - r))`. Avec 10 : centre = 10,
+  demi-rayon = 6, bord ou au-dela = 1. Sans `multiplier`, chaque validation
+  rapporte 1. Ce sont des anneaux elliptiques dans la face projetee, pas les
+  secteurs numerotes d'une cible de flechettes traditionnelle.
+- Sans `fall`, un projectile ne rapporte qu'une seule fois dans le jeu, meme
+  s'il touche plusieurs cibles ou declenche des callbacks repetes.
+- `fall: true` exige `properties.physics.type: "Dynamic"` sur toutes les cibles.
+  Un impact arme la cible mais ne rapporte rien tant que son axe vertical n'a
+  pas bascule d'au moins **60 degres par rapport a sa pose initiale** (orientation
+  du sol comprise). Une rotation autour de cet axe ne suffit pas. La pose native
+  est echantillonnee toutes les 100 ms apres le premier tir ; pas de delai maximal
+  artificiel. Les contacts entre cibles propagent l'attribution du tir pour les
+  reactions en chaine du bowling. Chaque cible rapporte une seule fois par
+  instance de jeu, et un meme tir peut donc faire scorer plusieurs quilles.
+  Une cible jamais touchee par un tir ou par une cible de cette chaine ne score
+  pas simplement parce qu'elle tombe.
+- Pour un renversement direct ou indirect, les points et la position de recompense
+  sont memorises au premier contact eligible de la cible avec le projectile ou
+  une cible de sa chaine. Associer `freeze` et `fall` est accepte, mais
+  immobiliser la balle peut empecher les renversements.
+- Les types incorrects (`"true"`, nombres fractionnaires, `null`...), un
+  `multiplier` hors entier positif sur, un asset absent ou des cibles non
+  dynamiques avec `fall` provoquent une erreur explicite de preparation.
+  Les erreurs de lecture des poses natives sont remontees via `onError`.
+
+Exemple bowling : reprendre les champs de preparation habituels et definir
+`"fall": true, "freeze": false, "multiplier": 1` ; utiliser des cibles `capsule`
+ou `bounding` avec des corps Dynamic.
+
+L'evenement de validation garde `name: "collision"` et `scoringContact: true`,
+avec `projectileId`, `point`, `normal`, et desormais `points` (ainsi que
+`fallen: true` pour les renversements). Les notifications brutes de collision
+restent distinctes et n'ajoutent pas de points. L'application additionne
+`points` (1 pour les anciens evenements) dans la progression existante.
+Le payload de `POST /api/progress` reste identique : seulement des totaux absolus,
+pas un appel supplementaire par impact. Ces regles sont communes a l'AR et au
+viewer 3D ; aucune execution backend ou evaluation de script arbitraire n'est
+ajoutee.
+
 ### Configurer `capsule` et `diamond`
 
 Ces formes sont utilisables pour un projectile ou une cible, en AR comme dans le
-viewer 3D. Les dimensions `[X, Y, Z]` sont en metres, dans le repere local de
+viewer 3D. Toutes les dimensions sont en metres, dans le repere local de
 l'objet ; `rotation` oriente le corps complet. `scale` ne modifie que le modele
 visible, pas ces dimensions physiques.
 
@@ -369,20 +458,39 @@ Capsule verticale de 20 cm de diametre et 60 cm de hauteur totale :
 Le collider est un `Compound` de spheres superposees et d'une boite centrale.
 Lorsque `Y = X`, il devient une sphere.
 
-Diamant (octaedre) de 20 cm de large, 40 cm de haut et 60 cm de profondeur :
+Diamond a socle et haut plats : base carree de 20 cm de cote, hauteur de 60 cm,
+sphere centrale de 15 cm de rayon :
 
 ```json
 {
-  "collider": { "type": "diamond", "size": [0.2, 0.4, 0.6] }
+  "collider": { "type": "diamond", "base": 0.2, "middle": 0.15, "height": 0.6 }
 }
 ```
 
-Le collider est un `Compound` de 8 couches de 5 boites, plus etroit vers le haut
-et le bas. Le pont Viro utilise n'expose pas de capsule ni d'octaedre natifs :
-ces deux formes sont des approximations, pas des surfaces lisses exactes.
+Le collider `diamond` est un `Compound` de deux formes :
+
+- Une boite pleine (comme un `bounding` solide), de dimensions
+  `[base, height, base]`, assurant un socle et un haut carres et plats.
+- Une sphere de rayon `middle`, centree a mi-hauteur de la boite.
+
+Les deux formes sont centrees en `[0, 0, 0]`. Le bas est a `-height / 2` et le haut
+a `height / 2` ; la hauteur est toujours portee par l'axe local Y. `base`,
+`middle` et `height` sont des nombres finis strictement positifs obligatoires.
+`middle <= height / 2` est impose pour que la sphere ne depasse pas les plans
+du socle et du haut. Pour un renflement visible au milieu, choisir
+`middle > base / 2`. La largeur et la profondeur totales valent
+`max(base, 2 * middle)` ; ces dimensions sont aussi utilisees pour le calcul
+radial du score et les formes physiques derivees.
+
+L'ancien `diamond` en octaedre a couches n'est plus accepte :
+`size` ne doit pas etre envoye pour `diamond`, et il n'existe pas de valeurs
+par defaut pour les trois nouveaux champs. Les autres colliders conservent
+`size: [X, Y, Z]` et n'acceptent pas ces nouveaux champs.
+Le pont Viro utilise fournit les boites, spheres et corps composes necessaires ;
+seule la capsule reste une approximation a spheres superposees.
 Les collisions restent actives apres impact et ne suppriment pas le projectile.
-Comme indique plus haut, leur utilisation comme cible n'ajoute pas de regle de
-score automatique.
+Sans les nouvelles regles d'impact, leur utilisation comme cible n'ajoute pas
+de score automatique.
 
 ### Configurer un objet collectible
 
@@ -423,7 +531,7 @@ flowchart TD
         Mode -->|Viewer 3D| Synthetic["Sol synthetique immediat"]
         Lock --> Floor["Sol Static : 100 x 100 x 1 m<br/>Face superieure au niveau du plane"]
         Synthetic --> Floor
-        Floor --> Targets["Monter les cibles<br/>Fond et 4 parois pour bounding / basket"]
+        Floor --> Targets["Monter les cibles<br/>bounding plein avec les nouvelles regles"]
     end
 
     subgraph Throw["Interaction et creation d'un projectile"]
@@ -444,7 +552,16 @@ flowchart TD
         Sim --> Contact{"Contact ?"}
         Contact -->|Non| Sim
         Contact -->|Oui| Keep["Conserver le projectile et son collider<br/>Aucune suppression ou copie visuelle a l'impact"]
-        Keep --> Eligible{"Callback d'une cible<br/>bounding / basket ?"}
+        Keep --> Rules{"Nouvelles regles d'impact ?"}
+        Rules -->|Non| Eligible{"Callback d'une cible<br/>bounding / basket ?"}
+        Rules -->|Oui| Impact["Contact cible / projectile actif<br/>basket : fond uniquement"]
+        Impact --> Effects["Figer si freeze ; calcul radial des points"]
+        Effects --> Fall{"fall ?"}
+        Fall -->|Oui| Tilt["Attendre 60 degres ; une validation par cible<br/>Propager les contacts entre quilles"]
+        Fall -->|Non| Once["Une validation par projectile"]
+        Tilt --> Reward["Ajouter reward si configure"]
+        Once --> Reward
+        Reward --> ScoreEvent
         Eligible -->|Non| Continue["Pas de point : la simulation continue"]
         Eligible -->|Oui| Transform["SceneObject : getTransformAsync<br/>Position et rotation monde actuelles"]
         Transform -->|Erreur| Error["Signaler onError ; aucun point"]
@@ -462,7 +579,7 @@ flowchart TD
     subgraph Scoring["Application et progression par compte"]
         ScoreEvent --> App["App.handleExperienceEvent"]
         App --> Memory{"Lieu actif AR ou viewer<br/>et ID de projectile valide ?"}
-        Memory -->|Oui| Score["+1 point par lieu et type : useProgress"]
+        Memory -->|Oui| Score["+points par lieu et type : useProgress<br/>1 pour les anciens evenements"]
         Memory -->|En AR| Inventory["Ajouter le souvenir a l'inventaire historique"]
         Score --> ScoreStore["AsyncStorage : @progress:user:{userId}"]
         Inventory --> ScoreStore
@@ -493,7 +610,7 @@ flowchart TD
   distinct pour chaque sous-collider du compound.
 - Le dessus des parois, les faces laterales et le dessous du fond ne doivent pas
   scorer. Une tolerance de penetration est appliquee au point de contact du fond.
-- `claimScore` partage un ensemble d'IDs entre les cibles du jeu : le meme tir ne
+- En mode historique, `claimScore` partage un ensemble d'IDs entre les cibles du jeu : le meme tir ne
   rapporte qu'un point, meme s'il touche plusieurs fois ou plusieurs cibles.
 - Une nouvelle instance du jeu recommence ses IDs de tir ; les totaux enregistres
   par memoire restent persistants sur cet appareil.
@@ -517,7 +634,7 @@ flowchart TD
 | Selection du template | [ExperienceTemplates.tsx](../src/experiences/ExperienceTemplates.tsx) |
 | Tracking, pose camera et chronometrage du geste | [AimingScene.tsx](../src/experiences/AimingScene.tsx) |
 | Plane, sol, cibles, creation des tirs et deduplication des points | [AimingTemplate.tsx](../src/experiences/AimingTemplate.tsx) |
-| Calcul de vitesse, formes physiques et test du fond | [aiming.ts](../src/experiences/aiming.ts) |
+| Calcul de vitesse, formes physiques, score radial, seuil de chute et test du fond | [aiming.ts](../src/experiences/aiming.ts) |
 | Association modele/collider et callback natif de collision | [SceneObject.tsx](../src/experiences/SceneObject.tsx) |
 | Scene AR et affichage diagnostique des colliders | [ViroARView.tsx](../src/components/ViroARView.tsx) |
 | Scene 3D de remplacement | [ExperienceViewer.tsx](../src/experiences/ExperienceViewer.tsx) |

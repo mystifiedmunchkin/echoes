@@ -6,6 +6,7 @@ import ExperienceViewer from '../src/experiences/ExperienceViewer';
 import ViroARView from '../src/components/ViroARView';
 import { readExperience } from '../src/experiences/experience';
 import { colliderShape } from '../src/experiences/aiming';
+import type { AimingCollider, AimingSettings } from '../src/experiences/aiming';
 
 jest.mock('../constants/i18n', () => ({ translate: (key: string) => key }));
 
@@ -372,6 +373,32 @@ describe('configured aiming runtime', () => {
     act(() => jest.advanceTimersByTime(1000));
     act(() => scene().props.onCameraTransformUpdate(camera));
   };
+  const withRules = (rules: Partial<AimingSettings>, secondTarget = false) => {
+    const game = aiming.games[0];
+    const target = {
+      ...game.objects[1],
+      properties: {
+        ...game.objects[1].properties,
+        ...(rules.fall ? { physics: {
+          type: 'Dynamic' as const,
+          shape: { type: 'Box' as const, params: [1, 1, 1] },
+        } } : {}),
+      },
+    };
+    return {
+      ...aiming,
+      games: [{
+        ...game,
+        assets: [...game.assets, { id: 406, type: 'image' as const, url: 'file://reward.png' }],
+        objects: [game.objects[0], target, ...(secondTarget ? [{ ...target, id: 405 }] : [])],
+        settings: { ...game.settings!, ...rules, targets: secondTarget ? [404, 405] : [404] },
+      }],
+    };
+  };
+  const scoringEvents = () => onEvent.mock.calls
+    .map(([event]) => event)
+    .filter(event => event.data?.scoringContact === true);
+  const targetBody = (id = '404') => host('ViroNode').find(node => node.props.viroTag === id)!;
 
   beforeEach(() => {
     jest.useFakeTimers();
@@ -404,6 +431,121 @@ describe('configured aiming runtime', () => {
     diagnosticLog.mockRestore();
     diagnosticWarning.mockRestore();
     jest.useRealTimers();
+  });
+
+  test('scores radial impacts once per shot, displays the reward and freezes at the native pose', async () => {
+    await mountAR(withRules({ reward: 406, freeze: true, multiplier: 10 }, true));
+    detectFloor();
+    tap();
+    expect(targetBody().props.physicsBody.shape.type).toBe('Box');
+    await act(async () => targetBody().props.onCollision('-1', [0.85, -0.5, -3.5], [1, 0, 0]));
+    expect(scoringEvents()).toHaveLength(1);
+    expect(scoringEvents()[0].data).toMatchObject({ points: 10, projectileId: -1 });
+    expect(host('ViroImage')[0].props.source).toEqual({ uri: 'file://reward.png' });
+    const frozen = targetBody('-1');
+    expect(frozen.props.position).toEqual([0.75, -0.5, -3.5]);
+    expect(frozen.props.rotation).toEqual([0, 90, 0]);
+    expect(frozen.props.physicsBody).toMatchObject({ type: 'Static', useGravity: false, mass: 0 });
+    expect(frozen.props.physicsBody.instantVelocity).toBeUndefined();
+    await act(async () => {
+      await targetBody().props.onCollision('-1', [0.85, -0.5, -3.5], [1, 0, 0]);
+      await targetBody('405').props.onCollision('-1', [0.85, -0.5, -3.5], [1, 0, 0]);
+    });
+    expect(scoringEvents()).toHaveLength(1);
+    expect(host('ViroImage')).toHaveLength(1);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  test('explicit false rules enable contact scoring without freezing or displaying a reward', async () => {
+    await mountAR(withRules({ freeze: false, fall: false }));
+    detectFloor();
+    tap();
+    await act(async () => targetBody().props.onCollision('-999', bottomPoint, [0, 1, 0]));
+    expect(scoringEvents()).toHaveLength(0);
+    await act(async () => targetBody().props.onCollision('-1', bottomPoint, [0, 1, 0]));
+    expect(scoringEvents()[0].data.points).toBe(1);
+    expect(targetBody('-1').props.physicsBody.type).toBe('Dynamic');
+    expect(host('ViroImage')).toHaveLength(0);
+  });
+
+  test('new basket rules still reject wall contacts and score only the interior bottom', async () => {
+    const configured = withRules({ multiplier: 5 });
+    configured.games[0].objects[1].properties.collider = {
+      type: 'basket', size: [1, 1, 1], thickness: 0.05,
+    };
+    await mountAR(configured);
+    detectFloor();
+    tap();
+    await act(async () => targetBody().props.onCollision('-1', bottomPoint, [0, 0, 1]));
+    expect(scoringEvents()).toHaveLength(0);
+    await act(async () => targetBody().props.onCollision('-1', bottomPoint, [0, 1, 0]));
+    expect(scoringEvents()[0].data.points).toBe(5);
+  });
+
+  test('waits for the exact fall threshold, propagates pin collisions and scores each pin once', async () => {
+    await mountAR(withRules({ fall: true, multiplier: 10, reward: 406 }, true));
+    detectFloor();
+    tap();
+    // Native callbacks can report the pin-to-pin contact before the ball-to-pin contact.
+    await act(async () => targetBody('405').props.onCollision('404', [0.85, -0.5, -3.5], [1, 0, 0]));
+    await act(async () => targetBody().props.onCollision('-1', [0.85, -0.5, -3.5], [1, 0, 0]));
+    expect(scoringEvents()).toHaveLength(0);
+    expect(host('ViroImage')).toHaveLength(0);
+    getBodyTransform.mockResolvedValue({ position: [0.75, -0.5, -3.5], rotation: [59.999, 90, 0] });
+    await act(async () => jest.advanceTimersByTime(100));
+    expect(scoringEvents()).toHaveLength(0);
+    getBodyTransform.mockResolvedValue({ position: [0.75, -0.5, -3.5], rotation: [60, 90, 0] });
+    await act(async () => jest.advanceTimersByTime(100));
+    expect(scoringEvents()).toHaveLength(2);
+    expect(scoringEvents().map(event => event.objectId).sort()).toEqual([404, 405]);
+    expect(scoringEvents().map(event => event.data.points)).toEqual([10, 10]);
+    expect(host('ViroImage')).toHaveLength(2);
+    act(() => jest.runAllTicks());
+    expect(jest.getTimerCount()).toBe(0);
+    await act(async () => targetBody().props.onCollision('-1', bottomPoint, [0, 1, 0]));
+    await act(async () => jest.advanceTimersByTime(500));
+    expect(scoringEvents()).toHaveLength(2);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  test('surfaces native impact and fall query errors and stops monitoring on unmount', async () => {
+    await mountAR(withRules({ fall: true }));
+    detectFloor();
+    tap();
+    getBodyTransform.mockRejectedValueOnce(new Error('Impact transform unavailable'));
+    await act(async () => targetBody().props.onCollision('-1', bottomPoint, [0, 1, 0]));
+    expect(onError).toHaveBeenCalledWith('Impact transform unavailable');
+    getBodyTransform.mockResolvedValueOnce({ position: [NaN, 0, 0], rotation: [0, 0, 0] });
+    await act(async () => jest.advanceTimersByTime(100));
+    expect(onError).toHaveBeenCalledWith('Invalid native target transform');
+    act(() => renderer.unmount());
+    act(() => jest.runAllTicks());
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('reports freeze errors without pretending the projectile has stopped', async () => {
+    await mountAR(withRules({ freeze: true }));
+    detectFloor();
+    tap();
+    getBodyTransform
+      .mockResolvedValueOnce({ position: [0.75, -0.5, -3.5], rotation: [0, 90, 0] })
+      .mockRejectedValueOnce(new Error('Cannot freeze projectile'));
+    await act(async () => targetBody().props.onCollision('-1', bottomPoint, [0, 1, 0]));
+    expect(onError).toHaveBeenCalledWith('Cannot freeze projectile');
+    expect(targetBody('-1').props.physicsBody.type).toBe('Dynamic');
+  });
+
+  test('does not award a collision whose native query finishes after leaving the game', async () => {
+    await mountAR(withRules({ multiplier: 10, reward: 406 }));
+    detectFloor();
+    tap();
+    let finish: (value: unknown) => void = () => { throw new Error('Missing native query'); };
+    getBodyTransform.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    act(() => targetBody().props.onCollision('-1', bottomPoint, [0, 1, 0]));
+    act(() => renderer.unmount());
+    await act(async () => finish({ position: [0.75, -0.5, -3.5], rotation: [0, 90, 0] }));
+    expect(scoringEvents()).toHaveLength(0);
+    expect(onError).not.toHaveBeenCalled();
   });
 
   test('samples native body/model transforms after contact without removing or replacing the shot', async () => {
@@ -563,7 +705,9 @@ describe('configured aiming runtime', () => {
   ] as const)(
     'wires %s %s colliders to projectile and target bodies and preserves them after contact',
     async (mode, type) => {
-      const collider = { type, size: [0.2, 0.6, 0.2] as [number, number, number] };
+      const collider: AimingCollider = type === 'diamond'
+        ? { type, base: 0.2, middle: 0.15, height: 0.6 }
+        : { type, size: [0.2, 0.6, 0.2] };
       const configured = readExperience({
         logic: {
           games: aiming.games.map(game => ({
@@ -598,9 +742,7 @@ describe('configured aiming runtime', () => {
       )!;
       const shape = colliderShape(collider);
       expect(shape.type).toBe('Compound');
-      expect(shape.children!.some(part => part.type === 'Sphere')).toBe(
-        type === 'capsule',
-      );
+      expect(shape.children!.some(part => part.type === 'Sphere')).toBe(true);
       expect(shot.props.physicsBody).toMatchObject({
         type: 'Dynamic',
         useGravity: true,

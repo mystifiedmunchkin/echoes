@@ -1,4 +1,4 @@
-import { readAiming, readCollider } from './aiming';
+import { colliderSize, readAiming, readCollider } from './aiming';
 import type { AimingCollider, AimingSettings } from './aiming';
 
 export type ExperienceType = 'aiming' | 'treasure' | 'discovery' | 'images';
@@ -129,7 +129,7 @@ function physicsBody(
   );
   const shape = record(
     source.shape ??
-      (collider ? { type: 'Box', params: collider.size } : undefined),
+      (collider ? { type: 'Box', params: colliderSize(collider) } : undefined),
   );
   requireValue(
     shape.type === 'Box' || shape.type === 'Sphere',
@@ -334,6 +334,11 @@ export function readExperience(memory: unknown): Experience | null {
     };
     if (type === 'aiming' && game.settings !== undefined) {
       result.settings = readAiming(game.settings, objects, `${path}.settings`);
+      if (result.settings.reward !== undefined)
+        requireValue(
+          assets.some(asset => asset.id === result.settings!.reward),
+          `${path}.settings.reward: unknown asset`,
+        );
       for (const id of [
         result.settings.projectile.objectId,
         ...result.settings.targets,

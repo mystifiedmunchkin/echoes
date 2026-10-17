@@ -10,6 +10,7 @@ import {
 } from '@reactvision/react-viro';
 import { translate } from '../../constants/i18n';
 import { isBodyTransform, isBottomContact } from './aiming';
+import type { BodyTransform } from './aiming';
 import { AimingSceneContext } from './AimingScene';
 import type { ExperienceEvent, ExperienceObject, Vector3 } from './experience';
 import type { TemplateProps } from './ExperienceTemplates';
@@ -27,9 +28,20 @@ export function SceneObject({
   physicsBody,
   projectileDiagnostics,
   sourceObjectId,
+  freeze = false,
+  onBodyCollision,
+  onSampleTransform,
 }: Omit<TemplateProps, 'mode'> & {
   object: ExperienceObject;
   sourceObjectId?: number;
+  freeze?: boolean;
+  onBodyCollision?: (
+    tag: string | undefined,
+    point: Vector3,
+    normal: Vector3,
+    transform: BodyTransform,
+  ) => void;
+  onSampleTransform?: (transform: BodyTransform) => void;
   onPress?: () => void;
   onClickState?: React.ComponentProps<typeof ViroNode>['onClickState'];
   scoreOnBottom?: boolean;
@@ -77,6 +89,47 @@ export function SceneObject({
       }
     };
   const node = React.useRef<ViroNode | null>(null);
+  const [frozen, setFrozen] = React.useState<BodyTransform | null>(null);
+  const sample = React.useRef(onSampleTransform);
+  sample.current = onSampleTransform;
+  const sampling = onSampleTransform !== undefined;
+  React.useEffect(() => {
+    if (!freeze) return;
+    let cancelled = false;
+    const freezeBody = async () => {
+      try {
+        if (!node.current) throw new Error('Projectile body is not mounted');
+        const transform: unknown = await node.current.getTransformAsync();
+        if (!isBodyTransform(transform)) throw new Error('Invalid native projectile transform');
+        if (!cancelled) setFrozen(transform);
+      } catch (freezeError) {
+        if (!cancelled) onError(freezeError instanceof Error ? freezeError.message : String(freezeError));
+      }
+    };
+    freezeBody();
+    return () => { cancelled = true; };
+  }, [freeze, onError]);
+  React.useEffect(() => {
+    if (!sampling) return;
+    let cancelled = false;
+    let busy = false;
+    const timer = setInterval(async () => {
+      if (busy || cancelled) return;
+      busy = true;
+      try {
+        if (!node.current) throw new Error('Target body is not mounted');
+        const transform: unknown = await node.current.getTransformAsync();
+        if (!isBodyTransform(transform)) throw new Error('Invalid native target transform');
+        if (!cancelled) sample.current?.(transform);
+      } catch (sampleError) {
+        clearInterval(timer);
+        if (!cancelled) onError(sampleError instanceof Error ? sampleError.message : String(sampleError));
+      } finally {
+        busy = false;
+      }
+    }, 100);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [sampling, onError]);
   const model = React.useRef<Viro3DObject | null>(null);
   const diagnosticState = React.useRef({
     config: projectileDiagnostics,
@@ -191,6 +244,20 @@ export function SceneObject({
       }
     }
     let scoringContact = false;
+    if (onBodyCollision && point && normal) {
+      try {
+        if (![...point, ...normal].every(Number.isFinite) || Math.hypot(...normal) === 0)
+          throw new Error('Invalid native collision contact');
+        if (!node.current) throw new Error('Collision body is not mounted');
+        const transform: unknown = await node.current.getTransformAsync();
+        if (!isBodyTransform(transform)) throw new Error('Invalid native collision body transform');
+        if (!mounted.current) return;
+        onBodyCollision(tag, point, normal, transform);
+      } catch (collisionError) {
+        if (!mounted.current) return;
+        onError(collisionError instanceof Error ? collisionError.message : String(collisionError));
+      }
+    }
     if (scoreOnBottom && properties.collider && point && normal) {
       try {
         if (!node.current) throw new Error('Collision body is not mounted');
@@ -222,12 +289,20 @@ export function SceneObject({
   if (properties.active === false) return null;
   return (
     <ViroNode
+      key={frozen ? 'frozen' : 'live'}
       ref={node}
       viroTag={String(object.id)}
-      position={properties.position || [0, 0, 0]}
-      rotation={properties.rotation || [0, 0, 0]}
+      position={frozen?.position ?? properties.position ?? [0, 0, 0]}
+      rotation={frozen?.rotation ?? properties.rotation ?? [0, 0, 0]}
       scale={physicsBody ? undefined : properties.scale || [1, 1, 1]}
-      physicsBody={physicsBody || properties.physics}
+      physicsBody={frozen ? {
+        ...physicsBody,
+        type: 'Static',
+        mass: 0,
+        useGravity: false,
+        velocity: undefined,
+        instantVelocity: undefined,
+      } : physicsBody || properties.physics}
       animation={
         animation && animationReady
           ? { name: animationName, run: true, loop: animation.loop ?? true }

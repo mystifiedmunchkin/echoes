@@ -1,7 +1,11 @@
 import {
   colliderShape,
+  colliderSize,
   isBottomContact,
   launchSpeed,
+  hasFallen,
+  impactPoints,
+  readCollider,
 } from '../src/experiences/aiming';
 import { cacheExperience, readExperience } from '../src/experiences/experience';
 
@@ -64,6 +68,71 @@ test.each(['GLB', 'OBJ'])('accepts a %s projectile', type => {
   ).not.toBeNull();
 });
 
+test('reads impact rules and preserves explicit false values', () => {
+  expect(readGame({
+    ...game,
+    settings: { ...game.settings, reward: 20, freeze: false, multiplier: 10, fall: false },
+  })!.games[0].settings).toMatchObject({
+    reward: 20, freeze: false, multiplier: 10, fall: false,
+  });
+});
+
+test.each([
+  { reward: -1 }, { reward: 999 }, { reward: '20' }, { reward: 1.5 },
+  { multiplier: 0 }, { multiplier: -1 }, { multiplier: 1.5 },
+  { multiplier: Infinity }, { multiplier: Number.MAX_SAFE_INTEGER + 1 },
+  { multiplier: null }, { freeze: 1 }, { fall: 'true' }, { fall: true },
+])('rejects invalid impact rules %j', rules => {
+  expect(() => readGame({
+    ...game, settings: { ...game.settings, ...rules },
+  })).toThrow('Invalid experience:');
+});
+
+test('requires dynamic targets for fall, but allows combined freeze and fall', () => {
+  expect(readGame({
+    ...game,
+    objects: [projectile, {
+      ...target,
+      properties: { ...target.properties, physics: { type: 'Dynamic' } },
+    }],
+    settings: { ...game.settings, fall: true, freeze: true },
+  })!.games[0].settings).toMatchObject({ fall: true, freeze: true });
+});
+
+test.each([
+  [[0, 0, 0.1], 10],
+  [[0.5, 0, 0.1], 6],
+  [[1, 0, 0.1], 1],
+  [[2, 2, 0.1], 1],
+])('scores a radial hit at %j as %s points', (point, expected) => {
+  expect(impactPoints(
+    { type: 'bounding', size: [2, 2, 0.2] },
+    point as [number, number, number], [0, 0, 1],
+    { position: [0, 0, 0], rotation: [0, 0, 0] }, 10,
+  )).toBe(expected);
+});
+
+test('scores in the rotated body frame and projects basket hits onto the bottom', () => {
+  expect(impactPoints(
+    { type: 'bounding', size: [2, 2, 0.2] },
+    [3.1, 4, 5], [1, 0, 0],
+    { position: [3, 4, 5], rotation: [0, 90, 0] }, 10,
+  )).toBe(10);
+  expect(impactPoints(
+    { type: 'basket', size: [2, 2, 2], thickness: 0.1 },
+    [0, -0.9, 0], [0, 1, 0],
+    { position: [0, 0, 0], rotation: [0, 0, 0] }, 10,
+  )).toBe(10);
+});
+
+test('detects the exact 60 degree fall threshold without treating yaw as a fall', () => {
+  expect(hasFallen([59.999, 0, 0], [0, 0, 0], [0, 0, 0])).toBe(false);
+  expect(hasFallen([60, 0, 0], [0, 0, 0], [0, 0, 0])).toBe(true);
+  expect(hasFallen([0, 150, 0], [0, 0, 0], [0, 90, 0])).toBe(false);
+  expect(hasFallen([0, 0, 80], [0, 0, 20], [0, 0, 0])).toBe(true);
+  expect(hasFallen([0, 90, -30], [30, 0, 0], [0, 90, 0])).toBe(false);
+});
+
 test.each(['GLB', 'GLTF', 'OBJ'])('accepts a %s target', type => {
   expect(
     readGame({
@@ -76,7 +145,7 @@ test.each(['GLB', 'GLTF', 'OBJ'])('accepts a %s target', type => {
 test.each([
   { type: 'capsule', size: [0.2, 0.6, 0.2] },
   { type: 'bounding', size: [0.2, 0.4, 0.6] },
-  { type: 'diamond', size: [0.2, 0.4, 0.6] },
+  { type: 'diamond', base: 0.2, middle: 0.15, height: 0.6 },
   { type: 'sphere', size: [0.2, 0.2, 0.2] },
   { type: 'basket', size: [0.2, 0.4, 0.6], thickness: 0.01 },
 ])('accepts $type for both projectile and target', collider => {
@@ -195,6 +264,21 @@ test.each([
   { type: 'basket', size: [1, 1, 1], thickness: 0.5 },
   { type: 'basket', size: [1, 1, 1] },
   { type: 'diamond', size: [1, 1, 1], thickness: 0.1 },
+  { type: 'diamond', size: [1, 1, 1] },
+  { type: 'diamond', base: 0.2, height: 0.6 },
+  { type: 'diamond', middle: 0.15, height: 0.6 },
+  { type: 'diamond', base: 0.2, middle: 0.15 },
+  ...['base', 'middle', 'height'].flatMap(key =>
+    [0, -1, NaN, Infinity, null, '0.2'].map(value => ({
+      type: 'diamond', base: 0.2, middle: 0.15, height: 0.6, [key]: value,
+    })),
+  ),
+  { type: 'diamond', base: 0.2, middle: 0.300001, height: 0.6 },
+  { type: 'diamond', base: 0.2, middle: 0.15, height: 0.6, size: [1, 1, 1] },
+  { type: 'diamond', base: 0.2, middle: 0.15, height: 0.6, thickness: 0.1 },
+  { type: 'bounding', size: [1, 1, 1], base: 0.2 },
+  { type: 'sphere', size: [1, 1, 1], middle: 0.15 },
+  { type: 'capsule', size: [1, 2, 1], height: 0.6 },
 ])('rejects malformed colliders (%#)', collider => {
   expect(() =>
     readGame({
@@ -322,17 +406,21 @@ test.each([
   },
 );
 
-test.each(['capsule', 'diamond'] as const)(
-  'builds finite positive compound parts for %s',
-  type => {
-    const shape = colliderShape({ type, size: [0.2, 0.6, 0.2] });
+test.each([
+  { type: 'capsule', size: [0.2, 0.6, 0.2] },
+  { type: 'diamond', base: 0.2, middle: 0.15, height: 0.6 },
+])(
+  'builds finite positive compound parts for $type',
+  definition => {
+    const collider = readCollider(definition, 'collider');
+    const shape = colliderShape(collider);
     expect(shape.type).toBe('Compound');
-    expect(shape.children!.length).toBeGreaterThan(2);
+    expect(shape.children!.length).toBeGreaterThanOrEqual(2);
     for (const part of shape.children!) {
       expect(part.params.every(n => Number.isFinite(n) && n > 0)).toBe(true);
       expect(part.position.every(Number.isFinite)).toBe(true);
     }
-    for (const [axis, dimension] of [0.2, 0.6, 0.2].entries()) {
+    for (const [axis, dimension] of colliderSize(collider).entries()) {
       const minimum = Math.min(
         ...shape.children!.map(
           part =>
@@ -377,25 +465,44 @@ test('centers capsule end caps at half the straight section length', () => {
   }
 });
 
-test('builds a diamond that tapers symmetrically towards its top and bottom', () => {
-  const shape = colliderShape({ type: 'diamond', size: [0.2, 0.4, 0.6] });
-  expect(shape.children).toHaveLength(40);
-  for (let layer = 0; layer < 4; layer++) {
-    const lower = shape.children!.slice(layer * 5, (layer + 1) * 5);
-    const upper = shape.children!.slice((7 - layer) * 5, (8 - layer) * 5);
-    for (let strip = 0; strip < 5; strip++) {
-      expect(lower[strip].type).toBe('Box');
-      lower[strip].params.forEach((value, axis) => {
-        expect(value).toBeCloseTo(upper[strip].params[axis]);
-      });
-      expect(lower[strip].position[1]).toBeCloseTo(-upper[strip].position[1]);
-    }
-    if (layer < 3) {
-      expect(lower[2].params[0]).toBeLessThan(
-        shape.children![(layer + 1) * 5 + 2].params[0],
-      );
-    }
-  }
+test('builds a diamond with flat square ends and one centered middle sphere', () => {
+  const collider = readCollider({ type: 'diamond', base: 0.2, middle: 0.15, height: 0.6 }, 'collider');
+  const expected = {
+    type: 'Compound', params: [], children: [
+      { type: 'Box', params: [0.2, 0.6, 0.2], position: [0, 0, 0] },
+      { type: 'Sphere', params: [0.15], position: [0, 0, 0] },
+    ],
+  };
+  expect(colliderShape(collider)).toEqual(expected);
+  expect(colliderShape(collider, { targetBottom: true })).toEqual(expected);
+  expect(colliderSize(collider)).toEqual([0.3, 0.6, 0.3]);
+  expect(colliderSize(readCollider({ type: 'diamond', base: 0.4, middle: 0.15, height: 0.6 }, 'collider')))
+    .toEqual([0.4, 0.6, 0.4]);
+});
+
+test('allows a middle sphere exactly tangent to the flat end planes, but not protruding beyond them', () => {
+  expect(readCollider({ type: 'diamond', base: 0.2, middle: 0.3, height: 0.6 }, 'collider'))
+    .toEqual({ type: 'diamond', base: 0.2, middle: 0.3, height: 0.6 });
+  expect(() => readCollider({ type: 'diamond', base: 0.2, middle: 0.300001, height: 0.6 }, 'collider'))
+    .toThrow('collider.middle');
+});
+
+test('uses diamond bounds for fallback physics shapes and radial scoring', () => {
+  const collider = { type: 'diamond', base: 0.2, middle: 0.15, height: 0.6 };
+  const parsed = readGame({
+    ...game,
+    objects: [{
+      ...projectile,
+      properties: { ...projectile.properties, collider },
+    }, target],
+  })!;
+  expect(parsed.games[0].objects[0].properties.physics!.shape)
+    .toEqual({ type: 'Box', params: [0.3, 0.6, 0.3] });
+  expect(impactPoints(
+    parsed.games[0].objects[0].properties.collider!,
+    [0.15, 0, 0], [0, 0, 1],
+    { position: [0, 0, 0], rotation: [0, 0, 0] }, 10,
+  )).toBe(1);
 });
 
 test('caches aiming OBJ and GLB assets with existing preparation', async () => {

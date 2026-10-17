@@ -7,13 +7,31 @@ export type ColliderType =
   | 'sphere'
   | 'basket';
 
-export interface AimingCollider {
-  type: ColliderType;
-  size: Vector3;
-  thickness?: number;
+export type AimingCollider =
+  | {
+      type: 'diamond';
+      base: number;
+      middle: number;
+      height: number;
+      thickness?: never;
+    }
+  | {
+      type: Exclude<ColliderType, 'diamond'>;
+      size: Vector3;
+      thickness?: number;
+    };
+
+export function colliderSize(collider: AimingCollider): Vector3 {
+  if (collider.type !== 'diamond') return collider.size;
+  const width = Math.max(collider.base, collider.middle * 2);
+  return [width, collider.height, width];
 }
 
 export interface AimingSettings {
+  reward?: number;
+  freeze?: boolean;
+  multiplier?: number;
+  fall?: boolean;
   plane: { minWidth: number; minLength: number; stableMs: number };
   projectile: {
     objectId: number;
@@ -40,6 +58,54 @@ export interface BodyTransform {
   rotation: Vector3;
 }
 
+export function hasImpactRules(settings: AimingSettings): boolean {
+  return ['reward', 'freeze', 'multiplier', 'fall'].some(
+    key => settings[key as keyof AimingSettings] !== undefined,
+  );
+}
+
+function rotate(vector: Vector3, rotation: Vector3): Vector3 {
+  let [x, y, z] = vector;
+  const [rx, ry, rz] = rotation.map(angle => (angle * Math.PI) / 180);
+  [y, z] = [y * Math.cos(rx) - z * Math.sin(rx), y * Math.sin(rx) + z * Math.cos(rx)];
+  [x, z] = [x * Math.cos(ry) + z * Math.sin(ry), -x * Math.sin(ry) + z * Math.cos(ry)];
+  return [x * Math.cos(rz) - y * Math.sin(rz), x * Math.sin(rz) + y * Math.cos(rz), z];
+}
+
+export function hasFallen(
+  rotation: Vector3,
+  initialRotation: Vector3,
+  parentRotation: Vector3,
+): boolean {
+  const initialUp = rotate(rotate([0, 1, 0], initialRotation), parentRotation);
+  const up = rotate([0, 1, 0], rotation);
+  return up.reduce((dot, value, i) => dot + value * initialUp[i], 0) <= 0.5 + 1e-10;
+}
+
+export function impactPoints(
+  collider: AimingCollider,
+  point: Vector3,
+  normal: Vector3,
+  transform: BodyTransform,
+  multiplier: number,
+): number {
+  const local = inverseRotate(
+    [point[0] - transform.position[0], point[1] - transform.position[1], point[2] - transform.position[2]],
+    transform.rotation,
+  );
+  const localNormal = inverseRotate(normal, transform.rotation);
+  // Project onto the struck face: depth must not penalize a centered hit.
+  const axis = localNormal.reduce(
+    (best, value, i) => Math.abs(value) > Math.abs(localNormal[best]) ? i : best,
+    0,
+  );
+  const size = colliderSize(collider);
+  const radius = Math.min(1, Math.hypot(
+    ...local.map((value, i) => i === axis ? 0 : value / (size[i] / 2)),
+  ));
+  return 1 + Math.round((multiplier - 1) * (1 - radius));
+}
+
 export function isBodyTransform(value: unknown): value is BodyTransform {
   const source = record(value);
   return [source.position, source.rotation].every(
@@ -57,7 +123,7 @@ export function launchSpeed(speed: number, heldMs: number): number {
 export function basketThickness(collider: AimingCollider): number {
   return collider.type === 'basket'
     ? collider.thickness!
-    : Math.min(0.05, ...collider.size.map(size => size / 4));
+    : Math.min(0.05, ...colliderSize(collider).map(size => size / 4));
 }
 
 function inverseRotate(vector: Vector3, rotation: Vector3): Vector3 {
@@ -99,7 +165,7 @@ export function isBottomContact(
     transform.rotation,
   );
   const localNormal = inverseRotate(normal, transform.rotation);
-  const [width, height, length] = collider.size;
+  const [width, height, length] = colliderSize(collider);
   const thickness = basketThickness(collider);
   // Bullet contact points may penetrate slightly into the top face.
   const tolerance = Math.min(0.01, thickness / 4);
@@ -142,6 +208,17 @@ export function readCollider(value: unknown, path: string): AimingCollider {
       type === 'basket',
     `${path}.type`,
   );
+  if (type === 'diamond') {
+    const base = positive(source.base, `${path}.base`);
+    const middle = positive(source.middle, `${path}.middle`);
+    const height = positive(source.height, `${path}.height`);
+    requireValue(middle <= height / 2, `${path}.middle: sphere must fit within height`);
+    requireValue(source.size === undefined, `${path}.size: use base, middle and height for diamond`);
+    requireValue(source.thickness === undefined, `${path}.thickness: only supported for basket`);
+    return { type, base, middle, height };
+  }
+  for (const key of ['base', 'middle', 'height'] as const)
+    requireValue(source[key] === undefined, `${path}.${key}: only supported for diamond`);
   const size = source.size;
   requireValue(Array.isArray(size) && size.length === 3, `${path}.size`);
   const dimensions: Vector3 = [
@@ -239,7 +316,33 @@ export function readAiming(
     stableMs <= 2147483647 && (lifetimeMs === null || lifetimeMs <= 2147483647),
     `${path}: timer exceeds native limit`,
   );
+  const rules: Pick<AimingSettings, 'reward' | 'freeze' | 'multiplier' | 'fall'> = {};
+  for (const key of ['freeze', 'fall'] as const) {
+    if (source[key] === undefined) continue;
+    requireValue(typeof source[key] === 'boolean', `${path}.${key}`);
+    rules[key] = source[key];
+  }
+  if (source.reward !== undefined) {
+    requireValue(
+      typeof source.reward === 'number' && Number.isSafeInteger(source.reward) && source.reward >= 0,
+      `${path}.reward`,
+    );
+    rules.reward = source.reward;
+  }
+  if (source.multiplier !== undefined) {
+    requireValue(
+      typeof source.multiplier === 'number' && Number.isSafeInteger(source.multiplier) && source.multiplier > 0,
+      `${path}.multiplier`,
+    );
+    rules.multiplier = source.multiplier;
+  }
+  if (rules.fall) {
+    requireValue(targetIds.every(id =>
+      objects.find(object => object.id === id)!.properties.physics?.type === 'Dynamic',
+    ), `${path}.fall: targets must be Dynamic`);
+  }
   return {
+    ...rules,
     plane: {
       minWidth: positive(plane.minWidth, `${path}.plane.minWidth`),
       minLength: positive(plane.minLength, `${path}.plane.minLength`),
@@ -263,7 +366,7 @@ export function colliderShape(
   collider: AimingCollider,
   options: ColliderShapeOptions = {},
 ): ColliderShape {
-  const [w, h, l] = collider.size;
+  const [w, h, l] = colliderSize(collider);
   if (collider.type === 'bounding' && !options.targetBottom)
     return { type: 'Box', params: [w, h, l] };
   if (collider.type === 'sphere') return { type: 'Sphere', params: [w / 2] };
@@ -289,25 +392,13 @@ export function colliderShape(
         position: [0, -span / 2 + (span * i) / steps, 0],
       });
     box([w / Math.SQRT2, span, w / Math.SQRT2], [0, 0, 0]);
-  } else {
-    // A stepped octahedron: each horizontal layer approximates a diamond cross-section.
-    const layers = 8;
-    const strips = 5;
-    for (let y = 0; y < layers; y++) {
-      const vertical =
-        (1 - Math.abs(((y + 0.5) / layers) * 2 - 1)) / (1 - 1 / layers);
-      for (let z = 0; z < strips; z++) {
-        const depth = 1 - Math.abs(((z + 0.5) / strips) * 2 - 1);
-        box(
-          [w * vertical * depth, h / layers, (l * vertical) / strips],
-          [
-            0,
-            -h / 2 + ((y + 0.5) * h) / layers,
-            l * vertical * ((z + 0.5) / strips - 0.5),
-          ],
-        );
-      }
-    }
+  } else if (collider.type === 'diamond') {
+    box([collider.base, collider.height, collider.base], [0, 0, 0]);
+    children.push({
+      type: 'Sphere',
+      params: [collider.middle],
+      position: [0, 0, 0],
+    });
   }
   return { type: 'Compound', params: [], children };
 }

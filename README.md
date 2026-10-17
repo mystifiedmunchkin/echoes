@@ -120,10 +120,10 @@ Legacy string-encoded fields remain readable for backwards compatibility.
   `targetUpdated`, and `targetRemoved` events, including game/object IDs.
   `press.data` contains the object's unchanged `actions`; custom game settings
   and object properties are preserved. These declarations are **not executed**
-  as scripts or interpreted as game rules. Implement each template's mechanics
+  as scripts. Only documented settings are interpreted as game rules. Implement each template's mechanics
   behind these extension points. The shell currently displays the pressed
   object's ID. Configured aiming games also award inventory items and persistent
-  scores for qualifying bottom contacts.
+  scores for qualifying impacts, with optional radial scoring and fall conditions.
 - Invalid types, target dimensions, references and physics data reject
   preparation with an explicit error rather than silently choosing a template.
 
@@ -239,17 +239,33 @@ contains the mobile consumer, not a server editor or backend.
   discrete-physics tunneling.
 - Tracking loss blocks new shots and requests a fresh camera pose on recovery;
   the floor remains fixed and existing physics simulation continues.
-  Collisions do not remove, replace or freeze projectiles: they retain their
+  Unless `settings.freeze` is true, collisions do not freeze projectiles: they retain their
   dynamic bodies, gravity and physical interaction with the walls and bottom.
   They count toward `maxActive` until leaving the game, including after an impact.
   Reaching this limit blocks further shots.
-- A contact on the interior top face of a box/basket bottom awards one point per
+- Without the optional impact rules below, a contact on the interior top face of a box/basket bottom awards one point per
   projectile across all targets in the current game instance. Classification uses
   the contact position and normal in the body's current native world transform,
   including moved/rotated targets; wall faces, top rims, the underside and
   non-projectile bodies do not score. Native transform failures are reported.
   Scores persist per account, location and game type and appear in the menu's
   Scores tab; in AR, a scoring contact also adds the memory to the legacy collection.
+- Optional fields directly in `settings` configure impact behavior:
+  `reward` references an asset in this game's `assets`, displayed at the impact
+  position once scoring is validated; `freeze` stops the projectile at its
+  native contact pose; `multiplier` is a positive safe integer defining the
+  radial maximum score (default 1); `fall` delays scoring until a Dynamic target
+  tilts at least 60 degrees from its initial orientation. Each fallen target
+  scores once, including pin-to-pin chains; without `fall`, each projectile
+  scores once. A radial hit scores `1 + round((multiplier - 1) * (1 - r))`,
+  where `r` is the normalized radial distance in the struck face, capped at 1.
+  Rewards remain visible until leaving the game, without becoming inventory items.
+  Providing any of these fields, including explicit `false`, enables the new
+  rules: `bounding` targets become solid boxes and all collider types can score
+  on impact, while `basket` still requires an interior bottom contact.
+  Omitting all four preserves legacy behavior. The scoring collision event
+  carries `data.points`; progression stores and uploads their sum using the
+  existing API. See the [complete impact contract](docs/jeux-adresse.md#regles-dimpact--contrat-serveurclient).
 - Collider debug outlines are currently disabled with `physicsWorld.drawBounds: false`
   in both AR and the 3D viewer, including development builds. Physical collisions
   remain enabled.
@@ -264,7 +280,8 @@ contains the mobile consumer, not a server editor or backend.
   strings in logs rather than converted to JSON `null`. Native query failures
   are logged explicitly. Read with `adb logcat -s ReactNativeJS` and filter for
   `AimingPhysics`; no model URLs or authentication data are logged.
-- Colliders have an explicit `size: [width, height, length]` in meters,
+- Colliders have an explicit `size: [width, height, length]` in meters
+  (except `diamond`, which requires `base`, `middle` and `height` instead),
   centered on their object's origin. Unlike the generic object contract,
   configured projectile/target `scale` changes **only the visual model**;
   collider dimensions stay in meters. `physics.shape` is optional and overridden
@@ -273,16 +290,19 @@ contains the mobile consumer, not a server editor or backend.
 
 | Collider   | Configuration / implementation                                                                                                       |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `bounding` | Explicit dimensions; no automatic OBJ/GLB bounds extraction. Projectiles use a solid box. Aiming targets use an open compound basket with a bottom and four walls, up to 5 cm thick (reduced for small dimensions). |
+| `bounding` | Explicit dimensions; no automatic OBJ/GLB bounds extraction. Projectiles and targets with impact rules use a solid box. Legacy aiming targets use an open compound basket with a bottom and four walls, up to 5 cm thick (reduced for small dimensions). |
 | `sphere`   | Equal X/Y/Z dimensions; radius is half the width.                                                                                    |
 | `capsule`  | Vertical, X = Z and Y >= X; compound approximation using overlapping spheres and a central box. Y = X becomes a sphere.              |
-| `diamond`  | Octahedron approximation, made of 8 vertical layers with 5 box strips each.                                                          |
+| `diamond`  | Solid box `[base, height, base]` with flat square ends, plus a centered sphere of radius `middle`. All three fields are required positive finite numbers; `middle <= height / 2`. No `size` field. |
 | `basket`   | Open rectangular basket: bottom and four walls, no lid. Requires positive `thickness` smaller than height and half the width/length. All five parts remain physical; only projectile contacts on the interior top face of the bottom can score. |
 
-Viro supports boxes, spheres and their compounds, not native capsule or convex
-octahedron shapes. The two approximations are intentional and not exact smooth
-surfaces. All five choices work for projectiles and targets independently of the
-visual asset; aiming box/basket targets remain open so projectiles can enter.
+Viro supports boxes, spheres and their compounds. The capsule uses an intentional
+approximation; diamond uses exactly one box and one sphere. For example,
+`{"type":"diamond","base":0.2,"middle":0.15,"height":0.6}` creates a 60 cm tall
+collider with a 20 cm square base and a 15 cm middle radius. Its width/depth are
+`max(base, 2 * middle)`. Old diamond definitions using `size` are rejected.
+All five choices work for projectiles and targets independently of the
+visual asset; basket targets and legacy aiming box targets remain open so projectiles can enter.
 Physical dimensions and the visual asset's authored origin must agree; scaling
 the model alone does not resize or recenter its collider.
 
