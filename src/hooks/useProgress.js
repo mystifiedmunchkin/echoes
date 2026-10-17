@@ -53,12 +53,12 @@ export function useProgress(user, token) {
     });
   }, [enqueue]);
 
-  const addScore = useCallback(({ id, name, gameType, points = 1 }) => {
+  const addScore = useCallback(({ location_id, name, gameType, points = 1 }) => {
     update(data => {
-      const locationId = progressId(id);
-      const index = data.scores.findIndex(item => item.id === locationId && item.gameType === gameType);
+      const locationId = progressId(location_id);
+      const index = data.scores.findIndex(item => item.location_id === locationId && item.gameType === gameType);
       const scores = index < 0
-        ? [...data.scores, { id: locationId, name, gameType, points }]
+        ? [...data.scores, { location_id: locationId, name, gameType, points }]
         : data.scores.map((item, i) => i === index
           ? { ...item, name: name || item.name, points: item.points + points }
           : item);
@@ -73,7 +73,8 @@ export function useProgress(user, token) {
       const existing = data.visitedPlaces.find(place => place.id === id);
       const now = new Date().toISOString();
       const place = {
-        id, name: memory.name || '', description: memory.description || '',
+        id, location_id: progressId(memory.location_id),
+        name: memory.name || '', description: memory.description || '',
         creatorName: memory.creatorName || '',
         lat: memory.lat ?? memory.latitude ?? null,
         lng: memory.lng ?? memory.longitude ?? null,

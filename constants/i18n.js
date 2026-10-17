@@ -4,6 +4,8 @@ import { useCallback, useMemo } from 'react';
 
 const translations = {
   fr: {
+    nearbyIdentifierInvalid: 'Identifiant invalide : games[{{index}}].{{field}} doit être un entier positif ou nul. Les identifiants du jeu et du lieu sont obligatoires.',
+    nearbyGameLocationConflict: 'Le jeu {{id}} est associé à plusieurs lieux dans la réponse du serveur.',
     progressError: 'Progression non synchronisée',
     progressAuthenticationRequired: 'Reconnectez-vous pour synchroniser votre progression. Les données restent enregistrées sur cet appareil.',
     collectibleHint: 'Maintenez un objet collectible pendant 0,6 s pour le collectionner.',
@@ -149,6 +151,8 @@ const translations = {
     visitedPlacesSaveError: 'Erreur d’enregistrement des lieux visités',
   },
   en: {
+    nearbyIdentifierInvalid: 'Invalid identifier: games[{{index}}].{{field}} must be a non-negative safe integer. Game and location identifiers are required.',
+    nearbyGameLocationConflict: 'Game {{id}} is associated with multiple locations in the server response.',
     progressError: 'Progress not synchronized',
     progressAuthenticationRequired: 'Sign in again to synchronize your progress. Your data remains saved on this device.',
     collectibleHint: 'Hold a collectible object for 0.6 s to collect it.',

@@ -26,7 +26,11 @@ jest.mock('../src/services/geolocation', () => ({
   getCurrentPositionAsync: jest.fn(),
   requestForegroundPermissionsAsync: jest.fn(),
 }));
-jest.mock('../constants/i18n', () => ({ translate: key => key }));
+jest.mock('../constants/i18n', () => ({
+  translate: (key, variables) => key === 'nearbyIdentifierInvalid'
+    ? `${key}:games[${variables.index}].${variables.field}`
+    : key,
+}));
 
 let radar;
 let renderer;
@@ -48,6 +52,7 @@ beforeEach(() => {
     json: async () => [
       {
         id: 1,
+        location_id: 70,
         name: 'Equator',
         latitude: 0,
         longitude: 0,
@@ -81,13 +86,14 @@ test('refreshes GPS and downloads the nearby records with a 2500 m request cap',
   expect(radar.radius).toBe(2500);
   expect(result.location).toEqual(origin);
   expect(result.memories).toHaveLength(1);
-  expect(result.memories[0]).toMatchObject({ id: 1, lat: 0, lng: 0 });
+  expect(result.memories[0]).toMatchObject({ id: 1, location_id: 70, lat: 0, lng: 0 });
   expect(FileSystem.fetch).not.toHaveBeenCalled();
 });
 
 test('deduplicates nearby memory IDs before exposing map and AR records', async () => {
   const memory = {
     id: 1,
+    location_id: 70,
     title: 'First record',
     latitude: 0,
     longitude: 0,
@@ -127,6 +133,7 @@ test('normalizes interactive games, object properties, and JSON actions', async 
     json: async () => [
       {
         id: 2,
+        location_id: 3,
         name: 'Interactive memory',
         latitude: 0,
         longitude: 0,
@@ -216,6 +223,7 @@ test('normalizes a direct game response into one interactive game and ignores le
     json: async () => [
       {
         id: 10,
+        location_id: 70,
         latitude: 44,
         longitude: 1,
         title: 'Direct game',
@@ -225,7 +233,7 @@ test('normalizes a direct game response into one interactive game and ignores le
         assets: [],
         objects: [{ id: 1, properties: { text: 'Hello' } }],
       },
-      { id: 11, latitude: 44, longitude: 1, name: 'Legacy memory' },
+      { id: 11, location_id: 70, latitude: 44, longitude: 1, name: 'Legacy memory' },
     ],
   });
   await act(async () => {
@@ -233,6 +241,8 @@ test('normalizes a direct game response into one interactive game and ignores le
   });
   expect(radar.memories).toHaveLength(1);
   expect(radar.memories[0]).toMatchObject({
+    id: 10,
+    location_id: 70,
     title: 'Direct game',
     description: 'Server metadata',
     interactive: {
@@ -378,6 +388,7 @@ test('preserves root type and object logic returned directly by the API', async 
     json: async () => [
       {
         id: 5,
+        location_id: 70,
         latitude: 0,
         longitude: 0,
         type: 'treasure',
@@ -425,4 +436,83 @@ test('removes a partial file after a rejected download so a retry cannot reuse i
   expect(FileSystem.unlink).toHaveBeenCalledWith(
     'cache/memory-assets/30-image-0.jpg',
   );
+});
+
+const nearbyGame = (id, location_id) => ({
+  id, location_id, latitude: 0, longitude: 0,
+  title: `Game ${id}`, type: 'discovery',
+  assets: [{ id: 0, type: 'GLB', url: `https://example.test/${id}.glb` }],
+  objects: [{ id: 1, properties: { asset: 0, collectible: true } }],
+});
+
+test('keeps distinct games at the same location and scopes repeated asset/object IDs to each game', async () => {
+  global.fetch.mockResolvedValue({
+    ok: true,
+    json: async () => [nearbyGame(101, 7), nearbyGame(102, 7)],
+  });
+  let result;
+  let cached;
+  await act(async () => {
+    result = await radar.loadNearbyMemories();
+    cached = await Promise.all(result.memories.map(radar.cacheMemoryAssets));
+  });
+  expect(result.memories.map(({ id, location_id }) => ({ id, location_id }))).toEqual([
+    { id: 101, location_id: 7 }, { id: 102, location_id: 7 },
+  ]);
+  expect(cached.map(item => item.interactive.logic.games[0])).toEqual([
+    expect.objectContaining({
+      id: 101,
+      assets: [expect.objectContaining({ id: 0, url: expect.stringContaining('101-experience-') })],
+      objects: [expect.objectContaining({ id: 1, properties: expect.objectContaining({ asset: 0 }) })],
+    }),
+    expect.objectContaining({
+      id: 102,
+      assets: [expect.objectContaining({ id: 0, url: expect.stringContaining('102-experience-') })],
+      objects: [expect.objectContaining({ id: 1, properties: expect.objectContaining({ asset: 0 }) })],
+    }),
+  ]);
+});
+
+test.each([undefined, null, '', false, -1, 1.5, Infinity, Number.MAX_SAFE_INTEGER + 1])(
+  'rejects missing or invalid location_id %s without substituting the game ID',
+  async locationId => {
+    global.fetch.mockResolvedValue({
+      ok: true, json: async () => [nearbyGame(101, locationId)],
+    });
+    await act(async () => {
+      await expect(radar.loadNearbyMemories()).rejects.toThrow('nearbyIdentifierInvalid:games[0].location_id');
+    });
+    expect(radar.apiError).toBe('nearbyIdentifierInvalid:games[0].location_id');
+    expect(radar.memories).toEqual([]);
+  },
+);
+
+test('rejects a missing game ID rather than inventing an array-index ID', async () => {
+  global.fetch.mockResolvedValue({
+    ok: true, json: async () => [nearbyGame(undefined, 7)],
+  });
+  await act(async () => {
+    await expect(radar.loadNearbyMemories()).rejects.toThrow('nearbyIdentifierInvalid:games[0].id');
+  });
+});
+
+test('normalizes numeric identifier strings, including zero, without conflating game and location IDs', async () => {
+  global.fetch.mockResolvedValue({
+    ok: true, json: async () => [nearbyGame('101', '0')],
+  });
+  await act(async () => { await radar.loadNearbyMemories(); });
+  expect(radar.memories[0]).toMatchObject({
+    id: 101, location_id: 0,
+    interactive: { logic: { games: [expect.objectContaining({ id: 101, location_id: 0 })] } },
+  });
+});
+
+test('rejects one game ID assigned to different locations instead of silently keeping an arbitrary association', async () => {
+  global.fetch.mockResolvedValue({
+    ok: true, json: async () => [nearbyGame(101, 7), nearbyGame(101, 8)],
+  });
+  await act(async () => {
+    await expect(radar.loadNearbyMemories()).rejects.toThrow('nearbyGameLocationConflict');
+  });
+  expect(radar.memories).toEqual([]);
 });

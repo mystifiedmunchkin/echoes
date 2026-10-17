@@ -22,10 +22,11 @@ afterAll(() => { globalThis.fetch = originalFetch; });
 
 test('builds the exact API payload without UI metadata', () => {
   expect(progressPayload({
-    scores: [{ id: 12, name: 'Basket', gameType: 'aiming', points: 125 }],
+    scores: [{ location_id: 12, name: 'Basket', gameType: 'aiming', points: 125 }],
     visitedPlaces: [
-      { id: 12, name: '', firstSeenAt: '', lastSeenAt: '' },
-      { id: 15, name: '', firstSeenAt: '', lastSeenAt: '' },
+      { id: 100, location_id: 12, name: '', firstSeenAt: '', lastSeenAt: '' },
+      { id: 101, location_id: 12, name: '', firstSeenAt: '', lastSeenAt: '' },
+      { id: 102, location_id: 15, name: '', firstSeenAt: '', lastSeenAt: '' },
     ],
     collectedItems: [{
       location_id: 12, game_id: 100, item_id: 3, quantity: 1,
@@ -73,6 +74,25 @@ test.each([401, 422, 500])('propagates HTTP %s failures', async status => {
   );
 });
 
+test('includes server validation fields in the reported synchronization error', async () => {
+  fetchMock.mockResolvedValueOnce({
+    ok: false,
+    status: 422,
+    json: async () => ({
+      message: 'Validation failed',
+      errors: {
+        'collected_items.0.location_id': ['The selected location is invalid.'],
+        'collected_items.0.game_id': ['The selected game is invalid.'],
+      },
+    }),
+  });
+  await expect(
+    postProgress('test-token', progressPayload(emptyProgress())),
+  ).rejects.toThrow(
+    'Validation failed (collected_items.0.location_id: The selected location is invalid.; collected_items.0.game_id: The selected game is invalid.)',
+  );
+});
+
 test('reports a non-JSON error response', async () => {
   fetchMock.mockResolvedValueOnce({
     ok: false, status: 502, json: async () => { throw new Error('Not JSON'); },
@@ -101,46 +121,36 @@ test('aborts stalled uploads after 15 seconds', async () => {
   }
 });
 
-test('migrates historical scores and visits once, but never treats old memories as objects', async () => {
-  jest.mocked(AsyncStorage.getItem).mockImplementation(async key => {
-    if (key === '@experience_scores') return JSON.stringify([{ id: '12', name: 'Basket', points: 7 }]);
-    if (key === '@visited_places') return JSON.stringify([{ id: '15', name: 'Park' }]);
-    if (key === '@collected_memories') return JSON.stringify([{ id: 15, name: 'Park' }]);
-    return null;
-  });
-  const result = await loadProgress(1);
-  expect(result.collectedMemories).toEqual([{ id: 15, name: 'Park' }]);
-  expect(progressPayload(result)).toEqual({
-    scores: [{ location_id: 12, game_type: 'aiming', score: 7 }],
-    visited_location_ids: [15], collected_items: [],
-  });
-  expect(AsyncStorage.multiSet).toHaveBeenCalledWith([
-    [progressKey(1), JSON.stringify(result)],
-    ['@progress_legacy_owner', '1'],
-  ]);
-});
-
-test('does not import legacy data into another account or a guest session', async () => {
-  jest.mocked(AsyncStorage.getItem).mockImplementation(async key =>
-    key === '@progress_legacy_owner' ? '1' : null);
-  expect(await loadProgress(2)).toEqual(emptyProgress());
-  expect(await loadProgress(null)).toEqual(emptyProgress());
-  expect(AsyncStorage.multiSet).not.toHaveBeenCalled();
-});
-
-test('attributes legacy history to only one account when two loads overlap', async () => {
+test('does not import or overwrite ambiguous progression from any previous storage format', async () => {
   const storage = new Map([
+    ['@progress:user:1', JSON.stringify({ scores: [{ id: 101, points: 7 }] })],
+    ['@progress:guest', JSON.stringify({ scores: [{ id: 102, points: 8 }] })],
     ['@experience_scores', JSON.stringify([{ id: 12, name: 'Basket', points: 7 }])],
+    ['@visited_places', JSON.stringify([{ id: 15, name: 'Park' }])],
+    ['@collected_memories', JSON.stringify([{ id: 15, name: 'Park' }])],
   ]);
   jest.mocked(AsyncStorage.getItem).mockImplementation(async key => storage.get(key) ?? null);
-  jest.mocked(AsyncStorage.multiSet).mockImplementationOnce(async entries => {
-    entries.forEach(([key, value]) => storage.set(key, value));
-  });
-  const [first, second] = await Promise.all([loadProgress(1), loadProgress(2)]);
-  expect(first.scores[0].points).toBe(7);
-  expect(second.scores).toEqual([]);
-  expect(storage.get('@progress_legacy_owner')).toBe('1');
-  expect(AsyncStorage.multiSet).toHaveBeenCalledTimes(1);
+  const [first, second, guest] = await Promise.all([loadProgress(1), loadProgress(2), loadProgress(null)]);
+  expect([first, second, guest]).toEqual([emptyProgress(), emptyProgress(), emptyProgress()]);
+  expect(AsyncStorage.getItem).toHaveBeenNthCalledWith(1, '@progress:v2:user:1');
+  expect(AsyncStorage.getItem).toHaveBeenNthCalledWith(2, '@progress:v2:user:2');
+  expect(AsyncStorage.getItem).toHaveBeenNthCalledWith(3, '@progress:v2:guest');
+  expect(AsyncStorage.getItem).toHaveBeenCalledTimes(3);
+  expect(AsyncStorage.multiSet).not.toHaveBeenCalled();
+  expect(storage.size).toBe(5);
+});
+
+test('loads saved corrected progression from its own namespace', async () => {
+  const saved = {
+    ...emptyProgress(),
+    scores: [{ location_id: 7, name: 'Garden', gameType: 'aiming', points: 5 }],
+    visitedPlaces: [
+      { id: 101, location_id: 7, name: 'Fountain', firstSeenAt: '', lastSeenAt: '' },
+    ],
+  };
+  jest.mocked(AsyncStorage.getItem).mockResolvedValueOnce(JSON.stringify(saved));
+  expect(await loadProgress(1)).toEqual(saved);
+  expect(AsyncStorage.getItem).toHaveBeenCalledWith(progressKey(1));
 });
 
 test('rejects corrupt saved progress rather than overwriting it with an empty state', async () => {

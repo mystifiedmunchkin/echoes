@@ -52,9 +52,9 @@ const mount = async () => {
 test('queues last-moment score, visit and collection writes before sending the final snapshot', async () => {
   await mount();
   await act(async () => {
-    progress.addScore({ id: 12, name: 'Basket', gameType: 'aiming' });
-    progress.addScore({ id: 12, name: 'Basket', gameType: 'aiming' });
-    progress.markPlaceVisited({ id: 12 });
+    progress.addScore({ location_id: 12, name: 'Basket', gameType: 'aiming' });
+    progress.addScore({ location_id: 12, name: 'Basket', gameType: 'aiming' });
+    progress.markPlaceVisited({ id: 100, location_id: 12 });
     progress.collectObject({ location_id: 12, game_id: 100, item_id: 3, name: 'Key' });
     progress.collectObject({ location_id: 12, game_id: 100, item_id: 3, name: 'Key' });
     progress.finishGame();
@@ -72,8 +72,8 @@ test('queues last-moment score, visit and collection writes before sending the f
 test('separates score types and disambiguates repeated object IDs between locations and games', async () => {
   await mount();
   await act(async () => {
-    progress.addScore({ id: 12, gameType: 'aiming' });
-    progress.addScore({ id: 12, gameType: 'treasure', points: 5 });
+    progress.addScore({ location_id: 12, gameType: 'aiming' });
+    progress.addScore({ location_id: 12, gameType: 'treasure', points: 5 });
     progress.collectObject({ location_id: 12, game_id: 1, item_id: 3 });
     progress.collectObject({ location_id: 12, game_id: 2, item_id: 3 });
     progress.collectObject({ location_id: 15, game_id: 1, item_id: 3 });
@@ -87,8 +87,8 @@ test('separates score types and disambiguates repeated object IDs between locati
 test('persists and uploads radial impact points rather than the number of impacts', async () => {
   await mount();
   await act(async () => {
-    progress.addScore({ id: 12, gameType: 'aiming', points: 10 });
-    progress.addScore({ id: 12, gameType: 'aiming', points: 6 });
+    progress.addScore({ location_id: 12, gameType: 'aiming', points: 10 });
+    progress.addScore({ location_id: 12, gameType: 'aiming', points: 6 });
     progress.finishGame();
   });
   expect(progress.scores[0].points).toBe(16);
@@ -102,7 +102,7 @@ test('keeps data after an upload failure and retries the absolute totals at the 
   await mount();
   global.fetch.mockRejectedValueOnce(new Error('Offline'));
   await act(async () => {
-    progress.addScore({ id: 12, gameType: 'aiming' });
+    progress.addScore({ location_id: 12, gameType: 'aiming' });
     progress.finishGame();
   });
   expect(Alert.alert).toHaveBeenCalledWith('progressError', 'Offline');
@@ -117,9 +117,9 @@ test('serializes uploads without delaying play and preserves their snapshot orde
   let release;
   global.fetch.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
   await act(async () => {
-    progress.addScore({ id: 12, gameType: 'aiming' });
+    progress.addScore({ location_id: 12, gameType: 'aiming' });
     progress.finishGame();
-    progress.addScore({ id: 12, gameType: 'aiming' });
+    progress.addScore({ location_id: 12, gameType: 'aiming' });
     progress.finishGame();
   });
   expect(progress.scores[0].points).toBe(2);
@@ -155,7 +155,7 @@ test('does not upload guest progression', async () => {
   mockAuth = { user: null, token: null };
   await mount();
   await act(async () => {
-    progress.addScore({ id: 12, gameType: 'aiming' });
+    progress.addScore({ location_id: 12, gameType: 'aiming' });
     progress.finishGame();
   });
   expect(global.fetch).not.toHaveBeenCalled();
@@ -163,7 +163,7 @@ test('does not upload guest progression', async () => {
 
 test('retains progress when the same account refreshes its token', async () => {
   await mount();
-  await act(async () => { progress.addScore({ id: 12, gameType: 'aiming' }); });
+  await act(async () => { progress.addScore({ location_id: 12, gameType: 'aiming' }); });
   mockAuth = { user: { id: 1 }, token: 'refreshed-token' };
   await act(async () => { renderer.update(<Probe />); });
   expect(progress.scores[0].points).toBe(1);
@@ -176,13 +176,13 @@ test('merges operations received while persisted account progress is loading', a
   AsyncStorage.getItem.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
   await mount();
   await act(async () => {
-    progress.addScore({ id: 12, gameType: 'aiming' });
+    progress.addScore({ location_id: 12, gameType: 'aiming' });
     progress.finishGame();
   });
   expect(global.fetch).not.toHaveBeenCalled();
   await act(async () => {
     release(JSON.stringify({
-      scores: [{ id: 12, gameType: 'aiming', points: 4 }],
+      scores: [{ location_id: 12, gameType: 'aiming', points: 4 }],
       visitedPlaces: [], collectedItems: [], collectedMemories: [],
     }));
   });
@@ -210,4 +210,63 @@ test('keeps legacy memory inventory account-scoped and outside the object payloa
   mockAuth = { user: { id: 2 }, token: 'token-2' };
   await act(async () => { renderer.update(<Probe />); });
   expect(progress.collectedMemories).toEqual([]);
+});
+
+test('keeps game history distinct but uploads one visited location for games sharing a place', async () => {
+  await mount();
+  await act(async () => {
+    progress.markPlaceVisited({ id: 101, location_id: 7, name: 'Fountain' });
+    progress.markPlaceVisited({ id: 102, location_id: 7, name: 'Garden' });
+    progress.markPlaceVisited({ id: 101, location_id: 7, name: 'Fountain updated' });
+    progress.collectObject({ location_id: 7, game_id: 101, item_id: 1 });
+    progress.collectObject({ location_id: 7, game_id: 102, item_id: 1 });
+    progress.addScore({ location_id: 7, gameType: 'aiming', points: 2 });
+    progress.addScore({ location_id: 7, gameType: 'aiming', points: 3 });
+    progress.finishGame();
+  });
+  expect(progress.visitedPlaces).toMatchObject([
+    { id: 101, location_id: 7, name: 'Fountain updated' },
+    { id: 102, location_id: 7, name: 'Garden' },
+  ]);
+  expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
+    scores: [{ location_id: 7, game_type: 'aiming', score: 5 }],
+    visited_location_ids: [7],
+    collected_items: [
+      { location_id: 7, game_id: 101, item_id: 1, quantity: 1 },
+      { location_id: 7, game_id: 102, item_id: 1, quantity: 1 },
+    ],
+  });
+});
+
+test('reports missing location IDs without interpreting game IDs as places', async () => {
+  await mount();
+  await act(async () => {
+    progress.markPlaceVisited({ id: 101 });
+    progress.addScore({ id: 101, gameType: 'aiming' });
+  });
+  expect(progress.visitedPlaces).toEqual([]);
+  expect(progress.scores).toEqual([]);
+  expect(Alert.alert).toHaveBeenCalledWith('progressError', 'Invalid progress identifier');
+});
+
+test('keeps old account progression untouched and uploads only the corrected namespace', async () => {
+  const oldKey = '@progress:user:1';
+  const oldValue = JSON.stringify({
+    scores: [{ id: 101, gameType: 'aiming', points: 99 }],
+    visitedPlaces: [{ id: 101 }],
+    collectedItems: [{ location_id: 101, game_id: 101, item_id: 1, quantity: 1 }],
+    collectedMemories: [],
+  });
+  AsyncStorage.storage.set(oldKey, oldValue);
+  await mount();
+  await act(async () => {
+    progress.addScore({ location_id: 7, gameType: 'aiming', points: 2 });
+    progress.finishGame();
+  });
+  expect(AsyncStorage.storage.get(oldKey)).toBe(oldValue);
+  expect(progressKey(1)).not.toBe(oldKey);
+  expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
+    scores: [{ location_id: 7, game_type: 'aiming', score: 2 }],
+    visited_location_ids: [], collected_items: [],
+  });
 });

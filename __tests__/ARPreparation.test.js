@@ -71,7 +71,7 @@ jest.mock('../src/components/ViroARView', () => ({
 
 const origin = { latitude: 0, longitude: 0 };
 const memoryAt = (meters) => ({
-  id: meters, name: `Memory ${meters}`, lat: 0, lng: (meters / 6371000) * (180 / Math.PI),
+  id: meters, location_id: 700, name: `Memory ${meters}`, lat: 0, lng: (meters / 6371000) * (180 / Math.PI),
 });
 const mockRadar = {
   location: origin, memories: [], isLoadingApi: false,
@@ -343,9 +343,9 @@ test('POSTs on game switch and close, including final scores and deduplicated na
   });
   expect(global.fetch).toHaveBeenCalledTimes(1);
   expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
-    scores: [{ location_id: 10, game_type: 'aiming', score: 1 }],
-    visited_location_ids: [10],
-    collected_items: [{ location_id: 10, game_id: 100, item_id: 2, quantity: 1 }],
+    scores: [{ location_id: 700, game_type: 'aiming', score: 1 }],
+    visited_location_ids: [700],
+    collected_items: [{ location_id: 700, game_id: 100, item_id: 2, quantity: 1 }],
   });
   await act(async () => {
     renderer.root.findByType(ExperienceControls).props.onSelect(1);
@@ -359,8 +359,8 @@ test('POSTs on game switch and close, including final scores and deduplicated na
   });
   expect(global.fetch).toHaveBeenCalledTimes(2);
   expect(JSON.parse(global.fetch.mock.calls[1][1].body).collected_items).toEqual([
-    { location_id: 10, game_id: 100, item_id: 2, quantity: 1 },
-    { location_id: 10, game_id: 101, item_id: 2, quantity: 1 },
+    { location_id: 700, game_id: 100, item_id: 2, quantity: 1 },
+    { location_id: 700, game_id: 101, item_id: 2, quantity: 1 },
   ]);
   await act(async () => {
     renderer.root.findByProps({ accessibilityLabel: 'closeCamera' }).props.onPress();
@@ -399,4 +399,78 @@ test.each(['button', 'hardware'])('closing the fallback experience via %s sends 
     else renderer.root.findByProps({ accessibilityLabel: 'closeModelViewer' }).props.onPress();
   });
   expect(global.fetch).toHaveBeenCalledTimes(1);
+});
+
+test('selects separate games at one location and sends location IDs rather than game IDs', async () => {
+  mockAuth = { user: { id: 1 }, token: 'test-token' };
+  const games = [101, 102].map((id, index) => {
+    const type = index === 0 ? 'discovery' : 'aiming';
+    return {
+      ...memoryAt(10),
+      id, location_id: 7, name: `Game ${id}`,
+      interactive: { logic: { games: [{
+        id, type,
+        assets: [{ id: 0, type: 'GLB', url: `file://model-${id}.glb` }],
+        objects: [{ id: 1, properties: { asset: 0, collectible: true } }],
+      }] } },
+    };
+  });
+  mockRadar.memories = games;
+  mockRadar.loadNearbyMemories.mockResolvedValue({ location: origin, memories: games });
+  mockRadar.cacheMemoryAssets.mockImplementation(async item => item);
+  await act(async () => {
+    renderer.unmount();
+    renderer = TestRenderer.create(<App />);
+  });
+  const markers = renderer.root.findByProps({ id: 'memory-markers' });
+  expect(markers.props.shape.features.map(item => item.properties)).toEqual([
+    { gameId: '101', locationId: 7, isNearby: true },
+    { gameId: '102', locationId: 7, isNearby: true },
+  ]);
+  expect(renderer.root.findByType('MapView').props.onPress).toBeUndefined();
+  await act(async () => {
+    markers.props.onPress({ features: [{ properties: { gameId: '102' } }] });
+  });
+  expect(renderer.root.findByType('MemoryInfoModal').props.memory.id).toBe(102);
+  act(() => renderer.root.findByType('MemoryInfoModal').props.onClose());
+  await act(async () => {
+    await renderer.root.findByProps({ accessibilityLabel: 'scanAr' }).props.onPress();
+  });
+  expect(renderer.root.findByType('ViroARView').props.arMemories.map(item => item.id))
+    .toEqual([101, 102]);
+  for (const [index, id] of [101, 102].entries()) {
+    await act(async () => {
+      await renderer.root.findByType('ViroARView').props.onMemorySelected({ nativeEvent: { id } });
+    });
+    const arView = renderer.root.findByType('ViroARView');
+    expect(arView.props.experience.games[0].id).toBe(id);
+    await act(async () => {
+      const type = index === 0 ? 'discovery' : 'aiming';
+      arView.props.onExperienceEvent({ type, gameId: id, objectId: 1, name: 'collect' });
+      if (type === 'aiming') arView.props.onExperienceEvent({
+        type, gameId: id, objectId: 1, name: 'collision',
+        data: { scoringContact: true, projectileId: -1, points: 2 },
+      });
+    });
+  }
+  await act(async () => {
+    renderer.root.findByProps({ accessibilityLabel: 'closeCamera' }).props.onPress();
+  });
+  const payload = JSON.parse(global.fetch.mock.calls.at(-1)[1].body);
+  expect(payload).toEqual({
+    scores: [{ location_id: 7, game_type: 'aiming', score: 2 }],
+    visited_location_ids: [7],
+    collected_items: [
+      { location_id: 7, game_id: 101, item_id: 1, quantity: 1 },
+      { location_id: 7, game_id: 102, item_id: 1, quantity: 1 },
+    ],
+  });
+  const menu = renderer.root.findByType('MenuModal');
+  expect(menu.props.places.map(item => item.id).sort()).toEqual([101, 102]);
+  await act(async () => {
+    menu.props.onSelectPlace(menu.props.places.find(item => item.id === 102));
+  });
+  expect(renderer.root.findByType('MemoryInfoModal').props.memory).toMatchObject({
+    id: 102, location_id: 7, name: 'Game 102',
+  });
 });

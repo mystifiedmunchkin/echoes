@@ -25,7 +25,9 @@ export interface InteractiveDefinition {
 }
 
 export interface MemoryRecord {
+  // The map/AR entry ID identifies the game, not its shared location.
   id: number;
+  location_id: number;
   name: string;
   model_url: string;
   model_urls?: string[];
@@ -41,6 +43,7 @@ export interface MemoryRecord {
 
 export interface NearbyMemory {
   id: number;
+  location_id: number;
   name: string;
   bearingDeg: number;
   distanceMeters: number;

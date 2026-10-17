@@ -18,9 +18,7 @@ import {
   ShapeSource,
   UserLocation,
 } from '@maplibre/maplibre-react-native';
-import {
-  createRadiusPolygon, getDistanceInMeters,
-} from './src/utils/geo';
+import { createRadiusPolygon } from './src/utils/geo';
 import {
   MAP_RADIUS_METERS, DISCOVERY_RADIUS_METERS, isGalaxyADevice,
   canViewMemoryContent, getMemoryDistance, createARSession,
@@ -72,7 +70,8 @@ function AppContent() {
       .map((memory) => ({
         type: 'Feature',
         properties: {
-          memoryId: String(memory.id),
+          gameId: String(memory.id),
+          locationId: memory.location_id,
           isNearby: getMemoryDistance(location, memory) <= DISCOVERY_RADIUS_METERS,
         },
         geometry: {
@@ -181,7 +180,7 @@ function AppContent() {
   useEffect(() => {
     const previous = gameSession.current;
     const current = activeGame && activeMemory
-      ? { locationId: activeMemory.id, gameId: activeGame.id, userId: user?.id, finishGame }
+      ? { locationId: activeMemory.location_id, gameId: activeGame.id, userId: user?.id, finishGame }
       : null;
     if (
       previous &&
@@ -209,7 +208,7 @@ function AppContent() {
       if (object?.properties.collectible !== true || !requireAuthentication()) return;
       const asset = game.assets.find(item => item.id === object.properties.asset);
       collectObject({
-        location_id: memory.id, game_id: game.id, item_id: object.id,
+        location_id: memory.location_id, game_id: game.id, item_id: object.id,
         name: asset?.name || object.properties.text || `${memory.name || ''} #${object.id}`,
       });
     }
@@ -224,7 +223,7 @@ function AppContent() {
       memory
     ) {
       addScore({
-        id: memory.id, name: memory.name, gameType: event.type,
+        location_id: memory.location_id, name: memory.name, gameType: event.type,
         points: event.data.points ?? 1,
       });
       Alert.alert(
@@ -505,6 +504,7 @@ function AppContent() {
   const nearbyMemories = useMemo(
     () => arSessionMemories.map(({ memory, bearingDeg, distanceMeters, relativePosition }) => ({
       id: memory.id,
+      location_id: memory.location_id,
       name: memory.name,
       bearingDeg,
       distanceMeters,
@@ -549,8 +549,8 @@ function AppContent() {
     }
   };
 
-  const handleMemorySelected = useCallback(async (memoryId) => {
-    const memory = arMemories.find((item) => String(item.id) === String(memoryId));
+  const handleMemorySelected = useCallback(async (gameId) => {
+    const memory = arMemories.find((item) => String(item.id) === String(gameId));
     if (!memory || isPreparingPlacement) return;
 
     setIsPreparingPlacement(true);
@@ -602,6 +602,7 @@ function AppContent() {
     // 2. Save the memory in the inventory.
     handleCollectMemory({
       id,
+      location_id: collectedMemory?.location_id,
       name,
       creatorName: collectedMemory?.creatorName || '',
     });
@@ -923,16 +924,6 @@ function AppContent() {
       <MapView
         style={styles.map}
         mapStyle="https://tiles.openfreemap.org/styles/bright"
-        onPress={(event) => {
-          const coordinates = event.geometry?.coordinates;
-          if (coordinates) {
-            const coords = { latitude: coordinates[1], longitude: coordinates[0] };
-            const hit = memories.find((m) =>
-              getDistanceInMeters(coords.latitude, coords.longitude, m.lat, m.lng) < 2
-            );
-            if (hit) openMemoryInfo(hit);
-          }
-        }}
       >
         <Camera
           defaultSettings={{
@@ -985,8 +976,8 @@ function AppContent() {
           id="memory-markers"
           shape={memoryMarkers}
           onPress={(event) => {
-            const memoryId = event.features?.[0]?.properties?.memoryId;
-            const memory = memories.find((item) => String(item.id) === String(memoryId));
+            const gameId = event.features?.[0]?.properties?.gameId;
+            const memory = memories.find((item) => String(item.id) === String(gameId));
             openMemoryInfo(memory);
           }}
         >

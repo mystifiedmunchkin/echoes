@@ -195,7 +195,7 @@ test.each(['aiming', 'treasure', 'discovery', 'images'] as const)(
 test('AR navigator reads current app props when the selected experience changes', async () => {
   await act(async () => {
     renderer = TestRenderer.create(
-      <ViroARView arMemories={[{ id: 1, name: 'Place', model_url: '' }]} />,
+      <ViroARView arMemories={[{ id: 1, location_id: 7, name: 'Place', model_url: '' }]} />,
     );
   });
   expect(host('ViroSphere')).toHaveLength(1);

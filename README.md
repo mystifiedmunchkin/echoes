@@ -46,6 +46,12 @@ Existing map proximity restrictions and legacy memory viewers remain unchanged.
 The nearby endpoint returns a **direct JSON list of interactive games**, not
 legacy `memory` records and not JSON-encoded strings. Each game carries its
 own GPS coordinates and required `type`; there is no root-level type fallback.
+Each entry requires `id` (the game ID) and `location_id` (its location ID),
+alongside `latitude` and `longitude`. Games sharing a `location_id` remain
+separate map, AR, and history entries; they are not grouped by location or coordinates.
+Map selection uses the marker's game ID, not a nearest-coordinate lookup.
+Missing or invalid identifiers cause an explicit loading error. The client never
+substitutes the game ID or an array index for a missing location ID.
 `title` and `description` are game metadata. All templates use the same
 `assets` / `objects` structure.
 Legacy string-encoded fields remain readable for backwards compatibility.
@@ -54,6 +60,7 @@ Legacy string-encoded fields remain readable for backwards compatibility.
 [
   {
     "id": 1,
+    "location_id": 12,
     "latitude": 44.0,
     "longitude": 1.0,
     "title": "Papillon animé",
@@ -95,7 +102,7 @@ Legacy string-encoded fields remain readable for backwards compatibility.
 ```
 
 - All `id` fields are non-negative safe integers, unique within their
-  game/collection. The game `id`, `latitude`, `longitude`, `title`,
+  game/collection. The game `id`, `location_id`, `latitude`, `longitude`, `title`,
   `description` and `type` are supplied directly by the server.
   Assets may additionally have an optional non-empty string `name`; `name` is
   not supported on games, objects or image targets. Asset types: `GLB`, `GLTF`, `OBJ`,
@@ -163,6 +170,7 @@ contains the mobile consumer, not a server editor or backend.
 [
   {
     "id": 100,
+    "location_id": 12,
     "latitude": 44.0,
     "longitude": 1.0,
     "title": "Lancer dans le panier",
@@ -356,15 +364,19 @@ requests. The payload contains absolute totals, not increments:
 
 `item_id` is the ID of `logic.games[].objects[]`; all three IDs are needed
 to disambiguate objects. Collection is unique per location/game/object.
+`location_id` always comes from the game's top-level `location_id`, while
+`game_id` comes from its `id`. History retains separate game entries, but
+`visited_location_ids` contains each visited location only once.
 Scores aggregate by location and game type, since the score API does not accept
 a game ID. Both AR and the Galaxy A fallback participate; merely backgrounding
 the app does not finish a game. No victory event is inferred.
 
-Progress is saved under `@progress:user:{userId}` (guests use a separate local
-key and do not upload). At first authenticated load, historical scores, visits
-and memory inventory are attributed once to that account; a migration owner key
-prevents another account from claiming them. Historical memory entries remain
-local inventory items, not fabricated object IDs in `collected_items`.
+Corrected progress is saved under `@progress:v2:user:{userId}` (guests use
+`@progress:v2:guest` and do not upload). Earlier account/guest progress and the
+standalone legacy score, visit, and inventory keys remain untouched on the device.
+They are neither imported into the new history nor uploaded: their identifiers
+may have confused games with locations and cannot be safely migrated without a
+verified mapping. The corrected progression starts separately for each account.
 No server progress retrieval/merge endpoint is implemented.
 
 Writes include late contacts/collections before an exit; uploads are serialized

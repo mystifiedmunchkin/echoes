@@ -98,6 +98,13 @@ Les memoires sont dedupliquees par ID avant d'alimenter la carte et les marqueur
 AR : `1` et `"1"` designent la meme memoire. La premiere occurrence valide est
 conservee et les IDs repetes sont signales par un avertissement dans les logs.
 Deux lieux avec des IDs distincts restent distincts, meme aux memes coordonnees.
+Le contrat actuel est un tableau direct de jeux. Chaque entree fournit `id`
+(identifiant du jeu), `location_id` (identifiant de son lieu), `latitude` et
+`longitude`. Plusieurs jeux d'un meme lieu restent des entrees distinctes sur
+la carte et en AR : la deduplication porte sur l'ID du jeu, pas sur `location_id`.
+L'absence d'un de ces identifiants provoque une erreur explicite ; l'ID du jeu
+n'est jamais utilise comme remplacement de `location_id`. Un meme ID de jeu
+associe a deux lieux differents est egalement rejete.
 Les telechargements paralleles attendent une creation partagee du dossier de
 cache, notamment au premier lancement. Une erreur reelle de creation est propagee
 a la preparation AR ; elle n'est pas masquee. Le cache des modeles utilise le meme
@@ -123,6 +130,9 @@ les totaux serveur. Le score est groupe par lieu et type de jeu ; le contrat
 des scores ne contient pas de `game_id`. Pour la collection, `item_id` correspond
 a `logic.games[].objects[].id`. Le triplet lieu/jeu/objet est unique et sa
 quantite reste 1. Le backend doit accepter ces trois identifiants nommes.
+`location_id` vient toujours du champ `location_id` du jeu recu et `game_id`
+de son champ `id`. L'historique conserve une entree par jeu, mais les IDs des
+lieux visites envoyes au serveur sont dedupliques.
 
 Une fermeture d'experience, de camera ou de viewer, ou un changement de jeu,
 declenche l'envoi pour le compte connecte. Les ecritures locales sont terminees
@@ -131,12 +141,12 @@ Un echec affiche une erreur, conserve les donnees et permet leur renvoi au
 prochain changement ou fermeture de jeu. Pas d'envoi a chaque impact, au simple
 passage en arriere-plan ni de synchronisation automatique au demarrage.
 
-La progression est isolee par compte dans `@progress:user:{userId}`. L'ancien
-historique (`@experience_scores`, `@visited_places`, `@collected_memories`) est
-attribue une seule fois au premier compte connecte ; `@progress_legacy_owner`
-empeche de l'importer dans un autre compte. Les anciens souvenirs restent dans
-l'inventaire local, mais ne sont pas convertis artificiellement en objets.
-Un invite conserve une progression locale distincte et n'envoie rien.
+La progression corrigee est isolee par compte dans `@progress:v2:user:{userId}`.
+Les anciennes cles par compte, invite et historiques autonomes restent intactes
+sur l'appareil. Elles ne sont ni importees ni envoyees : leurs identifiants ont pu
+confondre jeux et lieux. Sans correspondance verifiee, aucune migration automatique
+n'est effectuee. Le nouvel historique demarre separement.
+Un invite utilise `@progress:v2:guest` et n'envoie rien.
 Le client ne recupere ni ne fusionne encore la progression depuis le serveur.
 Le code du backend et son eventuel editeur de jeux ne font pas partie de ce depot.
 
@@ -581,7 +591,7 @@ flowchart TD
         App --> Memory{"Lieu actif AR ou viewer<br/>et ID de projectile valide ?"}
         Memory -->|Oui| Score["+points par lieu et type : useProgress<br/>1 pour les anciens evenements"]
         Memory -->|En AR| Inventory["Ajouter le souvenir a l'inventaire historique"]
-        Score --> ScoreStore["AsyncStorage : @progress:user:{userId}"]
+        Score --> ScoreStore["AsyncStorage : @progress:v2:user:{userId}"]
         Inventory --> ScoreStore
         Score --> Menu["Menu : onglet Scores"]
         Object["Objet avec properties.collectible = true"] --> HoldObject["Appui long 600 ms<br/>Annuler le tir charge"]
@@ -640,5 +650,5 @@ flowchart TD
 | Scene 3D de remplacement | [ExperienceViewer.tsx](../src/experiences/ExperienceViewer.tsx) |
 | Reception des evenements et integration avec la memoire selectionnee | [App.js](../App.js) |
 | Persistance par compte, scores, visites, collection et file d'envoi | [useProgress.js](../src/hooks/useProgress.js) |
-| Payload, migration historique et POST de progression | [progress.ts](../src/services/progress.ts) |
+| Payload, stockage corrige isole et POST de progression | [progress.ts](../src/services/progress.ts) |
 | Affichage des scores | [MenuModal.js](../src/components/MenuModal.js) |

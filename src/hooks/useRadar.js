@@ -239,6 +239,16 @@ const resolvePrivateFileUrl = (value, userId, mediaType) => {
   )}/${mediaType}/${encodeURIComponent(fileName)}`;
 };
 
+const readNearbyIdentifier = (value, index, field) => {
+  const id = typeof value === 'string' && /^\d+$/.test(value)
+    ? Number(value)
+    : value;
+  if (typeof id !== 'number' || !Number.isSafeInteger(id) || id < 0) {
+    throw new Error(translate('nearbyIdentifierInvalid', { index, field }));
+  }
+  return id;
+};
+
 export function useRadar(initialRadius = MAP_RADIUS_METERS) {
   const [location, setLocation] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -379,7 +389,13 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
         ? rawData
         : rawData.data || rawData.memories || [];
 
-      const formattedMemories = dataArray.map((item, index) => {
+      const formattedMemories = dataArray.map((rawGame, index) => {
+        // Entries stay keyed by game ID, even when several games share one location.
+        const item = {
+          ...rawGame,
+          id: readNearbyIdentifier(rawGame?.id, index, 'id'),
+          location_id: readNearbyIdentifier(rawGame?.location_id, index, 'location_id'),
+        };
         const latVal = Number(String(item.latitude ?? NaN).replace(',', '.'));
         const lngVal = Number(String(item.longitude ?? NaN).replace(',', '.'));
 
@@ -560,7 +576,7 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
 
         return {
           ...item,
-          id: item.id ?? index,
+          id: item.id,
           name: item.title || item.name || translate('memoryDefault'),
           title: item.title || item.name || translate('memoryDefault'),
           description: item.description || '',
@@ -603,6 +619,9 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
       for (const memory of validMemories) {
         const id = String(memory.id);
         if (uniqueMemories.has(id)) {
+          if (uniqueMemories.get(id).location_id !== memory.location_id) {
+            throw new Error(translate('nearbyGameLocationConflict', { id }));
+          }
           duplicateIds.add(id);
         } else {
           uniqueMemories.set(id, memory);

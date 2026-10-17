@@ -1,10 +1,10 @@
-/** Validates progression, migrates legacy local data, and builds the server's exact payload. */
+/** Validates location-scoped progression and builds the server's exact payload. */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { translate } from '../../constants/i18n';
 import type { ExperienceType } from '../experiences/experience';
 
 export interface ProgressScore {
-  id: number;
+  location_id: number;
   name: string;
   gameType: ExperienceType;
   points: number;
@@ -20,7 +20,9 @@ export interface CollectedItem {
 }
 
 export interface VisitedPlace {
+  // Keep one history entry per game; API visits are deduplicated by location_id.
   id: number;
+  location_id: number;
   name: string;
   description?: string;
   creatorName?: string;
@@ -56,11 +58,9 @@ export interface ProgressPayload {
   }[];
 }
 
-const LEGACY_OWNER_KEY = '@progress_legacy_owner';
-let migrations: Promise<void> = Promise.resolve();
-
+// Older keys remain untouched: their IDs may refer to games rather than locations.
 export const progressKey = (userId: string | number | null) =>
-  userId == null ? '@progress:guest' : `@progress:user:${userId}`;
+  userId == null ? '@progress:v2:guest' : `@progress:v2:user:${userId}`;
 
 export function progressId(value: unknown): number {
   const id =
@@ -87,12 +87,12 @@ export function progressPayload(progress: Progress): ProgressPayload {
         throw new Error('Invalid progress score');
       }
       return {
-        location_id: progressId(item.id),
+        location_id: progressId(item.location_id),
         game_type: item.gameType,
         score: item.points,
       };
     }),
-    visited_location_ids: [...new Set(progress.visitedPlaces.map(place => progressId(place.id)))],
+    visited_location_ids: [...new Set(progress.visitedPlaces.map(place => progressId(place.location_id)))],
     collected_items: progress.collectedItems.map(item => {
       if (item.quantity !== 1) throw new Error('Invalid collected quantity');
       return {
@@ -103,6 +103,30 @@ export function progressPayload(progress: Progress): ProgressPayload {
       };
     }),
   };
+}
+
+function validationMessage(payload: unknown, status: number): string {
+  if (!payload || typeof payload !== 'object') {
+    return translate('serverError', { status });
+  }
+  const response = payload as {
+    message?: unknown;
+    errors?: Record<string, unknown>;
+  };
+  const message =
+    typeof response.message === 'string' && response.message.trim()
+      ? response.message.trim()
+      : translate('serverError', { status });
+  if (!response.errors || typeof response.errors !== 'object') return message;
+
+  const details = Object.entries(response.errors)
+    .flatMap(([field, value]) => {
+      const messages = Array.isArray(value) ? value : [value];
+      return messages
+        .filter(item => typeof item === 'string' && item.trim())
+        .map(item => `${field}: ${item}`);
+    });
+  return details.length ? `${message} (${details.join('; ')})` : message;
 }
 
 function readProgress(stored: string): Progress {
@@ -116,54 +140,14 @@ function readProgress(stored: string): Progress {
   ) {
     throw new Error('Invalid saved progress');
   }
+  parsed.visitedPlaces.forEach(place => progressId(place.id));
   progressPayload(parsed);
   return parsed;
 }
 
 export async function loadProgress(userId: string | number | null): Promise<Progress> {
-  let result = emptyProgress();
-  // Serialize first-load migrations so only one signed-in account can claim legacy history.
-  const task = migrations.then(async () => {
-    const key = progressKey(userId);
-    const saved = await AsyncStorage.getItem(key);
-    if (saved) {
-      result = readProgress(saved);
-      return;
-    }
-    if (userId == null || await AsyncStorage.getItem(LEGACY_OWNER_KEY) !== null) {
-      return;
-    }
-    const [scoresJson, visitsJson, memoriesJson] = await Promise.all([
-      AsyncStorage.getItem('@experience_scores'),
-      AsyncStorage.getItem('@visited_places'),
-      AsyncStorage.getItem('@collected_memories'),
-    ]);
-    const scores = scoresJson ? JSON.parse(scoresJson) : [];
-    const visitedPlaces = visitsJson ? JSON.parse(visitsJson) : [];
-    const collectedMemories = memoriesJson ? JSON.parse(memoriesJson) : [];
-    if (!Array.isArray(scores) || !Array.isArray(visitedPlaces) || !Array.isArray(collectedMemories)) {
-      throw new Error('Invalid legacy progress');
-    }
-    result = {
-      scores: scores.map(item => ({
-        ...item,
-        id: progressId(item.id),
-        gameType: 'aiming',
-      })),
-      visitedPlaces: visitedPlaces.map(item => ({ ...item, id: progressId(item.id) })),
-      collectedItems: [],
-      collectedMemories,
-    };
-    progressPayload(result);
-    await AsyncStorage.multiSet([
-      [key, JSON.stringify(result)],
-      [LEGACY_OWNER_KEY, String(userId)],
-    ]);
-  });
-  // Keep later accounts loadable while still propagating this caller's failure.
-  migrations = task.then(() => undefined, () => undefined);
-  await task;
-  return result;
+  const saved = await AsyncStorage.getItem(progressKey(userId));
+  return saved ? readProgress(saved) : emptyProgress();
 }
 
 export async function postProgress(token: string, payload: ProgressPayload): Promise<void> {
@@ -183,7 +167,7 @@ export async function postProgress(token: string, payload: ProgressPayload): Pro
     });
     if (!response.ok) {
       const body = await response.json().catch(() => null);
-      throw new Error(body?.message || translate('serverError', { status: response.status }));
+      throw new Error(validationMessage(body, response.status));
     }
   } finally {
     clearTimeout(timeout);
