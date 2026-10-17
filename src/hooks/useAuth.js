@@ -1,6 +1,13 @@
 /** Loads and mutates the persisted authenticated user session. */
 import { useEffect, useState } from 'react';
-import { getAuthToken, getStoredUser, login, logout, register } from '../services/auth';
+import {
+  deleteAccount as removeAccount,
+  getAuthToken,
+  getStoredUser,
+  login,
+  logout,
+  register,
+} from '../services/auth';
 import { translate } from '../../constants/i18n';
 
 export function useAuth() {
@@ -36,5 +43,11 @@ export function useAuth() {
     setUser(null);
   };
 
-  return { token, user, isLoading, signIn, signUp, signOut };
+  const deleteAccount = async () => {
+    await removeAccount();
+    setToken(null);
+    setUser(null);
+  };
+
+  return { token, user, isLoading, signIn, signUp, signOut, deleteAccount };
 }

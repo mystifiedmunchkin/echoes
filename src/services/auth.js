@@ -54,6 +54,26 @@ export async function logout() {
   await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
 }
 
+export async function deleteAccount() {
+  const token = await getAuthToken();
+  if (!token) throw new Error(translate('accountDeletionAuthenticationRequired'));
+
+  const response = await fetch(`${API_URL}/api/user`, {
+    method: 'DELETE',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(
+      payload?.message || translate('serverError', { status: response.status }),
+    );
+  }
+  await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
+}
+
 export async function getAuthToken() {
   return AsyncStorage.getItem(TOKEN_KEY);
 }

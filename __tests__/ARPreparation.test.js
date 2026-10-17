@@ -200,6 +200,47 @@ test('selecting an experience routes to its template without entering legacy pla
   expect(renderer.root.findByType('ViroARView').props.experience).toBeNull();
 });
 
+test('selecting another AR bubble switches to that bubble game', async () => {
+  const firstMemory = {
+    ...memoryAt(10),
+    interactive: {
+      logic: {
+        games: [{ id: 100, type: 'discovery', assets: [], objects: [] }],
+      },
+    },
+  };
+  const secondMemory = {
+    ...memoryAt(11),
+    interactive: {
+      logic: {
+        games: [{ id: 101, type: 'treasure', assets: [], objects: [] }],
+      },
+    },
+  };
+  mockRadar.loadNearbyMemories.mockResolvedValue({
+    location: origin,
+    memories: [firstMemory, secondMemory],
+  });
+  mockRadar.cacheMemoryAssets.mockImplementation(async item => item);
+
+  await act(async () => {
+    await renderer.root.findByProps({ accessibilityLabel: 'scanAr' }).props.onPress();
+  });
+  await act(async () => {
+    const onMemorySelected = renderer.root.findByType('ViroARView').props.onMemorySelected;
+    await onMemorySelected({ nativeEvent: { id: 10 } });
+  });
+  expect(renderer.root.findByType('ViroARView').props.experience.games[0].type)
+    .toBe('discovery');
+
+  await act(async () => {
+    const onMemorySelected = renderer.root.findByType('ViroARView').props.onMemorySelected;
+    await onMemorySelected({ nativeEvent: { id: 11 } });
+  });
+  expect(renderer.root.findByType('ViroARView').props.experience.games[0].type)
+    .toBe('treasure');
+});
+
 test('Galaxy A opens an experience without a model URL in the fallback scene', async () => {
   jest.useFakeTimers();
   DeviceInfo.getManufacturerSync.mockReturnValue('samsung');
@@ -295,6 +336,7 @@ test('POSTs on game switch and close, including final scores and deduplicated na
       data: { scoringContact: true, projectileId: -1 },
     });
   });
+  expect(Alert.alert).toHaveBeenCalledWith('scoreAddedTitle', 'scoreAdded');
   expect(global.fetch).not.toHaveBeenCalled();
   await act(async () => {
     renderer.root.findByType(ExperienceControls).props.onSelect(1);

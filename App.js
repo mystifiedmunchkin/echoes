@@ -94,7 +94,7 @@ function AppContent() {
 
   // --- Inventory management ---
   const [showInventory, setShowInventory] = useState(false);
-  const { user, token, signIn, signUp, signOut } = useAuth();
+  const { user, token, signIn, signUp, signOut, deleteAccount } = useAuth();
   const {
     scores, addScore, visitedPlaces, markPlaceVisited, collectedItems,
     collectObject, clearCollectedItems: clearCollection, finishGame,
@@ -225,6 +225,10 @@ function AppContent() {
         id: memory.id, name: memory.name, gameType: event.type,
         points: event.data.points ?? 1,
       });
+      Alert.alert(
+        t('scoreAddedTitle'),
+        t('scoreAdded', { points: event.data.points ?? 1 }),
+      );
       if (selectedArMemory) {
         handleCollectMemory({
           ...selectedArMemory,
@@ -233,7 +237,7 @@ function AppContent() {
       }
     }
   }, [addScore, arExperience, collectObject, experienceGameIndex, modelViewerMemory,
-    handleCollectMemory, requireAuthentication, selectedArMemory, viewerExperience]);
+    handleCollectMemory, requireAuthentication, selectedArMemory, t, viewerExperience]);
   const modelViewerRequestKey = useRef(0);
   const modelViewerTransitionTimer = useRef(null);
   const [mediaViewer, setMediaViewer] = useState(null);
@@ -879,6 +883,7 @@ function AppContent() {
           onSignIn={signIn}
           onSignUp={signUp}
           onSignOut={signOut}
+          onDeleteAccount={deleteAccount}
         />
       </View>
     );

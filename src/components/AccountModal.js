@@ -4,7 +4,9 @@ import { ActivityIndicator, Alert, Modal, StyleSheet, Text, TextInput, Touchable
 import { COLORS } from '../../theme';
 import { useI18n } from '../../constants/i18n';
 
-export function AccountModal({ visible, onClose, user, onSignIn, onSignUp, onSignOut }) {
+export function AccountModal({
+  visible, onClose, user, onSignIn, onSignUp, onSignOut, onDeleteAccount,
+}) {
   const { t } = useI18n();
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
@@ -13,6 +15,7 @@ export function AccountModal({ visible, onClose, user, onSignIn, onSignUp, onSig
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const handleSignOut = async () => {
     if (signingOut) return;
@@ -26,6 +29,32 @@ export function AccountModal({ visible, onClose, user, onSignIn, onSignUp, onSig
     } finally {
       setSigningOut(false);
     }
+  };
+
+  const handleDeleteAccount = () => {
+    if (deletingAccount) return;
+    Alert.alert(
+      t('deleteAccountConfirmTitle'),
+      t('deleteAccountConfirmMessage'),
+      [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('deleteAccount'),
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingAccount(true);
+            try {
+              await onDeleteAccount();
+              onClose();
+            } catch (error) {
+              Alert.alert(t('deleteAccountError'), error.message);
+            } finally {
+              setDeletingAccount(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const submit = async () => {
@@ -85,6 +114,17 @@ export function AccountModal({ visible, onClose, user, onSignIn, onSignUp, onSig
                 accessibilityLabel={t('signOut')}
               >
                 {signingOut ? <ActivityIndicator color={COLORS.background} /> : <Text style={styles.submitText}>{t('signOut')}</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.deleteAccount}
+                onPress={handleDeleteAccount}
+                disabled={deletingAccount}
+                accessibilityRole="button"
+                accessibilityLabel={t('deleteAccount')}
+              >
+                {deletingAccount
+                  ? <ActivityIndicator color={COLORS.danger} />
+                  : <Text style={styles.deleteAccountText}>{t('deleteAccount')}</Text>}
               </TouchableOpacity>
             </>
           ) : (
@@ -161,4 +201,6 @@ const styles = StyleSheet.create({
   submit: { backgroundColor: COLORS.accent, padding: 13, borderRadius: 8, alignItems: 'center', marginTop: 4 },
   submitText: { color: COLORS.background, fontWeight: 'bold', fontFamily: 'monospace' },
   switchText: { color: COLORS.text, textAlign: 'center', marginTop: 18 },
+  deleteAccount: { padding: 13, borderRadius: 8, alignItems: 'center', marginTop: 12, borderWidth: 1, borderColor: COLORS.danger },
+  deleteAccountText: { color: COLORS.danger, fontWeight: 'bold', fontFamily: 'monospace' },
 });

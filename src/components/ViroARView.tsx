@@ -75,9 +75,8 @@ function MemoryARScene({
           intensity={800}
         />
 
-        {/* RENDER MEMORY DROPLETS */}
-        {!game &&
-          (arMemories || []).map(memory => {
+        {/* Keep memory droplets available so another bubble can switch the game. */}
+        {(arMemories || []).map(memory => {
             let material = 'pinkDroplet';
             if (memory.user_id === 1 || memory.created_by === 1) {
               material = 'orangeDroplet';
