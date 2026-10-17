@@ -27,7 +27,7 @@ export default function InventoryModal({ visible, onClose, items, onClear, onRep
       </View>
 
       {!item.isGameObject && <View style={styles.actionsRow}>
-        {/* Button for returning the object to the real world. */}
+        {/* Only legacy memories can be re-placed; individual game objects stay in the inventory. */}
         <TouchableOpacity
           style={styles.replaceButton}
           onPress={() => onReplace && onReplace(item)}

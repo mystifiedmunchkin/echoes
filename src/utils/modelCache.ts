@@ -1,3 +1,4 @@
+/** Legacy model-only cache; authenticated experience preparation is handled by useRadar. */
 import { Dirs, FileSystem } from 'react-native-file-access';
 import { translate } from '../../constants/i18n';
 import { ensureDirectory } from './ensureDirectory';

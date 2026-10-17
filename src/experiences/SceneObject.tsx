@@ -1,3 +1,4 @@
+/** Renders a declarative scene object and bridges collection, physics, and media callbacks. */
 import * as React from 'react';
 import {
   Viro3DObject,
@@ -74,6 +75,7 @@ export function SceneObject({
       const [state] = args;
       onClickState?.(...args);
       if (state === 1 && trackingReady !== false && collectionTimer.current === null) {
+        // A successful long press collects instead of also releasing a charged aiming shot.
         collectionTimer.current = setTimeout(() => {
           collectionTimer.current = null;
           aimingScene?.cancelCharge();
@@ -95,6 +97,7 @@ export function SceneObject({
   const sampling = onSampleTransform !== undefined;
   React.useEffect(() => {
     if (!freeze) return;
+    // Capture the simulated world pose before replacing the dynamic body with a static one.
     let cancelled = false;
     const freezeBody = async () => {
       try {
@@ -111,6 +114,7 @@ export function SceneObject({
   }, [freeze, onError]);
   React.useEffect(() => {
     if (!sampling) return;
+    // Native transform queries are asynchronous; never overlap polls or publish after unmount.
     let cancelled = false;
     let busy = false;
     const timer = setInterval(async () => {
@@ -287,6 +291,7 @@ export function SceneObject({
     onCollisionCallback?.(tag, point, normal);
   };
   if (properties.active === false) return null;
+  // Remount when freezing so the native body is rebuilt at the captured pose.
   return (
     <ViroNode
       key={frozen ? 'frozen' : 'live'}
@@ -317,6 +322,7 @@ export function SceneObject({
       }}
       onClickState={properties.collectible === true ? handleClickState : onClickState}
     >
+      {/* Scale visual geometry separately so explicit colliders retain their meter dimensions. */}
       <ViroNode scale={physicsBody ? properties.scale : undefined}>
         {asset &&
           (asset.type === 'GLB' ||

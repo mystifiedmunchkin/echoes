@@ -15,6 +15,7 @@ export function MemoryAudioControls({ source }) {
   const { t } = useI18n();
   const [status, setStatus] = useState({ duration: 0, currentTime: 0, playing: false });
   const startedRef = useRef(false);
+  // Nitro Sound reports milliseconds; the slider and displayed duration use seconds.
   const duration = Number.isFinite(status.duration) ? status.duration / 1000 : 0;
   const currentTime = Math.min(
     Number.isFinite(status.currentTime) ? status.currentTime / 1000 : 0,
@@ -37,6 +38,7 @@ export function MemoryAudioControls({ source }) {
     });
 
     return () => {
+      // Nitro Sound uses shared listeners/player state; release them when leaving this source.
       Sound.removePlayBackListener();
       Sound.removePlaybackEndListener();
       Sound.stopPlayer().catch(() => undefined);

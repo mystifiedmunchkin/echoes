@@ -31,6 +31,7 @@ function Objects(props: TemplateProps) {
 }
 
 export function AimingTemplate(props: TemplateProps) {
+  // Older aiming definitions without settings remain object-only scenes.
   if (props.game.settings) return <ConfiguredAimingTemplate {...props} />;
   return (
     <ViroNode viroTag="aiming">
@@ -40,6 +41,7 @@ export function AimingTemplate(props: TemplateProps) {
 }
 
 export function TreasureTemplate(props: TemplateProps) {
+  // Extension point for quest mechanics; currently renders the server-defined objects only.
   return (
     <ViroNode viroTag="treasure">
       <Objects {...props} />
@@ -48,6 +50,7 @@ export function TreasureTemplate(props: TemplateProps) {
 }
 
 export function DiscoveryTemplate(props: TemplateProps) {
+  // Discovery interactions are emitted by SceneObject; no custom scripts are evaluated.
   return (
     <ViroNode viroTag="discovery">
       <Objects {...props} />
@@ -63,6 +66,7 @@ export function ImagesTemplate(props: TemplateProps) {
   const target = game.target;
   React.useEffect(() => {
     if (mode !== 'ar' || !target) return;
+    // Register a unique native target before mounting its marker, and release it on unmount.
     setReady(false);
     setTracked(false);
     try {
@@ -118,6 +122,7 @@ export function ImagesTemplate(props: TemplateProps) {
         emit('targetRemoved');
       }}
     >
+      {/* Unmount content on tracking loss to stop its media and physics activity. */}
       {tracked && <Objects {...props} />}
     </ViroARImageMarker>
   );

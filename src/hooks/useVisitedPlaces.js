@@ -1,6 +1,6 @@
 /**
- * Persists places (memories/games) the player has already seen, for the menu history list.
- * Stored locally for now; will be synced with the server once the progression API exists.
+ * Legacy local-only history hook using the pre-account storage key.
+ * The active application uses useProgress for per-user history and server synchronization.
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';

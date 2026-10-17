@@ -5,6 +5,7 @@ import {
   spreadARPositions,
 } from './geo';
 
+// The map search area is wider than the radius that unlocks discovery.
 export const MAP_RADIUS_METERS = 2500;
 export const DISCOVERY_RADIUS_METERS = 50;
 
@@ -14,6 +15,7 @@ export function isGalaxyADevice(manufacturer, model, deviceId) {
 }
 
 export function getMemoryDistance(location, memory) {
+  // Unknown or invalid coordinates fail closed rather than unlocking nearby content.
   const coordinates = [
     location?.latitude, location?.longitude,
     memory?.lat ?? memory?.latitude, memory?.lng ?? memory?.longitude,
@@ -28,10 +30,12 @@ export function getMemoryDistance(location, memory) {
 }
 
 export function canViewMemoryContent(location, memory, isGalaxyA) {
+  // Nearby Galaxy A devices use the viewer fallback; other devices discover content in AR.
   return isGalaxyA && getMemoryDistance(location, memory) <= DISCOVERY_RADIUS_METERS;
 }
 
 export function createARSession(memories, location) {
+  // Freeze proximity and marker coordinates at preparation time, nearest memories first.
   return spreadARPositions(memories
     .map((memory) => ({ memory, distanceMeters: getMemoryDistance(location, memory) }))
     .filter(({ distanceMeters }) => distanceMeters <= DISCOVERY_RADIUS_METERS)

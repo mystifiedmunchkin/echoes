@@ -11,6 +11,7 @@ export async function requestForegroundPermissionsAsync() {
     const result = results[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION];
     const coarseGranted = results[PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION]
       === PermissionsAndroid.RESULTS.GRANTED;
+    // Android's approximate-location grant is sufficient even when precise access is denied.
     return {
       status: result === PermissionsAndroid.RESULTS.GRANTED || coarseGranted ? 'granted' : 'denied',
       granted: result === PermissionsAndroid.RESULTS.GRANTED || coarseGranted,

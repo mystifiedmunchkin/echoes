@@ -1,3 +1,4 @@
+/** Pure aiming rules: collider validation, compound shapes, launch speed, and impact scoring. */
 import type { ExperienceObject, Vector3 } from './experience';
 
 export type ColliderType =
@@ -79,6 +80,7 @@ export function hasFallen(
 ): boolean {
   const initialUp = rotate(rotate([0, 1, 0], initialRotation), parentRotation);
   const up = rotate([0, 1, 0], rotation);
+  // Compare world-space up vectors: a tilt of at least 60 degrees counts as a fall.
   return up.reduce((dot, value, i) => dot + value * initialUp[i], 0) <= 0.5 + 1e-10;
 }
 
@@ -117,6 +119,7 @@ export function isBodyTransform(value: unknown): value is BodyTransform {
 }
 
 export function launchSpeed(speed: number, heldMs: number): number {
+  // Charging increases speed linearly up to twice the base speed after two seconds.
   return speed * (1 + Math.min(2000, Math.max(0, heldMs)) / 2000);
 }
 
@@ -127,6 +130,7 @@ export function basketThickness(collider: AimingCollider): number {
 }
 
 function inverseRotate(vector: Vector3, rotation: Vector3): Vector3 {
+  // Undo the forward Euler rotations in reverse order to recover local coordinates.
   let [x, y, z] = vector;
   const [rx, ry, rz] = rotation.map(angle => (-angle * Math.PI) / 180);
   [x, y] = [
@@ -169,6 +173,7 @@ export function isBottomContact(
   const thickness = basketThickness(collider);
   // Bullet contact points may penetrate slightly into the top face.
   const tolerance = Math.min(0.01, thickness / 4);
+  // Only the interior top face of the bottom scores, not the walls, rim, or underside.
   return (
     Math.abs(localNormal[1]) > 0 &&
     Math.abs(localNormal[1]) >
@@ -374,6 +379,7 @@ export function colliderShape(
   const box = (params: number[], position: number[]) =>
     children.push({ type: 'Box', params, position });
   if (collider.type === 'bounding' || collider.type === 'basket') {
+    // Five boxes form an open container; no hidden top face may block incoming shots.
     const t = basketThickness(collider);
     box([w, t, l], [0, -(h - t) / 2, 0]);
     box([t, h - t, l], [-(w - t) / 2, t / 2, 0]);

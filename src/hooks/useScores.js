@@ -1,4 +1,4 @@
-/** Persists aiming scores and exposes score updates to the menu. */
+/** Legacy aiming-score storage; the active application uses per-user useProgress instead. */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -27,6 +27,7 @@ export function useScores() {
         const saved = stored ? JSON.parse(stored) : [];
         if (!Array.isArray(saved)) throw new Error('Invalid saved scores');
         if (!mounted) return;
+        // Replay points earned during hydration on top of the saved scores.
         setScores(pending => pending.reduce(increment, saved));
         setLoaded(true);
       })

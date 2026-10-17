@@ -60,6 +60,7 @@ type ModelBounds = {
   max: [number, number, number];
 };
 
+// Measure transformed accessor bounds without depending on native renderer load timing.
 const parseGltfBounds = (gltf: {
   accessors?: Array<{ min?: number[]; max?: number[] }>;
   meshes?: Array<{ primitives?: Array<{ attributes?: { POSITION?: number } }> }>;
@@ -89,6 +90,7 @@ const parseGltfBounds = (gltf: {
     nodeIndices: number[]
   ): [number, number, number] => {
     let transformed = point;
+    // A point travels from its mesh node through each ancestor to the scene root.
     [...nodeIndices].reverse().forEach((nodeIndex) => {
       const node = gltf.nodes?.[nodeIndex];
       if (!node) return;
@@ -134,6 +136,7 @@ const parseGltfBounds = (gltf: {
       (mesh?.primitives || []).forEach((primitive) => {
         const accessor = gltf.accessors?.[primitive.attributes?.POSITION ?? -1];
         if (!accessor?.min || !accessor.max) return;
+        // Transform all eight corners: rotating only min/max would underestimate the bounds.
         for (let corner = 0; corner < 8; corner += 1) {
           const point: [number, number, number] = [
             corner % 2 ? accessor.max[0] : accessor.min[0],
@@ -203,6 +206,7 @@ const decodeGlbJsonChunk = (base64: string): string => {
   }
 
   let offset = 12;
+  // GLB v2 has a 12-byte header, then length/type-prefixed chunks; only JSON describes bounds.
   while (offset + 8 <= binary.length) {
     const chunkLength = readUint32(offset);
     const chunkType = readUint32(offset + 4);
@@ -298,6 +302,7 @@ function ModelContent({
 
       const fittedScale = TARGET_MODEL_SIZE / largestDimension;
       const center = bounds.min.map((value, axis) => (value + bounds.max[axis]) / 2);
+      // Fit the longest dimension and center the geometry around the gesture rotation pivot.
       if (!cancelled) {
         setModelTransform({
           scale: fittedScale,
@@ -412,6 +417,7 @@ export default function ViroModelViewer({ modelUrl, style }: ViroModelViewerProp
         zoomRef.current = nextZoom;
         setZoom(nextZoom);
         const angleDelta = Math.atan2(
+          // Keep twist deltas continuous when the touch angle crosses -PI/PI.
           Math.sin(angle - previous.angle), Math.cos(angle - previous.angle));
         const nextRotation: [number, number] = [
           dragRotationRef.current[0],
@@ -443,7 +449,7 @@ export default function ViroModelViewer({ modelUrl, style }: ViroModelViewerProp
   };
 
   React.useEffect(() => {
-    // Wrap in function to avoid direct setState in render/effect if needed
+    // A new model starts with fresh loading state and no gesture offsets from its predecessor.
     const reset = () => {
       setIsLoading(true);
       setError(null);

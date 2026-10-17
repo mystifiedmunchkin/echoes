@@ -16,6 +16,7 @@ interface AimingSceneState {
   cancelCharge: () => void;
 }
 
+// Share live camera/fire refs without rerendering the scene on every camera update.
 export const AimingSceneContext = React.createContext<AimingSceneState | null>(
   null,
 );
@@ -36,6 +37,7 @@ export function useAimingScene(mode: 'ar' | 'viewer') {
     if (state !== 2) return;
     const held = charge.current;
     charge.current = null;
+    // Releasing a press from an old game must not fire into the newly selected scene.
     if (held && held.fire === fire.current)
       held.fire(Date.now() - held.startedAt);
   }, []);
@@ -51,6 +53,7 @@ export function useAimingScene(mode: 'ar' | 'viewer') {
     onTrackingUpdated: (state: number) => {
       const ready = state === ViroTrackingStateConstants.TRACKING_NORMAL;
       if (!ready) {
+        // Tracking loss invalidates both the camera pose and any partially charged shot.
         camera.current = null;
         charge.current = null;
       }

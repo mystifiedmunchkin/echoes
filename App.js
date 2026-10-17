@@ -60,7 +60,7 @@ function AppContent() {
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
 
-  // // --- Radar state and API interaction ---
+  // --- Radar state and API interaction ---
   const {
     location, errorMsg, memories, isLoadingApi, apiError,
     refreshData, requestGpsPermission, cacheMemoryAssets, loadNearbyMemories,
@@ -100,6 +100,7 @@ function AppContent() {
     collectObject, clearCollectedItems: clearCollection, finishGame,
     collectedMemories, handleCollectMemory,
   } = useProgress(user, token);
+  // Legacy memories can be placed again; game objects use a composite inventory ID.
   const collectionItems = useMemo(() => [...collectedMemories.map((item) => {
     const sourceMemory = memories.find((memory) => String(memory.id) === String(item.id));
     return sourceMemory?.creatorName && !item.creatorName
@@ -133,7 +134,6 @@ function AppContent() {
     return false;
   }, [user]);
 
-  // --- Camera AR state and management ---
   // --- Camera AR state and management ---
   const [showCamera, setShowCamera] = useState(false);
   const [cameraKey, setCameraKey] = useState(0);
@@ -177,6 +177,7 @@ function AppContent() {
   const activeGame = (viewerExperience || arExperience)?.games[experienceGameIndex];
   const activeMemory = viewerExperience ? modelViewerMemory : selectedArMemory;
   const gameSession = useRef(null);
+  // Save the outgoing game's progress on switch/close, but never for a different user.
   useEffect(() => {
     const previous = gameSession.current;
     const current = activeGame && activeMemory
@@ -201,6 +202,7 @@ function AppContent() {
     const experience = viewerExperience || arExperience;
     const memory = viewerExperience ? modelViewerMemory : selectedArMemory;
     const game = experience?.games[experienceGameIndex];
+    // Ignore callbacks from a scene that is no longer the active game.
     if (!game || event.gameId !== game.id || event.type !== game.type) return;
     if (event.name === 'collect') {
       const object = game.objects.find(item => item.id === event.objectId);
@@ -294,6 +296,7 @@ function AppContent() {
     }
     if (!memory?.model_url && !hasExperience(memory)) return;
 
+    // Invalidate older downloads and allow the native modal to release before mounting Viro.
     const requestKey = ++modelViewerRequestKey.current;
     if (modelViewerTransitionTimer.current) {
       clearTimeout(modelViewerTransitionTimer.current);
@@ -360,6 +363,7 @@ function AppContent() {
     const mediaUrl = memory?.[`${type}_url`];
     if (!mediaUrl) return;
 
+    // A newer open/close request must prevent a completed download from reopening the viewer.
     const requestKey = ++mediaViewerRequestKey.current;
     if (mediaViewerTransitionTimer.current) {
       clearTimeout(mediaViewerTransitionTimer.current);
@@ -410,7 +414,7 @@ function AppContent() {
   }, [mediaViewer]);
 
   // --- AR camera closure ---
-  //// TODO :  maybe this needs looking at closely to get the correct order of instructions (buggy?)
+  // Record the close time so reopening waits for the native AR session to release.
   const closeARCamera = useCallback(() => {
     lastARCloseAt.current = Date.now();
     setShowCamera(false);
@@ -444,6 +448,7 @@ function AppContent() {
     try {
       const nearby = await loadNearbyMemories();
       const session = createARSession(nearby.memories, nearby.location);
+      // Mount AR only after a fresh location, proximity filtering, and all downloads succeed.
       const preparedSession = await Promise.all(session.map(async (entry) => ({
         ...entry,
         memory: await cacheMemoryAssets(entry.memory),
@@ -461,7 +466,7 @@ function AppContent() {
     }
   }, [isGalaxyA, loadNearbyMemories, cacheMemoryAssets, t]);
 
-  // --- Request camera permission and start AR session (FIRST)
+  // --- Request camera permission before preparing the AR session ---
   const requestCameraAndStart = useCallback(async () => {
     if (isGalaxyA) {
       await openARCamera();
@@ -522,7 +527,7 @@ function AppContent() {
     syncSelected();
   }, [arMemories]);
 
-  // Replace a memory from the inventory.
+  // Re-place a legacy collected memory without making it collectible a second time.
   const handleReplaceFromInventory = async (memory) => {
     setShowInventory(false);
     const sourceMemory = memories.find((item) => String(item.id) === String(memory.id));
@@ -622,7 +627,7 @@ function AppContent() {
   //   );
   // }
 
-  // --- AR camera view ---
+  // --- Fullscreen 3D and media viewers ---
   if (isPreparingModelViewer || modelViewerMemory) {
     return (
       <View style={styles.modelViewerScreen} collapsable={false}>
@@ -697,8 +702,7 @@ function AppContent() {
 
   if (showCamera) {
 
-    //// when opening the AR camera no memories should be selected yet
-    //// TODO : make sure that arMemoryToPlace can be null at startup and it won't disrupt anything
+    // No selection is required at startup: memory droplets remain available for discovery.
     const arMemoryToPlace = selectedMemoryToPlace || selectedArMemory;
     return (
       <View style={styles.arScreen} collapsable={false}>
@@ -903,7 +907,7 @@ function AppContent() {
         </View>
       </View>
 
-      {/* BANDEAU ERREUR RESEAU */}
+      {/* Network errors take priority over GPS errors; tapping retries the failed operation. */}
       {apiError && (
         <TouchableOpacity style={styles.errorBanner} onPress={refreshData}>
           <Text style={styles.errorText}>{apiError} - {t('retryNetwork')}</Text>

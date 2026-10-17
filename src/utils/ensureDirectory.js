@@ -1,5 +1,6 @@
 import { FileSystem } from 'react-native-file-access';
 
+// Concurrent asset downloads share creation work, but later calls recheck the filesystem.
 const pendingDirectories = new Map();
 
 export async function ensureDirectory(path) {
@@ -16,6 +17,7 @@ export async function ensureDirectory(path) {
     try {
       await FileSystem.mkdir(path);
     } catch (error) {
+      // Another caller/process may have created the directory after the existence check.
       if (error?.code !== 'EEXIST' || !(await FileSystem.isDir(path))) {
         throw error;
       }

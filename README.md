@@ -2,6 +2,27 @@ This is a new [**React Native**](https://reactnative.dev) project, bootstrapped 
 
 # Getting Started
 
+## Source guide
+
+Source comments are written in English; user-facing strings remain localized in
+[`constants/i18n.js`](constants/i18n.js).
+
+- [`App.js`](App.js) coordinates map discovery, authentication, viewer transitions,
+  and AR preparation. An AR session snapshots nearby memories only after location
+  lookup and asset downloads succeed.
+- [`src/hooks/useRadar.js`](src/hooks/useRadar.js) normalizes API responses and
+  caches media. [`src/utils/memoryAccess.js`](src/utils/memoryAccess.js) defines
+  proximity limits and the Galaxy A viewer policy.
+- [`src/experiences/experience.ts`](src/experiences/experience.ts) validates scene
+  definitions. Templates and `SceneObject` render declarative content; aiming
+  helpers and the configured aiming template handle colliders, shots, and scoring.
+- [`src/hooks/useProgress.js`](src/hooks/useProgress.js) owns account-scoped local
+  progression and queued uploads. The standalone inventory, score, and visited-place
+  hooks retain the legacy storage format.
+- [`native/android/`](native/android/) holds the custom location module copied
+  into the Android project by [`plugins/withEchoesLocation.js`](plugins/withEchoesLocation.js).
+  Keep both tracked native copies aligned when changing the module.
+
 ## Memory discovery
 
 - The nearby endpoint is queried with the current latitude and longitude; the map

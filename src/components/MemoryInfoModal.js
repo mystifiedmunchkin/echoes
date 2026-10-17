@@ -13,8 +13,8 @@ import { MemoryAudioControls } from './MemoryAudioControls';
 import { hasExperience } from '../experiences/experience';
 
 /**
- * Read-only modal displaying an existing memory's details.
- * It contains no input fields and submits no POST requests.
+ * Read-only details with media and metadata gated by the caller's proximity/device policy.
+ * The title and description remain visible in preview mode.
  */
 export const MemoryInfoModal = ({
   visible,

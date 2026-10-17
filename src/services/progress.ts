@@ -1,3 +1,4 @@
+/** Validates progression, migrates legacy local data, and builds the server's exact payload. */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { translate } from '../../constants/i18n';
 import type { ExperienceType } from '../experiences/experience';
@@ -75,6 +76,7 @@ export function emptyProgress(): Progress {
 }
 
 export function progressPayload(progress: Progress): ProgressPayload {
+  // Keep display names, timestamps, coordinates, and legacy memories out of the API payload.
   return {
     scores: progress.scores.map(item => {
       if (
@@ -120,6 +122,7 @@ function readProgress(stored: string): Progress {
 
 export async function loadProgress(userId: string | number | null): Promise<Progress> {
   let result = emptyProgress();
+  // Serialize first-load migrations so only one signed-in account can claim legacy history.
   const task = migrations.then(async () => {
     const key = progressKey(userId);
     const saved = await AsyncStorage.getItem(key);

@@ -6,7 +6,7 @@ import { COLORS } from '../../theme';
 const { width } = Dimensions.get('window');
 
 export default function CollectionParticle({ startX, startY, onAnimationEnd }) {
-  // Target position: top right near the Inventory badge (~80% width, 60px top)
+  // Fly toward a fixed upper-right destination, independent of the triggering touch.
   const targetX = width * 0.8;
   const targetY = 60;
 
@@ -47,8 +47,7 @@ export default function CollectionParticle({ startX, startY, onAnimationEnd }) {
     ]).start(() => {
       if (onAnimationEnd) onAnimationEnd();
     });
-    // Run the animation once on mount.
-    // Dependencies are intentionally omitted because the values and parent callback are stable.
+    // Each mounted particle animates once from its initial touch coordinates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

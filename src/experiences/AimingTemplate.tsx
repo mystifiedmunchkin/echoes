@@ -1,3 +1,4 @@
+/** Locks a playable floor, launches projectiles, and translates native impacts into game events. */
 import * as React from 'react';
 import { ViroARPlane, ViroNode, ViroQuad } from '@reactvision/react-viro';
 import { AimingSceneContext } from './AimingScene';
@@ -54,6 +55,7 @@ function floorFromAnchor(
   )
     return null;
   const yaw = (rotation[1] * Math.PI) / 180;
+  // The anchor center is plane-local; rotate its offset into world space before locking.
   return {
     anchorId: anchor.anchorId,
     position: [
@@ -99,6 +101,7 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
     object => object.id === config.projectile.objectId,
   )!;
   const projectilePhysics = { ...projectile.properties.physics };
+  // Launch velocity is applied once via instantVelocity, rather than overriding gravity each render.
   delete projectilePhysics.velocity;
   const claimScore = (tag?: string) => {
     const id = Number(tag);
@@ -111,6 +114,7 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
     return true;
   };
   const award = (targetId: number, impact: Impact) => {
+    // Fall rules score each target once; other impact rules score each projectile once.
     const claimed = config.fall ? scoredTargets.current : scoredShots.current;
     const key = config.fall ? targetId : impact.projectileId;
     if (claimed.has(key)) return;
@@ -133,6 +137,7 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
     });
   };
   const propagateFall = (targetId: number, impact: Impact) => {
+    // Remember contact chains so a projectile can topple and score indirectly hit targets.
     if (pendingFalls.current.has(targetId)) return;
     pendingFalls.current.set(targetId, impact);
     for (const [neighbor, contact] of targetContacts.current.get(targetId) ?? []) {
@@ -189,6 +194,7 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
 
   React.useEffect(() => {
     if (!trackingReady || !candidate || floor) return;
+    // Small anchor refinements retain the timer; significant motion restarts stabilization.
     const timer = setTimeout(() => {
       const locked = latestCandidate.current;
       if (!locked) return;
@@ -257,12 +263,14 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
         direction[2] * speed,
       ];
       const shot: Shot = {
+        // Server object IDs are non-negative; negative IDs identify local shot/reward instances.
         id: -++sequence.current,
         position,
         rotation: camera.rotation,
         velocity,
       };
       activeShots.current = [...live, shot];
+      // Keep bodies for the scene's lifetime; the configured active-shot cap blocks further shots.
       setShots(activeShots.current);
       emit(
         'shot',

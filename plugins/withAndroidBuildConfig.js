@@ -5,6 +5,7 @@ const {
 } = require('expo/config-plugins');
 
 const GRADLE_MEMORY = '-Xmx6g -XX:MaxMetaspaceSize=1024m';
+// Stable markers make repeated prebuilds update generated sections instead of duplicating them.
 const SIGNING_MARKER = '// echoes-release-signing';
 const LOCAL_PROPERTIES_COPY_MARKER = '// echoes-copy-root-local-properties';
 
@@ -43,6 +44,7 @@ function withAndroidBuildConfig(config) {
 
   return withAppBuildGradle(config, (config) => {
     let contents = config.modResults.contents;
+    // Release builds must use explicit signing credentials, never the generated debug keystore.
     contents = contents.replace(
       /(buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?)signingConfig signingConfigs\.debug/,
       '$1',

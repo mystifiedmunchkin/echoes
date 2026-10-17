@@ -24,6 +24,7 @@ import com.facebook.react.bridge.WritableMap;
 
 import java.util.List;
 
+/** One-shot location bridge using Android providers without Google Play Services. */
 public class EchoesLocationModule extends ReactContextBaseJavaModule {
   private static final String MODULE_NAME = "EchoesLocation";
   private static final String TAG = "EchoesLocation";
@@ -58,6 +59,7 @@ public class EchoesLocationModule extends ReactContextBaseJavaModule {
       return;
     }
 
+    // Reuse the newest provider fix only when it satisfies the caller's maximum age.
     Location cachedLocation = getBestLastKnownLocation(providers);
     if (cachedLocation != null
         && System.currentTimeMillis() - cachedLocation.getTime() <= maximumAge) {
@@ -85,6 +87,7 @@ public class EchoesLocationModule extends ReactContextBaseJavaModule {
       }
 
       private void cleanup() {
+        // The listener also identifies its timeout callback, so a fix cancels the pending timeout.
         handler.removeCallbacksAndMessages(this);
         locationManager.removeUpdates(this);
       }
@@ -125,6 +128,7 @@ public class EchoesLocationModule extends ReactContextBaseJavaModule {
     boolean hasFinePermission = getReactApplicationContext().checkSelfPermission(
         Manifest.permission.ACCESS_FINE_LOCATION
     ) == PackageManager.PERMISSION_GRANTED;
+    // Approximate-only permission can use the network provider, but not GPS.
     if (hasFinePermission && providers.contains(LocationManager.GPS_PROVIDER)) {
       availableProviders.add(LocationManager.GPS_PROVIDER);
     }

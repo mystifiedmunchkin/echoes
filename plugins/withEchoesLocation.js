@@ -4,6 +4,7 @@ const { withDangerousMod } = require('expo/config-plugins');
 
 const PACKAGE_PATH = path.join('com', 'sophiehorner', 'echoes');
 const JAVA_FILES = ['EchoesLocationModule.java', 'EchoesLocationPackage.java'];
+// Restore the custom native module and its manual registration after Expo regenerates Android.
 module.exports = function withEchoesLocation(config) {
   return withDangerousMod(config, [
     'android',

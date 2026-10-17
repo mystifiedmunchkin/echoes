@@ -5,6 +5,7 @@ const { withAppBuildGradle, withDangerousMod } = require('expo/config-plugins');
 const GMS_LOCATION_DEPENDENCY =
   /\s*(?:\/\/ Required for ARCore Geospatial API\s*\r?\n\s*)?implementation ['"]com\.google\.android\.gms:play-services-location:[^'"]+['"]\s*\r?\n/g;
 
+// Location uses Android's LocationManager, not the GMS dependency inserted by the Viro plugin.
 module.exports = function withEchoesGmsCleanup(config) {
   config = withAppBuildGradle(config, (config) => {
     config.modResults.contents = config.modResults.contents.replace(
@@ -14,6 +15,7 @@ module.exports = function withEchoesGmsCleanup(config) {
     return config;
   });
 
+  // Also clean the on-disk file after plugins that edit Gradle outside the normal mod chain.
   return withDangerousMod(config, [
     'android',
     async (config) => {

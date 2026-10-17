@@ -1,4 +1,4 @@
-/** Persists collected-memory inventory and exposes collection actions to the UI. */
+/** Legacy collected-memory storage; the active application uses per-user useProgress instead. */
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { translate } from '../../constants/i18n';

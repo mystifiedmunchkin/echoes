@@ -296,6 +296,7 @@ const translations = {
 };
 
 const getDeviceLanguage = () => {
+  // English is opt-in by device locale; French is the fallback for every other language.
   const languageCode = getLocales()[0]?.languageCode?.toLowerCase();
   return languageCode === 'en' ? 'en' : 'fr';
 };

@@ -1,4 +1,4 @@
-/** Player menu: visited places/games list, with room for preferences and scores. */
+/** Player history and ranked scores; the preferences tab remains a placeholder. */
 import React, { useState } from 'react';
 import {
   StyleSheet,

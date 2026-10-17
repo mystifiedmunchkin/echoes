@@ -7,10 +7,12 @@ import {
   emptyProgress, loadProgress, postProgress, progressId, progressKey, progressPayload,
 } from '../services/progress';
 
+/** Owns per-user local progression and queues authenticated uploads when a game ends. */
 export function useProgress(user, token) {
   const { t } = useI18n();
   const userId = user?.id ?? null;
   const [view, setView] = useState(null);
+  // Isolate queued work and rendered data when switching between accounts or guest mode.
   const session = useMemo(() => ({
     userId, data: emptyProgress(), queue: Promise.resolve(),
     mounted: false, ready: null, uploads: Promise.resolve(),
@@ -33,6 +35,7 @@ export function useProgress(user, token) {
   }, [session]);
 
   const enqueue = useCallback((operation) => {
+    // Serialize mutations behind hydration so rapid scores/collections cannot overwrite each other.
     session.queue = session.queue.then(async () => {
       await session.ready;
       await operation(session);
@@ -103,8 +106,10 @@ export function useProgress(user, token) {
     enqueue(async current => {
       await AsyncStorage.setItem(progressKey(current.userId), JSON.stringify(current.data));
       const payload = progressPayload(current.data);
+      // Snapshot the saved payload, then serialize uploads separately from local UI mutations.
       current.uploads = current.uploads.then(async () => {
         const [storedToken, storedUser] = await Promise.all([getAuthToken(), getStoredUser()]);
+        // A queued upload must still belong to the authenticated account when it starts.
         if (storedToken !== authToken || String(storedUser?.id) !== String(current.userId)) {
           throw new Error(t('progressAuthenticationRequired'));
         }
@@ -130,6 +135,7 @@ export function useProgress(user, token) {
     }, () => Alert.alert(t('collection'), t('memoryAdded', { name: memory.name })));
   }, [update, t]);
 
+  // Never display the previous account's data while the new session is loading.
   const data = view?.session === session ? view.data : emptyProgress();
   return {
     ...data, addScore, markPlaceVisited, collectObject,

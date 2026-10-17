@@ -108,6 +108,7 @@ const parseJsonCollection = (value, fallback) => {
 };
 
 export const normalizeInteractiveGames = value => {
+  // Decode legacy JSON-encoded fields before the strict experience validator checks them.
   const parsed = parseJsonCollection(value, []);
   const games = Array.isArray(parsed) ? parsed : parsed?.games;
   if (!Array.isArray(games)) return [];
@@ -192,6 +193,7 @@ const isAudioReference = value =>
   isAudioUrl(value) || /\/(?:audios?|audio-files)\//i.test(value || '');
 const isRemoteUrl = value => /^https?:\/\//i.test(value || '');
 const resourceVersion = url => {
+  // Include the full resource URL, including version queries, in experience cache names.
   let hash = 0;
   for (let index = 0; index < url.length; index += 1) {
     hash = (hash * 31 + url.charCodeAt(index)) % 4294967296;
@@ -200,6 +202,7 @@ const resourceVersion = url => {
 };
 
 const resolvePrivateFileUrl = (value, userId, mediaType) => {
+  // Rewrite only first-party/private paths; external URLs and local URIs remain unchanged.
   if (typeof value !== 'string' || !value.trim()) return '';
 
   const candidate = value.trim();
@@ -267,6 +270,7 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
         );
       }
     } catch (error) {
+      // Remove partial downloads so a retry cannot mistake an incomplete file for a cache hit.
       if (await FileSystem.exists(localUri)) await FileSystem.unlink(localUri);
       throw error;
     }
@@ -622,6 +626,7 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
   }, []);
 
   const loadNearbyMemories = useCallback(async () => {
+    // AR preparation needs a new location request and propagated API errors, not stale map data.
     const currentLoc = await Location.getCurrentPositionAsync({
       timeout: 20000,
     });
@@ -634,7 +639,6 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
   }, [fetchMemories]);
 
   const requestGpsPermission = useCallback(async () => {
-    // This async function may call setState.
     let permission;
     try {
       permission = await Location.requestForegroundPermissionsAsync();
@@ -687,8 +691,7 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-    // Keep setState out of the effect's synchronous body to satisfy react-hooks/set-state-in-effect.
-    // Use a microtask only: the first render is a no-op, then the second render sets the idle state.
+    // Defer permission setup until after the effect; cleanup cancels it if the hook unmounts.
     const handle = () => {
       requestGpsPermission();
     };

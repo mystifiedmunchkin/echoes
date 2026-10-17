@@ -1,7 +1,9 @@
+/** Validates server-defined scenes and prepares their assets for AR or the 3D viewer. */
 import { colliderSize, readAiming, readCollider } from './aiming';
 import type { AimingCollider, AimingSettings } from './aiming';
 
 export type ExperienceType = 'aiming' | 'treasure' | 'discovery' | 'images';
+// Positions and collider dimensions use meters; rotations use degrees.
 export type Vector3 = [number, number, number];
 export type AssetType = 'GLB' | 'GLTF' | 'OBJ' | 'image' | 'video' | 'audio';
 
@@ -164,6 +166,7 @@ function physicsBody(
   return result;
 }
 
+// This lightweight presence check does not replace readExperience's full validation.
 export function hasExperience(memory: unknown): boolean {
   const source = record(memory);
   const definition =
@@ -172,6 +175,7 @@ export function hasExperience(memory: unknown): boolean {
   return Array.isArray(games) && games.length > 0;
 }
 
+// Missing/empty definitions are ordinary memories; malformed definitions throw with a field path.
 export function readExperience(memory: unknown): Experience | null {
   const source = record(memory);
   const definition =
@@ -228,6 +232,7 @@ export function readExperience(memory: unknown): Experience | null {
           object.name === undefined,
           `${objectPath}.name is not supported`,
         );
+        // Preserve custom declarative properties without executing actions as scripts.
         const properties = { ...record(object.properties) };
         if (properties.asset !== undefined) {
           requireValue(
@@ -318,6 +323,7 @@ export function readExperience(memory: unknown): Experience | null {
       `${path}.objects`,
     );
     if (objects.some(object => object.properties.collectible === true)) {
+      // Persisted collection IDs must come from the server, not a temporary array index.
       integer(game.id, `${path}.id required for collectible objects`);
     }
     const result: ExperienceGame = {
@@ -401,6 +407,7 @@ export async function cacheExperience(
 ): Promise<Experience | null> {
   const experience = readExperience(memory);
   if (!experience) return null;
+  // Share one resource index across games and image targets to avoid cache-name collisions.
   let resourceIndex = 0;
   const games = await Promise.all(
     experience.games.map(async game => ({

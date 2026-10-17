@@ -46,6 +46,7 @@ export function createRadiusPolygon(latitude, longitude, radiusMeters, steps = 6
 }
 
 /**
+ * Compress geographic distances into the AR marker radius; north maps to negative Z.
  * @returns {[number, number, number]}
  */
 export function getRelativeARPosition(
@@ -80,6 +81,7 @@ export function spreadARPositions(entries, minimumDistance = 0.18) {
       const dz = candidate[2] - position[2];
       return Math.hypot(dx, dz) < minimumDistance;
     })) {
+      // Golden-angle offsets separate overlapping markers without changing their height.
       const angle = ((index + attempt) * 137.5 * Math.PI) / 180;
       const distance = minimumDistance * (1 + Math.floor(attempt / 8) * 0.5);
       candidate = [

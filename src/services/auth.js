@@ -28,6 +28,7 @@ async function requestAuth(path, credentials, requiresToken = true) {
     throw new Error(payload?.message || translate('emailVerificationRequired'));
   }
 
+  // Registration requires email verification and must not replace an existing local session.
   if (!requiresToken) return { token: null, user, message: payload?.message };
 
   await AsyncStorage.setItem(TOKEN_KEY, token);
