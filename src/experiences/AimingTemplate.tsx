@@ -2,6 +2,7 @@
 import * as React from 'react';
 import { ViroARPlane, ViroNode, ViroQuad } from '@reactvision/react-viro';
 import { AimingSceneContext } from './AimingScene';
+import { AimingReadyProjectile } from './AimingReadyProjectile';
 import {
   colliderShape, hasFallen, hasImpactRules, impactPoints, isBottomContact, launchSpeed,
 } from './aiming';
@@ -73,6 +74,7 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
   const { game, mode, onEvent } = props;
   const config = game.settings!;
   const impactRules = hasImpactRules(config);
+  const basketGame = game.subtype === 'basket';
   const scene = React.useContext(AimingSceneContext);
   const trackingReady = mode === 'viewer' || scene?.trackingReady === true;
   const [floor, setFloor] = React.useState<Floor | null>(
@@ -158,10 +160,13 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
   ) => {
     const otherId = Number(tag);
     const collider = object.properties.collider!;
-    if (collider.type === 'basket' && !isBottomContact(collider, point, normal, transform)) return;
+    if ((basketGame || collider.type === 'basket') &&
+      !isBottomContact(collider, point, normal, transform)) return;
     const contact: Contact = {
       point, normal,
-      points: impactPoints(collider, point, normal, transform, config.multiplier ?? 1),
+      points: game.subtype === 'bowling' || basketGame
+        ? config.multiplier ?? 1
+        : impactPoints(collider, point, normal, transform, config.multiplier ?? 1),
     };
     if (config.fall && activeShots.current.length && config.targets.includes(otherId)) {
       if (!targetContacts.current.has(otherId)) targetContacts.current.set(otherId, new Map());
@@ -172,6 +177,7 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
       return;
     }
     if (!activeShots.current.some(shot => shot.id === otherId)) return;
+    if (!config.fall && scoredShots.current.has(otherId)) return;
     if (config.freeze) setFrozenShots(current =>
       current.has(otherId) ? current : new Set([...current, otherId]),
     );
@@ -181,7 +187,13 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
     if (config.fall) {
       propagateFall(object.id, impact);
       checkFall(object, transform);
-    } else award(object.id, impact);
+    } else {
+      award(object.id, impact);
+      if (basketGame) {
+        activeShots.current = activeShots.current.filter(shot => shot.id !== otherId);
+        setShots(activeShots.current);
+      }
+    }
   };
   const emit = React.useCallback(
     (
@@ -270,7 +282,7 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
         velocity,
       };
       activeShots.current = [...live, shot];
-      // Keep bodies for the scene's lifetime; the configured active-shot cap blocks further shots.
+      // Basket successes release a slot; other bodies remain for the scene's lifetime.
       setShots(activeShots.current);
       emit(
         'shot',
@@ -305,6 +317,12 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
   });
   return (
     <ViroNode viroTag="aiming">
+      <AimingReadyProjectile
+        {...props}
+        projectile={projectile}
+        visible={trackingReady && shots.length < config.projectile.maxActive}
+        showHint={floor !== null}
+      />
       {mode === 'ar' && !floor && (
         <ViroARPlane
           minWidth={config.plane.minWidth}
@@ -375,7 +393,7 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
                         : 0,
                     shape: colliderShape(object.properties.collider!, {
                       targetBottom:
-                        !impactRules && object.properties.collider!.type === 'bounding',
+                        (basketGame || !impactRules) && object.properties.collider!.type === 'bounding',
                     }),
                   }}
                 />

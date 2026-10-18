@@ -10,6 +10,7 @@ export interface InteractiveObject {
 
 export interface InteractiveGame {
   type?: string | null;
+  subtype?: string;
   assets?: unknown;
   objects?: InteractiveObject[];
   [key: string]: unknown;

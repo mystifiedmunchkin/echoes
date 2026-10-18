@@ -65,6 +65,12 @@ to be implemented. Aiming scores, long-press object collection and authenticated
 progress synchronization are implemented.
 Existing map proximity restrictions and legacy memory viewers remain unchanged.
 
+Every game type accepts an optional, non-empty string `subtype` alongside `type`.
+For `treasure`, `discovery`, and `images`, it is preserved as custom metadata.
+For `aiming`, the supported values are `basket`, `dartboard`, and `bowling`;
+these require `settings` and select the rules below. Omitting `subtype` preserves
+existing definitions and their behavior.
+
 The nearby endpoint returns a **direct JSON list of interactive games**, not
 legacy `memory` records and not JSON-encoded strings. Each game carries its
 own GPS coordinates and required `type`; there is no root-level type fallback.
@@ -267,9 +273,18 @@ contains the mobile consumer, not a server editor or backend.
   Their GLB, GLTF or OBJ geometry should be centered on the configured collider. Targets
   default to `Static`; optional `physics` can specify `Static`, `Dynamic` or
   `Kinematic` and the usual physical parameters. All configured targets must
-  reference GLB, GLTF or OBJ assets and a collider. The projectile is not
-  mounted before shooting.
-- Press and release the scene to spawn a dynamic projectile from the camera position plus
+  reference GLB, GLTF or OBJ assets and a collider.
+- Every configured aiming game, with or without `subtype`, displays its projectile
+  centered at `spawnDistance` in front of the native camera before throwing.
+  This held preview follows camera translation and rotation without JS pose updates,
+  preserves the model's scale, and has no physics or collection behavior.
+  Once the floor is ready, a white outlined hand with three concentric fingertip
+  arcs invites the player to press and hold. The hint does not intercept input.
+  The projectile stays attached during the press and launches on release.
+  Another preview appears while a shot slot is available; preview and hint are
+  hidden on tracking loss or when `maxActive` is reached. The preview itself
+  does not consume a slot, score, or become collectible.
+- Press and release the scene or held projectile to spawn a dynamic projectile from the camera position plus
   `spawnDistance` along its normalized forward axis. Defaults: distance 0.3 m,
   base speed 5 m/s, gravity enabled, unlimited lifetime, maximum 12 active projectiles.
   Holding increases the launch speed linearly: base speed for an immediate release,
@@ -292,18 +307,34 @@ contains the mobile consumer, not a server editor or backend.
   discrete-physics tunneling.
 - Tracking loss blocks new shots and requests a fresh camera pose on recovery;
   the floor remains fixed and existing physics simulation continues.
-  Unless `settings.freeze` is true, collisions do not freeze projectiles: they retain their
+  Unless `settings.freeze` is true (automatically for `dartboard`), collisions do not freeze projectiles: they retain their
   dynamic bodies, gravity and physical interaction with the walls and bottom.
-  They count toward `maxActive` until leaving the game, including after an impact.
+  They count toward `maxActive` until leaving the game, including after an impact,
+  except successful `basket` shots, which are removed and release their slot.
   Reaching this limit blocks further shots.
-- Without the optional impact rules below, a contact on the interior top face of a box/basket bottom awards one point per
+- With neither `subtype` nor the optional impact rules below, a contact on the interior top face of a box/basket bottom awards one point per
   projectile across all targets in the current game instance. Classification uses
   the contact position and normal in the body's current native world transform,
   including moved/rotated targets; wall faces, top rims, the underside and
   non-projectile bodies do not score. Native transform failures are reported.
   Scores persist per account, location and game type and appear in the menu's
   Scores tab; in AR, a scoring contact also adds the memory to the legacy collection.
-- Optional fields directly in `settings` configure impact behavior:
+- `subtype` belongs to the game, not to `settings` or the collider:
+
+  | Aiming subtype | Impact behavior | Score |
+  | --- | --- | --- |
+  | `basket` | Open `basket` or `bounding` target; remove the projectile only on the interior bottom, not walls or rim. | Constant `multiplier`, default 1, once per projectile. |
+  | `dartboard` | Solid target (`basket` colliders are rejected); freeze the projectile at its native contact pose and keep it visible. | Radial decrease from `multiplier` (default 10) at the center to 1 at the edge. |
+  | `bowling` | Dynamic targets (`basket` colliders are rejected); keep the projectile moving and wait for a tilt of at least 60 degrees, including target-to-target chains. | Constant `multiplier`, default 1, once per fallen target; touching alone awards nothing. |
+
+  The subtype imposes `freeze: true, fall: false` for `dartboard`,
+  `freeze: false, fall: true` for `bowling`, and both false for `basket`.
+  Contradictory explicit settings are rejected rather than silently ignored.
+  Example: `{ "type": "aiming", "subtype": "dartboard", "assets": [...],
+  "objects": [...], "settings": { "plane": { "minWidth": 2, "minLength": 3 },
+  "projectile": { "objectId": 103 }, "targets": [104], "multiplier": 20 } }`.
+- Optional fields directly in `settings` configure impact behavior (the following
+  defaults and freely combined rules describe games without `subtype`):
   `reward` references an asset in this game's `assets`, displayed at the impact
   position once scoring is validated; `freeze` stops the projectile at its
   native contact pose; `multiplier` is a positive safe integer defining the
@@ -316,7 +347,7 @@ contains the mobile consumer, not a server editor or backend.
   Providing any of these fields, including explicit `false`, enables the new
   rules: `bounding` targets become solid boxes and all collider types can score
   on impact, while `basket` still requires an interior bottom contact.
-  Omitting all four preserves legacy behavior. The scoring collision event
+  Omitting all four and `subtype` preserves legacy behavior. The scoring collision event
   carries `data.points`; progression stores and uploads their sum using the
   existing API. See the [complete impact contract](docs/jeux-adresse.md#regles-dimpact--contrat-serveurclient).
 - Collider debug outlines are currently disabled with `physicsWorld.drawBounds: false`

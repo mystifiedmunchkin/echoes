@@ -184,6 +184,7 @@ classDiagram
     class Game {
         number id
         string type = aiming
+        string subtype_optional
     }
     class Asset {
         number id
@@ -345,13 +346,14 @@ Les URL `example.test` sont des placeholders a remplacer par de vraies ressource
 | Champ | Interpretation |
 | --- | --- |
 | `logic.gravity` | Gravite globale ; `[0, -9.81, 0]` par defaut. |
+| `subtype` | Au niveau du jeu : `basket`, `dartboard` ou `bowling` pour aiming. Chaine libre non vide facultative pour les autres types. |
 | `assets[].id` | Identifiant d'une ressource ; `properties.asset` la reference. |
 | `objects[].id` | Identifiant d'un objet modele ; distinct des identifiants des tirs crees au runtime. |
-| `settings.projectile.objectId` | Objet utilise comme modele pour chaque lancer. Il n'est pas affiche avant le premier tir. |
+| `settings.projectile.objectId` | Modele affiche au centre devant la camera en attente du lancer, puis utilise pour chaque projectile physique. |
 | `settings.targets` | Identifiants des objets physiques servant de cibles. |
 | `settings.reward` | ID facultatif d'un asset du meme jeu, affiche lors de la validation du score. |
 | `settings.freeze` | Booleen facultatif : immobiliser le projectile au premier impact eligible. |
-| `settings.multiplier` | Entier strictement positif facultatif : score maximal au centre, 1 par defaut. |
+| `settings.multiplier` | Entier strictement positif facultatif : maximum radial pour dartboard (10 par defaut), valeur constante pour basket/bowling (1 par defaut). Sans subtype : maximum radial, 1 par defaut. |
 | `settings.fall` | Booleen facultatif : attendre le renversement des cibles Dynamic pour valider le score. |
 | `plane.minWidth`, `plane.minLength` | Dimensions minimales du plane detecte, en metres ; pas la taille du sol physique final. |
 | `plane.stableMs` | Delai de stabilite avant verrouillage automatique ; un tap sur l'indicateur peut aussi verrouiller le plane. |
@@ -374,6 +376,71 @@ la regle de score de fond. Les autres formes restent physiques sans attribution
 automatique de score.
 
 ### Regles d'impact : contrat serveur/client
+
+#### Sous-types
+
+Le champ `subtype` se trouve au meme niveau que `type`, `assets`, `objects`
+et `settings`. Tous les types d'activites l'acceptent : chaine libre non vide
+pour `treasure`, `discovery` et `images`, sans modifier leur comportement.
+Il reste facultatif pour conserver les anciennes definitions ; une valeur
+invalide ou vide, y compris `null`, est rejetee.
+
+Pour `aiming`, seuls trois sous-types sont acceptes et `settings` est requis :
+
+| Sous-type | Regles imposees | Score et personnalisation |
+| --- | --- | --- |
+| `basket` | Cibles `basket` ou `bounding` ouvertes ; ignorer parois et rebord. Retirer le projectile quand il touche la face interieure du fond et liberer une place dans `maxActive`. `freeze: false`, `fall: false`. | Une validation par tir ; valeur constante `multiplier`, 1 par defaut, independante de l'ecart au centre du fond. |
+| `dartboard` | Cibles pleines (collider `basket` interdit) ; figer le projectile a sa pose native de contact, visible jusqu'a la sortie du jeu. `freeze: true`, `fall: false`. | Une validation par tir ; score radial de 10 au centre a 1 au bord par defaut. `multiplier` personnalise le maximum. |
+| `bowling` | Cibles Dynamic (collider `basket` interdit) ; le projectile continue sa course. `freeze: false`, `fall: true`. | Aucun point au simple contact ; valeur constante `multiplier`, 1 par defaut, par cible renversee d'au moins 60 degres, y compris les reactions en chaine. |
+
+Les valeurs explicites de `freeze` et `fall` doivent correspondre au sous-type :
+les contradictions provoquent une erreur de preparation. Le champ `reward`
+reste facultatif pour les trois sous-types et apparait uniquement a la validation
+du score. Les projectiles figes et les tirs rates restent comptes dans `maxActive`.
+Les points restent groupes par lieu et type (`aiming`) pour la progression ;
+`subtype` ne modifie pas le contrat de synchronisation.
+
+#### Projectile en attente et indication du geste
+
+Pour tous les jeux aiming configures, y compris sans sous-type, le modele du
+projectile est d'abord enfant de la camera native (`ViroARCamera` en AR,
+`ViroCamera` dans le viewer). Il reste au centre a la distance `spawnDistance`,
+avec son echelle visuelle configuree, sans corps physique ni gravite.
+Les mouvements et rotations de la camera le suivent directement cote natif.
+L'appui le garde attache ; le relachement cree le projectile Dynamic a la pose
+actuelle de la camera, avec la puissance correspondant a la duree de l'appui.
+
+Une main blanche en contour et trois arcs concentriques autour du doigt invitent
+a maintenir l'appui. Le picto apparait une fois le sol pret, pres du projectile,
+sans intercepter les interactions. Le texte d'aide explique le maintien puis
+le relachement en francais et en anglais.
+
+Le modele en attente ne compte pas dans `maxActive`, ne rapporte aucun point et
+ne declenche pas de collecte, meme si le projectile serveur est collectible :
+un appui long sur la munition charge le tir, sans annuler le lancer apres 600 ms.
+Les projectiles deja lances conservent leur comportement de collecte.
+Une nouvelle munition est presente tant qu'une place reste disponible.
+Le modele en attente et le picto sont masques lorsque le tracking est perdu ou
+que `maxActive` est atteint ; un succes basket libere la place et les reaffiche.
+La detection du sol, l'annulation de charge et les blocages de tir restent actifs.
+
+Exemple de champs du jeu (completer avec ses assets et objets) :
+
+```json
+{
+  "type": "aiming",
+  "subtype": "dartboard",
+  "settings": {
+    "plane": { "minWidth": 2, "minLength": 3 },
+    "projectile": { "objectId": 103 },
+    "targets": [104],
+    "reward": 105,
+    "multiplier": 20
+  }
+}
+```
+
+#### Compatibilite sans subtype
 
 Les quatre champs sont directement dans `settings`, pas dans `projectile` ni
 dans les proprietes d'une cible. Ils s'appliquent aux cibles de ce jeu `aiming`.
@@ -499,7 +566,8 @@ par defaut pour les trois nouveaux champs. Les autres colliders conservent
 `size: [X, Y, Z]` et n'acceptent pas ces nouveaux champs.
 Le pont Viro utilise fournit les boites, spheres et corps composes necessaires ;
 seule la capsule reste une approximation a spheres superposees.
-Les collisions restent actives apres impact et ne suppriment pas le projectile.
+Les collisions restent actives apres impact et ne suppriment pas le projectile,
+sauf pour un fond valide du sous-type `basket`.
 Sans les nouvelles regles d'impact, leur utilisation comme cible n'ajoute pas
 de score automatique.
 
@@ -546,8 +614,9 @@ flowchart TD
     end
 
     subgraph Throw["Interaction et creation d'un projectile"]
-        Targets --> Down["CLICK_DOWN : memoriser le debut du geste"]
-        Down --> Hold["Maintien : aucun tir avant relachement"]
+        Targets --> Ready["Projectile sans physique au centre de la camera<br/>Main blanche et arcs lorsque le sol est pret"]
+        Ready --> Down["CLICK_DOWN : memoriser le debut du geste"]
+        Down --> Hold["Maintien : projectile attache a la camera<br/>Aucun tir avant relachement"]
         Hold --> Up["CLICK_UP : calculer la duree"]
         Hold -->|Tracking perdu ou jeu change| Cancel["Annuler la charge"]
         Up --> Checks{"Sol, tracking, camera<br/>et maxActive valides ?"}
@@ -562,16 +631,19 @@ flowchart TD
         Body --> Sim["Simulation physique native"]
         Sim --> Contact{"Contact ?"}
         Contact -->|Non| Sim
-        Contact -->|Oui| Keep["Conserver le projectile et son collider<br/>Aucune suppression ou copie visuelle a l'impact"]
-        Keep --> Rules{"Nouvelles regles d'impact ?"}
+        Contact -->|Oui| Keep["Qualifier le contact avec la cible"]
+        Keep --> Rules{"Sous-type ou regles d'impact ?"}
         Rules -->|Non| Eligible{"Callback d'une cible<br/>bounding / basket ?"}
         Rules -->|Oui| Impact["Contact cible / projectile actif<br/>basket : fond uniquement"]
-        Impact --> Effects["Figer si freeze ; calcul radial des points"]
+        Impact --> Effects["Figer si freeze ; points radiaux pour dartboard<br/>constants pour basket / bowling"]
         Effects --> Fall{"fall ?"}
         Fall -->|Oui| Tilt["Attendre 60 degres ; une validation par cible<br/>Propager les contacts entre quilles"]
         Fall -->|Non| Once["Une validation par projectile"]
         Tilt --> Reward["Ajouter reward si configure"]
-        Once --> Reward
+        Once --> Basket{"subtype basket ?"}
+        Basket -->|Oui| Remove["Retirer le projectile ; liberer maxActive"]
+        Basket -->|Non| Reward
+        Remove --> Reward
         Reward --> ScoreEvent
         Eligible -->|Non| Continue["Pas de point : la simulation continue"]
         Eligible -->|Oui| Transform["SceneObject : getTransformAsync<br/>Position et rotation monde actuelles"]
@@ -629,7 +701,8 @@ flowchart TD
   collecte d'objets. Ses fermetures et changements de jeu synchronisent aussi
   les totaux du compte connecte.
 - Avec une duree de vie illimitee, atteindre `maxActive` bloque les nouveaux tirs
-  jusqu'a la sortie du jeu. Un projectile pose au sol compte toujours dans cette limite.
+  jusqu'a la sortie du jeu, sauf si un succes `basket` libere une place.
+  Un projectile pose au sol ou fige sur une cible compte toujours dans cette limite.
 - Les contours physiques sont actuellement masques avec `drawBounds: false`,
   en AR et dans le viewer 3D, y compris en developpement. Les collisions restent actives.
   Les schemas decrivent le code ; ils ne remplacent pas une verification des

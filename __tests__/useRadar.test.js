@@ -167,6 +167,7 @@ test('normalizes interactive games, object properties, and JSON actions', async 
     JSON.stringify([
       {
         type: 'quiz',
+        subtype: 'custom-quiz',
         objects: [{ properties: '{"answer":42}', actions: ['{"type":"win"}'] }],
       },
     ]),
@@ -175,6 +176,7 @@ test('normalizes interactive games, object properties, and JSON actions', async 
     properties: { answer: 42 },
     actions: [{ type: 'win' }],
   });
+  expect(normalized[0].subtype).toBe('custom-quiz');
   expect(
     normalizeInteractive({
       id: 7,

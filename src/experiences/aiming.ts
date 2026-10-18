@@ -1,6 +1,8 @@
 /** Pure aiming rules: collider validation, compound shapes, launch speed, and impact scoring. */
 import type { ExperienceObject, Vector3 } from './experience';
 
+export type AimingSubtype = 'basket' | 'dartboard' | 'bowling';
+
 export type ColliderType =
   | 'capsule'
   | 'bounding'
@@ -261,6 +263,7 @@ export function readAiming(
   value: unknown,
   objects: ExperienceObject[],
   path: string,
+  subtype?: AimingSubtype,
 ): AimingSettings {
   const source = record(value);
   const plane = record(source.plane);
@@ -327,6 +330,25 @@ export function readAiming(
     requireValue(typeof source[key] === 'boolean', `${path}.${key}`);
     rules[key] = source[key];
   }
+  if (subtype) {
+    const required = { freeze: subtype === 'dartboard', fall: subtype === 'bowling' };
+    for (const key of ['freeze', 'fall'] as const) {
+      requireValue(
+        rules[key] === undefined || rules[key] === required[key],
+        `${path}.${key}: conflicts with subtype ${subtype}`,
+      );
+      rules[key] = required[key];
+    }
+    for (const id of targetIds) {
+      const collider = objects.find(object => object.id === id)!.properties.collider!;
+      requireValue(
+        subtype === 'basket'
+          ? collider.type === 'basket' || collider.type === 'bounding'
+          : collider.type !== 'basket',
+        `${path}.targets: ${id} collider incompatible with subtype ${subtype}`,
+      );
+    }
+  }
   if (source.reward !== undefined) {
     requireValue(
       typeof source.reward === 'number' && Number.isSafeInteger(source.reward) && source.reward >= 0,
@@ -341,6 +363,8 @@ export function readAiming(
     );
     rules.multiplier = source.multiplier;
   }
+  if (subtype === 'dartboard' && rules.multiplier === undefined)
+    rules.multiplier = 10;
   if (rules.fall) {
     requireValue(targetIds.every(id =>
       objects.find(object => object.id === id)!.properties.physics?.type === 'Dynamic',

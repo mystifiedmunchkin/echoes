@@ -6,7 +6,7 @@ import ExperienceViewer from '../src/experiences/ExperienceViewer';
 import ViroARView from '../src/components/ViroARView';
 import { readExperience } from '../src/experiences/experience';
 import { colliderShape } from '../src/experiences/aiming';
-import type { AimingCollider, AimingSettings } from '../src/experiences/aiming';
+import type { AimingCollider, AimingSettings, AimingSubtype } from '../src/experiences/aiming';
 
 jest.mock('../constants/i18n', () => ({ translate: (key: string) => key }));
 
@@ -41,6 +41,8 @@ jest.mock('@reactvision/react-viro', () => {
         sceneNavigator: { viroAppProps },
       }),
     ViroARScene: 'ViroARScene',
+    ViroARCamera: 'ViroARCamera',
+    ViroCamera: 'ViroCamera',
     ViroARPlane: 'ViroARPlane',
     ViroTrackingStateConstants: { TRACKING_NORMAL: 3 },
     Viro3DObject: 'Viro3DObject',
@@ -50,6 +52,7 @@ jest.mock('@reactvision/react-viro', () => {
     ViroSound: 'ViroSound',
     ViroText: 'ViroText',
     ViroQuad: 'ViroQuad',
+    ViroPolyline: 'ViroPolyline',
     ViroNode: 'ViroNode',
     ViroAmbientLight: 'ViroAmbientLight',
     ViroDirectionalLight: 'ViroDirectionalLight',
@@ -343,7 +346,8 @@ describe('configured aiming runtime', () => {
     host('ViroNode').filter(
       node =>
         typeof node.props.viroTag === 'string' &&
-        Number(node.props.viroTag) < 0,
+        Number(node.props.viroTag) < 0 &&
+        node.props.physicsBody !== undefined,
     );
   const mountAR = async (configured = aiming) => {
     await act(async () => {
@@ -399,6 +403,22 @@ describe('configured aiming runtime', () => {
     .map(([event]) => event)
     .filter(event => event.data?.scoringContact === true);
   const targetBody = (id = '404') => host('ViroNode').find(node => node.props.viroTag === id)!;
+  const withSubtype = (
+    subtype: AimingSubtype,
+    rules: Partial<AimingSettings> = {},
+    secondTarget = false,
+  ) => {
+    const configured = withRules({
+      ...(subtype === 'bowling' ? { fall: true } : {}),
+      ...rules,
+    }, secondTarget);
+    return readExperience({
+      logic: {
+        ...configured,
+        games: configured.games.map(game => ({ ...game, subtype })),
+      },
+    })!;
+  };
 
   beforeEach(() => {
     jest.useFakeTimers();
@@ -432,6 +452,237 @@ describe('configured aiming runtime', () => {
     diagnosticWarning.mockRestore();
     jest.useRealTimers();
   });
+
+  test.each([
+    ['ar', 'basket'], ['ar', 'dartboard'], ['ar', 'bowling'], ['ar', undefined],
+    ['viewer', 'basket'], ['viewer', 'dartboard'], ['viewer', 'bowling'], ['viewer', undefined],
+  ] as const)(
+    'holds the %s %s projectile in the native camera with a non-interactive white gesture hint',
+    async (mode, subtype) => {
+      const configured = subtype ? withSubtype(subtype) : aiming;
+      if (mode === 'ar') {
+        await mountAR(configured);
+        expect(host('ViroPolyline')).toHaveLength(0);
+        expect(host('ViroNode').find(node => node.props.viroTag === 'aiming-ready-projectile'))
+          .toBeUndefined();
+        detectFloor();
+      } else {
+        await act(async () => {
+          renderer = TestRenderer.create(
+            <ExperienceViewer
+              experience={configured}
+              gameIndex={0}
+              onEvent={onEvent}
+              onError={onError}
+            />,
+          );
+        });
+      }
+      const cameraNode = host(mode === 'ar' ? 'ViroARCamera' : 'ViroCamera')[0];
+      const held = host('ViroNode').find(node => node.props.viroTag === 'aiming-ready-projectile')!;
+      expect(cameraNode.findAll(node => node === held)).toHaveLength(1);
+      expect(held.props.position).toEqual([0, 0, -0.3]);
+      const model = held.find(node => String(node.type) === 'Viro3DObject');
+      expect(model.props.source).toEqual({ uri: 'file://ball.glb' });
+      const body = held.find(node => node.props.viroTag === '403');
+      expect(body.props.position).toEqual([0, 0, 0]);
+      expect(body.props.rotation).toEqual([0, 0, 0]);
+      expect(body.props.scale).toEqual([2, 2, 2]);
+      expect(body.props.physicsBody).toBeUndefined();
+      expect(projectiles()).toHaveLength(0);
+      const hint = host('ViroNode').find(node => node.props.viroTag === 'aiming-gesture-hint')!;
+      expect(hint.props.ignoreEventHandling).toBe(true);
+      expect(host('ViroPolyline')).toHaveLength(4);
+      for (const line of host('ViroPolyline')) {
+        expect(line.props.materials).toEqual(['aimingGestureHint']);
+        expect(line.props.ignoreEventHandling).toBe(true);
+      }
+      // The three arcs share one fingertip center, with increasing radii.
+      const radii = host('ViroPolyline').slice(1).map(line => {
+        const [x, y] = line.props.points[0];
+        return Math.hypot(x - 0.1, y - 0.04);
+      });
+      radii.forEach((radius, index) => expect(radius).toBeCloseTo([0.3, 0.48, 0.66][index]));
+      expect(onError).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each([[0, 6], [1000, 9], [3000, 12]])(
+    'keeps collectible ammunition attached during a %s ms press and launches once at speed %s on release',
+    async (heldMs, speed) => {
+      const configured = withSubtype('dartboard');
+      configured.games[0].objects[0].properties.collectible = true;
+      await mountAR(configured);
+      detectFloor();
+      const held = targetBody('403');
+      act(() => held.props.onClickState(1));
+      act(() => jest.advanceTimersByTime(heldMs));
+      expect(projectiles()).toHaveLength(0);
+      expect(host('ViroNode').some(node => node.props.viroTag === 'aiming-ready-projectile')).toBe(true);
+      act(() => held.props.onClickState(2));
+      act(() => scene().props.onClickState(2));
+      expect(projectiles()).toHaveLength(1);
+      expect(projectiles()[0].props.position).toEqual([2.3, 1, 0]);
+      expect(projectiles()[0].props.physicsBody.instantVelocity).toEqual([speed, 0, 0]);
+      expect(onEvent.mock.calls.filter(([event]) => event.name === 'shot')).toHaveLength(1);
+      expect(onEvent.mock.calls.filter(([event]) => event.name === 'collect')).toHaveLength(0);
+      expect(host('ViroNode').some(node => node.props.viroTag === 'aiming-ready-projectile')).toBe(false);
+      expect(host('ViroPolyline')).toHaveLength(0);
+    },
+  );
+
+  test('hides the held projectile and hint on tracking loss without removing launched bodies', async () => {
+    const configured = withSubtype('dartboard');
+    configured.games[0].settings!.projectile.maxActive = 2;
+    await mountAR(configured);
+    detectFloor();
+    tap();
+    expect(projectiles()).toHaveLength(1);
+    expect(host('ViroPolyline')).toHaveLength(4);
+    act(() => scene().props.onTrackingUpdated(2));
+    expect(host('ViroPolyline')).toHaveLength(0);
+    expect(host('ViroNode').some(node => node.props.viroTag === 'aiming-ready-projectile')).toBe(false);
+    expect(projectiles()).toHaveLength(1);
+    act(() => scene().props.onTrackingUpdated(3));
+    expect(host('ViroPolyline')).toHaveLength(4);
+    expect(projectiles()).toHaveLength(1);
+  });
+
+  test.each(['basket', 'bounding'] as const)(
+    'basket subtype removes a shot only at the %s bottom, awards once and releases its slot',
+    async colliderType => {
+      const configured = withSubtype('basket', { multiplier: 5, reward: 406 });
+      if (colliderType === 'basket') {
+        configured.games[0].objects[1].properties.collider = {
+          type: 'basket', size: [1, 1, 1], thickness: 0.05,
+        };
+      }
+      await mountAR(configured);
+      detectFloor();
+      tap();
+      expect(targetBody().props.physicsBody.shape.type).toBe('Compound');
+      await act(async () => targetBody().props.onCollision('-1', bottomPoint, [0, 0, 1]));
+      expect(projectiles()).toHaveLength(1);
+      expect(scoringEvents()).toHaveLength(0);
+      // Off-center bottom hits still award the full basket value.
+      const offCenterBottom = [0.75, -0.95, -3.7];
+      await act(async () => targetBody().props.onCollision('-1', offCenterBottom, [0, 1, 0]));
+      expect(projectiles()).toHaveLength(0);
+      expect(host('ViroNode').some(node => node.props.viroTag === 'aiming-ready-projectile')).toBe(true);
+      expect(host('ViroPolyline')).toHaveLength(4);
+      expect(scoringEvents()).toHaveLength(1);
+      expect(scoringEvents()[0].data).toMatchObject({ points: 5, projectileId: -1 });
+      expect(host('ViroImage')).toHaveLength(1);
+      await act(async () => targetBody().props.onCollision('-1', offCenterBottom, [0, 1, 0]));
+      expect(scoringEvents()).toHaveLength(1);
+      tap();
+      expect(projectiles()).toHaveLength(1);
+      expect(onError).not.toHaveBeenCalled();
+    },
+  );
+
+  test('dartboard subtype keeps multiple darts frozen and scores center, half-radius and edge hits', async () => {
+    const configured = withSubtype('dartboard', { reward: 406 });
+    configured.games[0].settings!.projectile.maxActive = 3;
+    await mountAR(configured);
+    detectFloor();
+    const points = [
+      [0.85, -0.5, -3.5],
+      [0.85, -0.25, -3.5],
+      [0.85, 0, -3.5],
+    ];
+    for (const [index, point] of points.entries()) {
+      tap();
+      const id = String(-(index * 2 + 1)); // Each reward also consumes an instance ID.
+      await act(async () => targetBody().props.onCollision(id, point, [1, 0, 0]));
+      const frozen = targetBody(id);
+      expect(frozen.props.position).toEqual([0.75, -0.5, -3.5]);
+      expect(frozen.props.rotation).toEqual([0, 90, 0]);
+      expect(frozen.props.physicsBody).toMatchObject({ type: 'Static', useGravity: false });
+      await act(async () => targetBody().props.onCollision(id, point, [1, 0, 0]));
+    }
+    expect(scoringEvents().map(event => event.data.points)).toEqual([10, 6, 1]);
+    expect(projectiles()).toHaveLength(3);
+    expect(host('ViroImage')).toHaveLength(3);
+    act(() => jest.advanceTimersByTime(10000));
+    expect(projectiles()).toHaveLength(3);
+    tap();
+    expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'shotBlocked', data: { reason: 'limit' },
+    }));
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  test('bowling subtype awards a constant value only on falls, including indirect hits', async () => {
+    await mountAR(withSubtype('bowling', { multiplier: 7 }, true));
+    detectFloor();
+    tap();
+    const edge = [0.85, 0, -3.5];
+    await act(async () => targetBody('405').props.onCollision('404', edge, [1, 0, 0]));
+    await act(async () => targetBody().props.onCollision('-1', edge, [1, 0, 0]));
+    expect(scoringEvents()).toHaveLength(0);
+    expect(targetBody('-1').props.physicsBody.type).toBe('Dynamic');
+    getBodyTransform.mockResolvedValue({ position: [0.75, -0.5, -3.5], rotation: [59.999, 90, 0] });
+    await act(async () => jest.advanceTimersByTime(100));
+    expect(scoringEvents()).toHaveLength(0);
+    getBodyTransform.mockResolvedValue({ position: [0.75, -0.5, -3.5], rotation: [60, 90, 0] });
+    await act(async () => jest.advanceTimersByTime(100));
+    expect(scoringEvents().map(event => event.data.points)).toEqual([7, 7]);
+    expect(scoringEvents().every(event => event.data.fallen)).toBe(true);
+    await act(async () => jest.advanceTimersByTime(500));
+    expect(scoringEvents()).toHaveLength(2);
+    expect(projectiles()).toHaveLength(1);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  test.each(['basket', 'dartboard', 'bowling'] as const)(
+    'applies %s subtype rules in the 3D viewer too',
+    async subtype => {
+      await act(async () => {
+        renderer = TestRenderer.create(
+          <ExperienceViewer
+            experience={withSubtype(subtype)}
+            gameIndex={0}
+            onEvent={onEvent}
+            onError={onError}
+          />,
+          {
+            createNodeMock: element =>
+              element.type === 'ViroNode'
+                ? { getTransformAsync: getBodyTransform }
+                : element.type === 'Viro3DObject'
+                ? {
+                    getTransformAsync: getModelTransform,
+                    getBoundingBoxAsync: getModelBounds,
+                  }
+                : null,
+          },
+        );
+      });
+      const viewer = host('ViroScene')[0];
+      act(() => viewer.props.onCameraTransformUpdate(camera));
+      tap(viewer);
+      expect(projectiles()).toHaveLength(1);
+      await act(async () => targetBody().props.onCollision(
+        '-1',
+        subtype === 'basket' ? bottomPoint : [0.85, -0.5, -3.5],
+        subtype === 'basket' ? [0, 1, 0] : [1, 0, 0],
+      ));
+      if (subtype === 'bowling') {
+        expect(scoringEvents()).toHaveLength(0);
+        getBodyTransform.mockResolvedValue({
+          position: [0.75, -0.5, -3.5], rotation: [60, 90, 0],
+        });
+        await act(async () => jest.advanceTimersByTime(100));
+      }
+      expect(scoringEvents()).toHaveLength(1);
+      expect(scoringEvents()[0].data.points).toBe(subtype === 'dartboard' ? 10 : 1);
+      expect(projectiles()).toHaveLength(subtype === 'basket' ? 0 : 1);
+      if (subtype === 'dartboard')
+        expect(targetBody('-1').props.physicsBody.type).toBe('Static');
+      expect(onError).not.toHaveBeenCalled();
+    },
+  );
 
   test('scores radial impacts once per shot, displays the reward and freezes at the native pose', async () => {
     await mountAR(withRules({ reward: 406, freeze: true, multiplier: 10 }, true));
@@ -671,7 +922,7 @@ describe('configured aiming runtime', () => {
     expect(floor()!.parent!.props.position).toEqual([1.35, -1, -3.5]);
     expect(floor()!.parent!.props.rotation).toEqual([0, 90, 0]);
     expect(host('ViroARPlane')).toHaveLength(0);
-    expect(host('Viro3DObject')).toHaveLength(1);
+    expect(host('Viro3DObject')).toHaveLength(2);
     expect(onEvent).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'planeReady' }),
     );

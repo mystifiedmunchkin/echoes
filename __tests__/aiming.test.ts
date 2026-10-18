@@ -77,6 +77,88 @@ test('reads impact rules and preserves explicit false values', () => {
   });
 });
 
+test.each(['basket', 'dartboard', 'bowling'] as const)(
+  'reads %s subtype defaults without mutating the definition',
+  subtype => {
+    const source = {
+      ...game,
+      subtype,
+      objects: [projectile, {
+        ...target,
+        properties: {
+          ...target.properties,
+          collider: subtype === 'basket'
+            ? target.properties.collider
+            : { type: 'bounding', size: [1, 1, 0.1] },
+          ...(subtype === 'bowling' ? { physics: { type: 'Dynamic' } } : {}),
+        },
+      }],
+    };
+    const parsed = readGame(source)!.games[0];
+    expect(parsed.subtype).toBe(subtype);
+    expect(parsed.settings).toMatchObject({
+      freeze: subtype === 'dartboard',
+      fall: subtype === 'bowling',
+    });
+    expect(parsed.settings?.multiplier).toBe(subtype === 'dartboard' ? 10 : undefined);
+    expect(source.settings).toBe(game.settings);
+    expect(source.settings).not.toHaveProperty('freeze');
+  },
+);
+
+test('accepts an open bounding basket and a customized dartboard maximum and reward', () => {
+  const objects = [projectile, {
+    ...target,
+    properties: {
+      ...target.properties,
+      collider: { type: 'bounding', size: [1, 1, 0.2] },
+    },
+  }];
+  expect(readGame({ ...game, subtype: 'basket', objects })!.games[0].settings)
+    .toMatchObject({ freeze: false, fall: false });
+  expect(readGame({
+    ...game, subtype: 'dartboard', objects,
+    settings: { ...game.settings, multiplier: 25, reward: 20, freeze: true, fall: false },
+  })!.games[0].settings).toMatchObject({ multiplier: 25, reward: 20, freeze: true, fall: false });
+});
+
+test.each([
+  ['basket', { freeze: true }],
+  ['basket', { fall: true }],
+  ['dartboard', { freeze: false }],
+  ['dartboard', { fall: true }],
+  ['bowling', { freeze: true }],
+  ['bowling', { fall: false }],
+])('rejects settings contradicting subtype %s: %j', (subtype, rules) => {
+  expect(() => readGame({
+    ...game, subtype, settings: { ...game.settings, ...rules },
+  })).toThrow(`conflicts with subtype ${subtype}`);
+});
+
+test.each([
+  { ...game, subtype: 'unknown' },
+  { ...game, subtype: 'basket', settings: undefined },
+  { ...game, subtype: 'dartboard' },
+  { ...game, subtype: 'bowling' },
+  {
+    ...game, subtype: 'basket',
+    objects: [projectile, {
+      ...target, properties: { ...target.properties, collider: projectile.properties.collider },
+    }],
+  },
+  {
+    ...game, subtype: 'bowling',
+    objects: [projectile, {
+      ...target, properties: {
+        ...target.properties,
+        collider: { type: 'bounding', size: [1, 1, 1] },
+      },
+    }],
+  },
+])('rejects incomplete or incompatible aiming subtypes (%#)', invalid => {
+  expect(() => readGame(invalid)).toThrow('Invalid experience:');
+});
+
 test.each([
   { reward: -1 }, { reward: 999 }, { reward: '20' }, { reward: 1.5 },
   { multiplier: 0 }, { multiplier: -1 }, { multiplier: 1.5 },

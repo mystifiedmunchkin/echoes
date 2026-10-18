@@ -70,6 +70,34 @@ test('requires type inside each game and preserves custom settings', () => {
   expect(result?.gravity).toEqual([0, 0, 0]);
 });
 
+test.each(['treasure', 'discovery', 'images'])(
+  'validates and caches a custom subtype for %s',
+  async type => {
+    const definition = memory(type);
+    const source = {
+      logic: {
+        games: [{ ...definition.interactive.logic.games[0], subtype: 'custom-activity' }],
+      },
+    };
+    expect(readExperience(source)?.games[0].subtype).toBe('custom-activity');
+    expect((await cacheExperience(source, async url => `local:${url}`))
+      ?.games[0].subtype).toBe('custom-activity');
+    expect(readExperience(memory(type))?.games[0].subtype).toBeUndefined();
+  },
+);
+
+test.each(['aiming', 'treasure', 'discovery', 'images'])(
+  '%s rejects malformed subtypes',
+  type => {
+    const definition = memory(type);
+    for (const subtype of ['', '   ', null, false, 42, {}, []]) {
+      expect(() => readExperience({
+        logic: { games: [{ ...definition.interactive.logic.games[0], subtype }] },
+      })).toThrow('logic.games[0].subtype');
+    }
+  },
+);
+
 test('rejects a root or definition type when a game type is missing', () => {
   expect(() =>
     readExperience({ type: 'treasure', logic: { games: [game] } }),

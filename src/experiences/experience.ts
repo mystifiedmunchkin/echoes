@@ -1,6 +1,6 @@
 /** Validates server-defined scenes and prepares their assets for AR or the 3D viewer. */
 import { colliderSize, readAiming, readCollider } from './aiming';
-import type { AimingCollider, AimingSettings } from './aiming';
+import type { AimingCollider, AimingSettings, AimingSubtype } from './aiming';
 
 export type ExperienceType = 'aiming' | 'treasure' | 'discovery' | 'images';
 // Positions and collider dimensions use meters; rotations use degrees.
@@ -52,6 +52,7 @@ export interface ImageTarget {
 export interface ExperienceGame {
   id: number;
   type: ExperienceType;
+  subtype?: string;
   assets: ExperienceAsset[];
   objects: ExperienceObject[];
   target?: ImageTarget;
@@ -196,6 +197,18 @@ export function readExperience(memory: unknown): Experience | null {
         type === 'images',
       `${path}.type (aiming, treasure, discovery, images)`,
     );
+    const subtype = game.subtype === undefined
+      ? undefined
+      : nonEmptyString(game.subtype, `${path}.subtype`);
+    let aimingSubtype: AimingSubtype | undefined;
+    if (type === 'aiming' && subtype !== undefined) {
+      requireValue(
+        subtype === 'basket' || subtype === 'dartboard' || subtype === 'bowling',
+        `${path}.subtype (basket, dartboard, bowling)`,
+      );
+      aimingSubtype = subtype;
+      requireValue(game.settings !== undefined, `${path}.settings required with subtype`);
+    }
     requireValue(Array.isArray(game.assets), `${path}.assets`);
     const assets = game.assets.map((rawAsset, assetIndex): ExperienceAsset => {
       const asset = record(rawAsset);
@@ -330,6 +343,7 @@ export function readExperience(memory: unknown): Experience | null {
       ...game,
       id: game.id === undefined ? index : integer(game.id, `${path}.id`),
       type,
+      subtype,
       assets,
       objects,
       target: undefined,
@@ -339,7 +353,7 @@ export function readExperience(memory: unknown): Experience | null {
           : (game.settings as AimingSettings | undefined),
     };
     if (type === 'aiming' && game.settings !== undefined) {
-      result.settings = readAiming(game.settings, objects, `${path}.settings`);
+      result.settings = readAiming(game.settings, objects, `${path}.settings`, aimingSubtype);
       if (result.settings.reward !== undefined)
         requireValue(
           assets.some(asset => asset.id === result.settings!.reward),
