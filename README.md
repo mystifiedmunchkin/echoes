@@ -46,12 +46,14 @@ Existing map proximity restrictions and legacy memory viewers remain unchanged.
 The nearby endpoint returns a **direct JSON list of interactive games**, not
 legacy `memory` records and not JSON-encoded strings. Each game carries its
 own GPS coordinates and required `type`; there is no root-level type fallback.
-Each entry requires `id` (the game ID) and `location_id` (its location ID),
-alongside `latitude` and `longitude`. Games sharing a `location_id` remain
-separate map, AR, and history entries; they are not grouped by location or coordinates.
-Map selection uses the marker's game ID, not a nearest-coordinate lookup.
-Missing or invalid identifiers cause an explicit loading error. The client never
-substitutes the game ID or an array index for a missing location ID.
+Each entry requires `location_id` (its location ID), alongside `latitude` and
+`longitude`. The server `id` field is not used as a game identity. The client
+assigns each entry a zero-based game index within its location; games sharing a
+`location_id` therefore remain separate map, AR, and history entries. The same
+game index can occur at different locations and is always paired with
+`location_id`. Map selection uses this location/game pair, not a
+nearest-coordinate lookup. Missing or invalid location identifiers cause an
+explicit loading error.
 `title` and `description` are game metadata. All templates use the same
 `assets` / `objects` structure.
 Legacy string-encoded fields remain readable for backwards compatibility.
@@ -365,7 +367,7 @@ requests. The payload contains absolute totals, not increments:
 `item_id` is the ID of `logic.games[].objects[]`; all three IDs are needed
 to disambiguate objects. Collection is unique per location/game/object.
 `location_id` always comes from the game's top-level `location_id`, while
-`game_id` comes from its `id`. History retains separate game entries, but
+`game_id` is the zero-based index of that game within its location. History retains separate game entries, but
 `visited_location_ids` contains each visited location only once.
 Scores aggregate by location and game type, since the score API does not accept
 a game ID. Both AR and the Galaxy A fallback participate; merely backgrounding

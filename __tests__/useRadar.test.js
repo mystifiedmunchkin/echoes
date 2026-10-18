@@ -86,11 +86,11 @@ test('refreshes GPS and downloads the nearby records with a 2500 m request cap',
   expect(radar.radius).toBe(2500);
   expect(result.location).toEqual(origin);
   expect(result.memories).toHaveLength(1);
-  expect(result.memories[0]).toMatchObject({ id: 1, location_id: 70, lat: 0, lng: 0 });
+  expect(result.memories[0]).toMatchObject({ id: 0, location_id: 70, lat: 0, lng: 0 });
   expect(FileSystem.fetch).not.toHaveBeenCalled();
 });
 
-test('deduplicates nearby memory IDs before exposing map and AR records', async () => {
+test('assigns game indexes within each location before exposing map and AR records', async () => {
   const memory = {
     id: 1,
     location_id: 70,
@@ -107,24 +107,15 @@ test('deduplicates nearby memory IDs before exposing map and AR records', async 
       memory,
       { ...memory, title: 'Repeated record' },
       { ...memory, id: '1', title: 'String ID alias' },
-      { ...memory, id: 0, title: 'Zero ID' },
+      { ...memory, id: 3, title: 'Another ID' },
       { ...memory, id: 2, title: 'Different place at the same coordinates' },
     ],
   });
-  const warning = jest.spyOn(console, 'warn').mockImplementation(() => {});
-  try {
-    let result;
-    await act(async () => { result = await radar.loadNearbyMemories(); });
-    expect(result.memories.map(item => item.id)).toEqual([1, 0, 2]);
-    expect(radar.memories.map(item => item.id)).toEqual([1, 0, 2]);
-    expect(result.memories[0].name).toBe('First record');
-    expect(warning).toHaveBeenCalledWith(
-      'Duplicate memory IDs in nearby API response; keeping the first record:',
-      ['1'],
-    );
-  } finally {
-    warning.mockRestore();
-  }
+  let result;
+  await act(async () => { result = await radar.loadNearbyMemories(); });
+  expect(result.memories.map(item => item.id)).toEqual([0, 1, 2, 3, 4]);
+  expect(radar.memories.map(item => item.id)).toEqual([0, 1, 2, 3, 4]);
+  expect(result.memories[0].name).toBe('First record');
 });
 
 test('normalizes interactive games, object properties, and JSON actions', async () => {
@@ -222,7 +213,7 @@ test('normalizes a direct game response into one interactive game and ignores le
     ok: true,
     json: async () => [
       {
-        id: 10,
+        id: 0,
         location_id: 70,
         latitude: 44,
         longitude: 1,
@@ -233,7 +224,7 @@ test('normalizes a direct game response into one interactive game and ignores le
         assets: [],
         objects: [{ id: 1, properties: { text: 'Hello' } }],
       },
-      { id: 11, location_id: 70, latitude: 44, longitude: 1, name: 'Legacy memory' },
+      { id: 0, location_id: 70, latitude: 44, longitude: 1, name: 'Legacy memory' },
     ],
   });
   await act(async () => {
@@ -241,7 +232,7 @@ test('normalizes a direct game response into one interactive game and ignores le
   });
   expect(radar.memories).toHaveLength(1);
   expect(radar.memories[0]).toMatchObject({
-    id: 10,
+    id: 0,
     location_id: 70,
     title: 'Direct game',
     description: 'Server metadata',
@@ -251,7 +242,7 @@ test('normalizes a direct game response into one interactive game and ignores le
         description: 'Server metadata',
         games: [
           {
-            id: 10,
+            id: 0,
             type: 'discovery',
             settings: { difficulty: 'easy' },
           },
@@ -303,7 +294,7 @@ test('awaits a media download and returns a local URI', async () => {
     releaseDownload({ status: 200 });
     cached = await download;
   });
-  expect(cached.image_url).toBe('file://cache/memory-assets/1-image-0.jpg');
+  expect(cached.image_url).toBe('file://cache/memory-assets/memory-1-image-0.jpg');
 });
 
 test('prepares the cache folder once before parallel first-launch downloads', async () => {
@@ -333,8 +324,8 @@ test('prepares the cache folder once before parallel first-launch downloads', as
     cached = await downloads;
   });
   expect(FileSystem.fetch).toHaveBeenCalledTimes(3);
-  expect(cached[0].image_url).toBe('file://cache/memory-assets/1-image-0.jpg');
-  expect(cached[1].model_url).toBe('file://cache/memory-assets/2-model-0.glb');
+  expect(cached[0].image_url).toBe('file://cache/memory-assets/memory-1-image-0.jpg');
+  expect(cached[1].model_url).toBe('file://cache/memory-assets/memory-2-model-0.glb');
 });
 
 test('prepares private image targets and scene assets before returning the experience', async () => {
@@ -363,13 +354,13 @@ test('prepares private image targets and scene assets before returning the exper
   expect(FileSystem.fetch).toHaveBeenCalledWith(
     'https://echoes.sophiehorner.art/api/private-files/4/model_3D/butterfly.glb',
     expect.objectContaining({
-      path: expect.stringContaining('20-experience-GLB-'),
+      path: expect.stringContaining('memory-20-experience-GLB-'),
     }),
   );
   expect(FileSystem.fetch).toHaveBeenCalledWith(
     'https://echoes.sophiehorner.art/api/private-files/4/image/poster.jpg',
     expect.objectContaining({
-      path: expect.stringContaining('20-experience-image-'),
+      path: expect.stringContaining('memory-20-experience-image-'),
     }),
   );
   expect(cached.interactive.logic.games[0]).toMatchObject({
@@ -434,7 +425,7 @@ test('removes a partial file after a rejected download so a retry cannot reuse i
     ).rejects.toThrow('Network interrupted');
   });
   expect(FileSystem.unlink).toHaveBeenCalledWith(
-    'cache/memory-assets/30-image-0.jpg',
+    'cache/memory-assets/memory-30-image-0.jpg',
   );
 });
 
@@ -457,17 +448,17 @@ test('keeps distinct games at the same location and scopes repeated asset/object
     cached = await Promise.all(result.memories.map(radar.cacheMemoryAssets));
   });
   expect(result.memories.map(({ id, location_id }) => ({ id, location_id }))).toEqual([
-    { id: 101, location_id: 7 }, { id: 102, location_id: 7 },
+    { id: 0, location_id: 7 }, { id: 1, location_id: 7 },
   ]);
   expect(cached.map(item => item.interactive.logic.games[0])).toEqual([
     expect.objectContaining({
-      id: 101,
-      assets: [expect.objectContaining({ id: 0, url: expect.stringContaining('101-experience-') })],
+      id: 0,
+      assets: [expect.objectContaining({ id: 0, url: expect.stringContaining('0-experience-') })],
       objects: [expect.objectContaining({ id: 1, properties: expect.objectContaining({ asset: 0 }) })],
     }),
     expect.objectContaining({
-      id: 102,
-      assets: [expect.objectContaining({ id: 0, url: expect.stringContaining('102-experience-') })],
+      id: 1,
+      assets: [expect.objectContaining({ id: 0, url: expect.stringContaining('1-experience-') })],
       objects: [expect.objectContaining({ id: 1, properties: expect.objectContaining({ asset: 0 }) })],
     }),
   ]);
@@ -487,32 +478,43 @@ test.each([undefined, null, '', false, -1, 1.5, Infinity, Number.MAX_SAFE_INTEGE
   },
 );
 
-test('rejects a missing game ID rather than inventing an array-index ID', async () => {
+test('uses the location-scoped array index when the server game ID is missing', async () => {
   global.fetch.mockResolvedValue({
     ok: true, json: async () => [nearbyGame(undefined, 7)],
   });
-  await act(async () => {
-    await expect(radar.loadNearbyMemories()).rejects.toThrow('nearbyIdentifierInvalid:games[0].id');
-  });
+  await act(async () => { await radar.loadNearbyMemories(); });
+  expect(radar.memories[0].id).toBe(0);
 });
 
-test('normalizes numeric identifier strings, including zero, without conflating game and location IDs', async () => {
+test('uses the same location-scoped index regardless of the server game ID', async () => {
   global.fetch.mockResolvedValue({
     ok: true, json: async () => [nearbyGame('101', '0')],
   });
   await act(async () => { await radar.loadNearbyMemories(); });
   expect(radar.memories[0]).toMatchObject({
-    id: 101, location_id: 0,
-    interactive: { logic: { games: [expect.objectContaining({ id: 101, location_id: 0 })] } },
+    id: 0, location_id: 0,
+    interactive: { logic: { games: [expect.objectContaining({ id: 0, location_id: 0 })] } },
   });
 });
 
-test('rejects one game ID assigned to different locations instead of silently keeping an arbitrary association', async () => {
+test('assigns the next index for another game in the same location', async () => {
+  global.fetch.mockResolvedValue({
+    ok: true, json: async () => [nearbyGame(101, 73), nearbyGame(0, 73)],
+  });
+  await act(async () => {
+    await radar.loadNearbyMemories();
+  });
+  expect(radar.memories.map(item => item.id)).toEqual([0, 1]);
+});
+
+test('restarts the game index for each location', async () => {
   global.fetch.mockResolvedValue({
     ok: true, json: async () => [nearbyGame(101, 7), nearbyGame(101, 8)],
   });
   await act(async () => {
-    await expect(radar.loadNearbyMemories()).rejects.toThrow('nearbyGameLocationConflict');
+    await radar.loadNearbyMemories();
   });
-  expect(radar.memories).toEqual([]);
+  expect(radar.memories.map(({ id, location_id }) => ({ id, location_id }))).toEqual([
+    { id: 0, location_id: 7 }, { id: 0, location_id: 8 },
+  ]);
 });

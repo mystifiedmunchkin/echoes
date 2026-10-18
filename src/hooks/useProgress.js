@@ -70,17 +70,26 @@ export function useProgress(user, token) {
   const markPlaceVisited = useCallback(memory => {
     update(data => {
       const id = progressId(memory.id);
-      const existing = data.visitedPlaces.find(place => place.id === id);
+      const locationId = progressId(memory.location_id);
+      const existing = data.visitedPlaces.find(place =>
+        place.id === id && place.location_id === locationId);
       const now = new Date().toISOString();
       const place = {
-        id, location_id: progressId(memory.location_id),
+        id, location_id: locationId,
         name: memory.name || '', description: memory.description || '',
         creatorName: memory.creatorName || '',
         lat: memory.lat ?? memory.latitude ?? null,
         lng: memory.lng ?? memory.longitude ?? null,
         firstSeenAt: existing?.firstSeenAt || now, lastSeenAt: now,
       };
-      return { ...data, visitedPlaces: [place, ...data.visitedPlaces.filter(item => item.id !== id)] };
+      return {
+        ...data,
+        visitedPlaces: [
+          place,
+          ...data.visitedPlaces.filter(item =>
+            item.id !== id || item.location_id !== locationId),
+        ],
+      };
     });
   }, [update]);
 

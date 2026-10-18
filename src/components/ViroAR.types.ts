@@ -25,7 +25,7 @@ export interface InteractiveDefinition {
 }
 
 export interface MemoryRecord {
-  // The map/AR entry ID identifies the game, not its shared location.
+  // The game index is scoped to location_id; the server's raw ID is ignored.
   id: number;
   location_id: number;
   name: string;
@@ -52,11 +52,11 @@ export interface NearbyMemory {
 }
 
 export interface MemoryCollectedEvent {
-  nativeEvent: { id: number; name: string };
+  nativeEvent: { id: number; location_id: number; name: string };
 }
 
 export interface MemoryPlacedEvent {
-  nativeEvent: { id: number; name: string };
+  nativeEvent: { id: number; location_id: number; name: string };
 }
 
 export interface ModelLoadingStatusEvent {

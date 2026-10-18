@@ -243,7 +243,11 @@ const readNearbyIdentifier = (value, index, field) => {
   const id = typeof value === 'string' && /^\d+$/.test(value)
     ? Number(value)
     : value;
-  if (typeof id !== 'number' || !Number.isSafeInteger(id) || id < 0) {
+  if (
+    typeof id !== 'number' ||
+    !Number.isSafeInteger(id) ||
+    id < 0
+  ) {
     throw new Error(translate('nearbyIdentifierInvalid', { index, field }));
   }
   return id;
@@ -298,7 +302,7 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
           : '';
         return cacheRemoteAsset(
           url,
-          `${memory.id}-${type}-${index}${extension}`,
+        `${memory.location_id ?? 'memory'}-${memory.id}-${type}-${index}${extension}`,
           token,
         );
       };
@@ -389,12 +393,16 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
         ? rawData
         : rawData.data || rawData.memories || [];
 
+      const gameIndexesByLocation = new Map();
       const formattedMemories = dataArray.map((rawGame, index) => {
-        // Entries stay keyed by game ID, even when several games share one location.
+        // Game IDs are scoped indexes within each location; the server ID is not a game identity.
+        const locationId = readNearbyIdentifier(rawGame?.location_id, index, 'location_id');
+        const gameId = gameIndexesByLocation.get(locationId) || 0;
+        gameIndexesByLocation.set(locationId, gameId + 1);
         const item = {
           ...rawGame,
-          id: readNearbyIdentifier(rawGame?.id, index, 'id'),
-          location_id: readNearbyIdentifier(rawGame?.location_id, index, 'location_id'),
+          id: gameId,
+          location_id: locationId,
         };
         const latVal = Number(String(item.latitude ?? NaN).replace(',', '.'));
         const lngVal = Number(String(item.longitude ?? NaN).replace(',', '.'));
@@ -614,28 +622,8 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
           Number.isFinite(m.lng) &&
           m.interactive?.logic?.games?.length > 0,
       );
-      const uniqueMemories = new Map();
-      const duplicateIds = new Set();
-      for (const memory of validMemories) {
-        const id = String(memory.id);
-        if (uniqueMemories.has(id)) {
-          if (uniqueMemories.get(id).location_id !== memory.location_id) {
-            throw new Error(translate('nearbyGameLocationConflict', { id }));
-          }
-          duplicateIds.add(id);
-        } else {
-          uniqueMemories.set(id, memory);
-        }
-      }
-      if (duplicateIds.size) {
-        console.warn(
-          'Duplicate memory IDs in nearby API response; keeping the first record:',
-          [...duplicateIds],
-        );
-      }
-      const memoriesById = [...uniqueMemories.values()];
-      setMemories(memoriesById);
-      return memoriesById;
+      setMemories(validMemories);
+      return validMemories;
     } catch (err) {
       setApiError(err.message || translate('networkUnavailable'));
       if (throwOnError) throw err;

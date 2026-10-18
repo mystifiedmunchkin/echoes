@@ -94,17 +94,18 @@ Le chargement accepte les enveloppes suivantes :
 Un tableau directement a la racine est egalement accepte. La normalisation
 accepte plusieurs variantes des definitions interactives, dont certains champs
 serialises en chaines JSON. L'exemple ci-dessous utilise des objets JSON natifs.
-Les memoires sont dedupliquees par ID avant d'alimenter la carte et les marqueurs
-AR : `1` et `"1"` designent la meme memoire. La premiere occurrence valide est
-conservee et les IDs repetes sont signales par un avertissement dans les logs.
-Deux lieux avec des IDs distincts restent distincts, meme aux memes coordonnees.
-Le contrat actuel est un tableau direct de jeux. Chaque entree fournit `id`
-(identifiant du jeu), `location_id` (identifiant de son lieu), `latitude` et
-`longitude`. Plusieurs jeux d'un meme lieu restent des entrees distinctes sur
-la carte et en AR : la deduplication porte sur l'ID du jeu, pas sur `location_id`.
-L'absence d'un de ces identifiants provoque une erreur explicite ; l'ID du jeu
-n'est jamais utilise comme remplacement de `location_id`. Un meme ID de jeu
-associe a deux lieux differents est egalement rejete.
+Les jeux sont conserves dans l'ordre fourni par le serveur avant d'alimenter la
+carte et les marqueurs AR. Le client derive un index de jeu independant pour
+chaque `location_id`, de sorte que les memes index dans deux lieux differents
+restent distincts.
+Le contrat actuel est un tableau direct de jeux. Chaque entree fournit
+`location_id` (identifiant de son lieu), `latitude` et `longitude`. Le champ
+`id` fourni par le serveur n'est pas utilise comme identite du jeu. Le client
+attribue a chaque entree un index de jeu commencant a zero dans son lieu.
+Plusieurs jeux d'un meme lieu restent des entrees distinctes sur la carte et en
+AR. Le meme index peut donc exister dans plusieurs lieux et doit toujours etre
+interprete avec `location_id`. L'absence ou l'invalidite de `location_id`
+provoque une erreur explicite.
 Les telechargements paralleles attendent une creation partagee du dossier de
 cache, notamment au premier lancement. Une erreur reelle de creation est propagee
 a la preparation AR ; elle n'est pas masquee. Le cache des modeles utilise le meme
@@ -131,7 +132,7 @@ des scores ne contient pas de `game_id`. Pour la collection, `item_id` correspon
 a `logic.games[].objects[].id`. Le triplet lieu/jeu/objet est unique et sa
 quantite reste 1. Le backend doit accepter ces trois identifiants nommes.
 `location_id` vient toujours du champ `location_id` du jeu recu et `game_id`
-de son champ `id`. L'historique conserve une entree par jeu, mais les IDs des
+est l'index zero-based du jeu dans son lieu. L'historique conserve une entree par jeu, mais les IDs des
 lieux visites envoyes au serveur sont dedupliques.
 
 Une fermeture d'experience, de camera ou de viewer, ou un changement de jeu,

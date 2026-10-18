@@ -86,11 +86,13 @@ function MemoryARScene({
 
             return (
               <ViroNode
-                key={memory.id}
+                key={`${memory.location_id}:${memory.id}`}
                 position={memory.relativePosition || [0, 0, 0]}
                 onClick={() =>
                   onMemorySelected?.({
-                    nativeEvent: { id: memory.id, name: memory.name },
+                    nativeEvent: {
+                      id: memory.id, location_id: memory.location_id, name: memory.name,
+                    },
                   })
                 }
               >
@@ -101,7 +103,9 @@ function MemoryARScene({
                   opacity={0.5}
                   onClick={() =>
                     onMemorySelected?.({
-                      nativeEvent: { id: memory.id, name: memory.name },
+                      nativeEvent: {
+                        id: memory.id, location_id: memory.location_id, name: memory.name,
+                      },
                     })
                   }
                 />

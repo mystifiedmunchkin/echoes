@@ -42,6 +42,7 @@ const MAP_NEIGHBORHOOD_ZOOM = 12;
 const DEFAULT_MAP_CENTER = [1.3553, 44.0175];
 const AR_SESSION_RELEASE_MS = 1500;
 const MODEL_VIEWER_RELEASE_MS = 500;
+const memoryKey = memory => `${memory?.location_id}:${memory?.id}`;
 
 export default function App() {
   return (
@@ -101,7 +102,7 @@ function AppContent() {
   } = useProgress(user, token);
   // Legacy memories can be placed again; game objects use a composite inventory ID.
   const collectionItems = useMemo(() => [...collectedMemories.map((item) => {
-    const sourceMemory = memories.find((memory) => String(memory.id) === String(item.id));
+    const sourceMemory = memories.find((memory) => memoryKey(memory) === memoryKey(item));
     return sourceMemory?.creatorName && !item.creatorName
       ? { ...item, creatorName: sourceMemory.creatorName }
       : item;
@@ -114,14 +115,14 @@ function AppContent() {
   // --- Places/games already seen by the player, listed in the menu ---
   const [showMenu, setShowMenu] = useState(false);
   const menuPlaces = useMemo(() => {
-    const collectedIds = new Set(collectedMemories.map((item) => String(item.id)));
-    const visitedIds = new Set(visitedPlaces.map((place) => String(place.id)));
+    const collectedIds = new Set(collectedMemories.map((item) => memoryKey(item)));
+    const visitedIds = new Set(visitedPlaces.map((place) => memoryKey(place)));
     const collectedOnly = collectedMemories
-      .filter((item) => !visitedIds.has(String(item.id)))
+      .filter((item) => !visitedIds.has(memoryKey(item)))
       .map((item) => ({ ...item, lastSeenAt: item.collectedAt }));
     return [...visitedPlaces, ...collectedOnly].map((place) => ({
       ...place,
-      isDone: collectedIds.has(String(place.id)),
+      isDone: collectedIds.has(memoryKey(place)),
     }));
   }, [collectedMemories, visitedPlaces]);
 
@@ -520,7 +521,7 @@ function AppContent() {
     const syncSelected = () => {
       setSelectedArMemory((currentMemory) => {
         const refreshedMemory = currentMemory
-          && arMemories.find((memory) => String(memory.id) === String(currentMemory.id));
+          && arMemories.find((memory) => memoryKey(memory) === memoryKey(currentMemory));
         return refreshedMemory || null;
       });
     };
@@ -530,7 +531,7 @@ function AppContent() {
   // Re-place a legacy collected memory without making it collectible a second time.
   const handleReplaceFromInventory = async (memory) => {
     setShowInventory(false);
-    const sourceMemory = memories.find((item) => String(item.id) === String(memory.id));
+    const sourceMemory = memories.find((item) => memoryKey(item) === memoryKey(memory));
     setIsPreparingPlacement(true);
     try {
       const cachedMemory = await cacheMemoryAssets(sourceMemory || memory);
@@ -549,8 +550,11 @@ function AppContent() {
     }
   };
 
-  const handleMemorySelected = useCallback(async (gameId) => {
-    const memory = arMemories.find((item) => String(item.id) === String(gameId));
+  const handleMemorySelected = useCallback(async (selectedGame) => {
+    const memory = arMemories.find((item) =>
+      selectedGame?.location_id == null
+        ? String(item.id) === String(selectedGame?.id)
+        : memoryKey(item) === memoryKey(selectedGame));
     if (!memory || isPreparingPlacement) return;
 
     setIsPreparingPlacement(true);
@@ -711,7 +715,7 @@ function AppContent() {
           key={`ar-view-${cameraKey}`}
           style={styles.viroView}
           onMemoryCollected={(e) => handleCollectWithAnimation(e.nativeEvent)}
-          onMemorySelected={(e) => handleMemorySelected(e.nativeEvent.id)}
+          onMemorySelected={(e) => handleMemorySelected(e.nativeEvent)}
           onMemoryPlaced={() => {
             setIsPlacingMode(false);
             setSelectedMemoryToPlace(null);
@@ -852,7 +856,7 @@ function AppContent() {
         >
           <TouchableOpacity
             style={[styles.bottomAction, (!arMemoryToPlace || arExperience || isPlacingMode || isPreparingPlacement) && styles.disabledAction]}
-            onPress={() => handleMemorySelected(arMemoryToPlace.id)}
+            onPress={() => handleMemorySelected(arMemoryToPlace)}
             disabled={!arMemoryToPlace || !!arExperience || isPlacingMode || isPreparingPlacement}
           >
             <Text style={styles.bottomActionText}>⌄ {t('placeShort')}</Text>
@@ -977,7 +981,11 @@ function AppContent() {
           shape={memoryMarkers}
           onPress={(event) => {
             const gameId = event.features?.[0]?.properties?.gameId;
-            const memory = memories.find((item) => String(item.id) === String(gameId));
+            const locationId = event.features?.[0]?.properties?.locationId;
+            const memory = memories.find((item) =>
+              String(item.id) === String(gameId) &&
+              (locationId == null ||
+                String(item.location_id) === String(locationId)));
             openMemoryInfo(memory);
           }}
         >

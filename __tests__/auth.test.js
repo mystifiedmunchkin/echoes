@@ -96,3 +96,20 @@ test('keeps the local session when account deletion fails', async () => {
   expect(await getAuthToken()).toBe('test-token');
   expect(await getStoredUser()).toEqual(user);
 });
+
+test('includes account deletion validation fields in the reported error', async () => {
+  global.fetch.mockResolvedValue({
+    ok: false,
+    status: 422,
+    json: jest.fn().mockResolvedValue({
+      message: 'Validation failed',
+      errors: { password: ['The password is incorrect.'] },
+    }),
+  });
+
+  await expect(deleteAccount()).rejects.toThrow(
+    'Validation failed (password: The password is incorrect.)',
+  );
+  expect(await getAuthToken()).toBe('test-token');
+  expect(await getStoredUser()).toEqual(user);
+});

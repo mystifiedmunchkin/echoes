@@ -6,6 +6,20 @@ const API_URL = 'https://echoes.sophiehorner.art';
 const TOKEN_KEY = '@echoes_auth_token';
 const USER_KEY = '@echoes_auth_user';
 
+function responseError(payload, status) {
+  const message =
+    typeof payload?.message === 'string' && payload.message.trim()
+      ? payload.message.trim()
+      : translate('serverError', { status });
+  const details = Object.entries(payload?.errors || {}).flatMap(([field, value]) => {
+    const messages = Array.isArray(value) ? value : [value];
+    return messages
+      .filter(item => typeof item === 'string' && item.trim())
+      .map(item => `${field}: ${item}`);
+  });
+  return details.length ? `${message} (${details.join('; ')})` : message;
+}
+
 async function requestAuth(path, credentials, requiresToken = true) {
   const response = await fetch(`${API_URL}${path}`, {
     method: 'POST',
@@ -18,8 +32,7 @@ async function requestAuth(path, credentials, requiresToken = true) {
 
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    const message = payload?.message || payload?.errors?.email?.[0] || translate('serverError', { status: response.status });
-    throw new Error(message);
+    throw new Error(responseError(payload, response.status));
   }
 
   const user = payload.user || payload.data || null;
@@ -63,13 +76,14 @@ export async function deleteAccount() {
     method: 'DELETE',
     headers: {
       Accept: 'application/json',
+      'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
   });
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
     throw new Error(
-      payload?.message || translate('serverError', { status: response.status }),
+      responseError(payload, response.status),
     );
   }
   await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);

@@ -95,7 +95,7 @@ export default function MenuModal({
     return (
       <FlatList
         data={places}
-        keyExtractor={(item) => String(item.id)}
+        keyExtractor={(item) => `${item.location_id}:${item.id}`}
         renderItem={renderPlace}
         ItemSeparatorComponent={PlaceSeparator}
         contentContainerStyle={styles.listContainer}
