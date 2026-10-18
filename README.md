@@ -2,6 +2,17 @@ This is a new [**React Native**](https://reactnative.dev) project, bootstrapped 
 
 # Getting Started
 
+This app reads games and contents added to locations on the map.
+Make your own contents for wherever you are by creating an account here :
+https://echoes.sophiehorner.art
+Payment test mode is on, you'll be able to "pay" for subscriptions by giving the test credit card number:
+4242 4242 4242 4242 - Put whatever you like in the other fields, it'll pass.
+Editor account creation isn't quite intuitive yet. 
+Note : Only "aiming" type games can be read by the app for now.
+Send me inquireries or bug reports through my contact page here :
+https://sophiehorner.art/?page_id=228
+
+
 ## Source guide
 
 Source comments are written in English; user-facing strings remain localized in
