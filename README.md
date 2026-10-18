@@ -33,6 +33,17 @@ Source comments are written in English; user-facing strings remain localized in
 - [`native/android/`](native/android/) holds the custom location module copied
   into the Android project by [`plugins/withEchoesLocation.js`](plugins/withEchoesLocation.js).
   Keep both tracked native copies aligned when changing the module.
+- [`src/services/geolocation.ios.js`](src/services/geolocation.ios.js) provides
+  foreground iOS location through Expo Location. Metro selects it on iOS;
+  Android keeps [`src/services/geolocation.js`](src/services/geolocation.js)
+  and the custom native module. Expo Location is excluded from Android
+  autolinking to avoid introducing Google Play Services into that GPS path.
+  Both providers return `{ coords, timestamp }`, accept `timeout` (20 seconds
+  by default) and `maximumAge` (10 seconds by default), and report failures to
+  the caller. iOS stops its temporary watcher after a fix, an error or timeout.
+  Its live fixes target 10 m accuracy (best available with `enableHighAccuracy`),
+  rather than the 100 m balanced mode, for the 50 m discovery radius. Actual
+  accuracy still depends on device conditions and the user's location settings.
 
 ## Memory discovery
 
@@ -438,33 +449,77 @@ yarn android
 
 ### iOS
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+#### Requirements
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+- A Mac with Xcode and its command-line tools, a supported Node.js version
+  (Node 22.21+ within the 22.x line, or another version allowed by
+  [`package.json`](package.json)), Ruby/Bundler and CocoaPods 1.16.2+.
+  A current Ruby 3.x installation is recommended instead of macOS's system Ruby.
+- A **physical ARKit-capable iPhone or iPad running iOS/iPadOS 17.6 or later**.
+  The installed ViroKit framework is an arm64 **device** binary with a 17.6
+  deployment minimum, not a simulator framework. A simulator, including an
+  Apple Silicon simulator, is not supported by this dependency set.
+- ViroKit was built with the iOS 27 SDK. Check compatibility with the Mac's
+  Xcode version; React Native's own minimum Xcode version alone is not enough
+  to certify this prebuilt framework.
+- An Apple signing team that can use `com.sophiehorner.echoes`. Select the
+  team locally in Xcode; no personal team ID or signing credentials are stored
+  in the repository. The app's display name is `echoes`, version `3.0.0`.
+
+This is a custom native application, **not an Expo Go application**. The tracked
+[`ios/`](ios/) project integrates Expo modules, Viro and MapLibre. Its internal
+target/scheme remains `TestApp` to preserve existing project references.
+
+#### Install native dependencies on the Mac
 
 ```sh
+npm ci
 bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
+cd ios
 bundle exec pod install
+cd ..
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+Run `pod install` again after changing native dependencies. Open the generated
+`ios/TestApp.xcworkspace`, not the `.xcodeproj`, when using Xcode. On first use,
+select the `TestApp` target, configure **Signing & Capabilities**, connect and
+trust the device, and enable its Developer Mode if requested.
+
+#### Build commands (manual, on the Mac only)
+
+The following commands **perform a native build**; dependency installation or
+source checks do not require running them.
 
 ```sh
-# Using npm
+# Debug: choose the connected physical device, not a simulator.
 npm run ios
 
-# OR using Yarn
-yarn ios
+# Release: verify startup without Metro before distribution.
+npm run ios -- --configuration Release
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+`npm start` runs Expo's Metro server for the custom native app, not Expo Go.
+Debug uses the Expo entry resolver and Release bundles through Expo CLI.
+The JavaScript root component is `main` on both platforms.
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+Before distributing, test first-launch permission grants and denials, return
+from Settings, GPS outside near a known location, map position/heading, AR plane
+and image tracking, aiming/collection, cached models, audio/video playback,
+account switching and progress uploads. Check both Debug and standalone Release.
+JavaScript tests do not replace these physical-device checks or Xcode validation.
+
+#### Regenerating the native project
+
+For ordinary builds, use the tracked native project; no prebuild is required.
+If regeneration is necessary, first save native changes in version control,
+then use `npx expo prebuild --clean --platform ios --no-install` and reinstall
+pods. **This replaces the iOS project** and may change the internal target name;
+open the newly generated workspace. Keep `--platform ios` to avoid regenerating
+Android. The configuration in [`app.json`](app.json) carries the bundle ID,
+minimum OS, ARKit requirement, permissions, and Viro/MapLibre plugins. Nitro's
+native dependencies are explicit in [`package.json`](package.json).
+Do not repeatedly apply a non-clean prebuild to the manually integrated
+Podfile: Viro's plugin can append duplicate pod declarations.
 
 ## Step 3: Modify your app
 

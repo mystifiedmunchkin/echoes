@@ -14,12 +14,15 @@
     },
     "userInterfaceStyle": "light",
     "ios": {
+      "bundleIdentifier": "com.sophiehorner.echoes",
+      "buildNumber": "1",
       "supportsTablet": true,
       "infoPlist": {
+        "UIRequiredDeviceCapabilities": ["arm64", "arkit"],
         "NSCameraUsageDescription": "ECHOES a besoin de la caméra pour afficher les souvenirs en Réalité Augmentée.",
         "NSLocationWhenInUseUsageDescription": "ECHOES utilise votre position pour afficher les souvenirs proches.",
         "NSPhotoLibraryUsageDescription": "ECHOES a besoin d'accéder aux photos pour les souvenirs.",
-        "NSPhotoLibraryAddUsageDescription": "Allow $(PRODUCT_NAME) to save photos",
+        "NSPhotoLibraryAddUsageDescription": "ECHOES a besoin d'enregistrer les souvenirs dans vos photos.",
         "NSMicrophoneUsageDescription": "ECHOES a besoin du microphone pour les souvenirs audio."
       }
     },
@@ -49,6 +52,9 @@
       [
         "expo-build-properties",
         {
+          "ios": {
+            "deploymentTarget": "17.6"
+          },
           "android": {
             "compileSdkVersion": 36,
             "targetSdkVersion": 36,
@@ -59,6 +65,7 @@
       "./plugins/withAndroidBuildConfig",
       "react-native-compressor",
       "./plugins/withEchoesGmsCleanup",
+      "@maplibre/maplibre-react-native",
       [
         "@reactvision/react-viro",
         {
@@ -69,7 +76,7 @@
             "cameraUsagePermission": "ECHOES a besoin de la caméra pour afficher les souvenirs en Réalité Augmentée.",
             "microphoneUsagePermission": "ECHOES a besoin du microphone pour les souvenirs audio.",
             "photosPermission": "ECHOES a besoin d'accéder aux photos pour les souvenirs.",
-            "savephotosPermission": "ECHOES a besoin d'enregistrer les souvenirs dans vos photos."
+            "savePhotosPermission": "ECHOES a besoin d'enregistrer les souvenirs dans vos photos."
           }
         }
       ],
