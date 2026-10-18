@@ -404,8 +404,12 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
           id: gameId,
           location_id: locationId,
         };
-        const latVal = Number(String(item.latitude ?? NaN).replace(',', '.'));
-        const lngVal = Number(String(item.longitude ?? NaN).replace(',', '.'));
+        const latVal = Number(
+          String(item.latitude ?? item.lat ?? NaN).replace(',', '.'),
+        );
+        const lngVal = Number(
+          String(item.longitude ?? item.lng ?? NaN).replace(',', '.'),
+        );
 
         // The server uses model_3D as the canonical 3D asset field.
         const mediaContents = parseJsonValue(item.media_contents, {});

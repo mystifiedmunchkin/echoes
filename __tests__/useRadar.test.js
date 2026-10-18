@@ -90,6 +90,34 @@ test('refreshes GPS and downloads the nearby records with a 2500 m request cap',
   expect(FileSystem.fetch).not.toHaveBeenCalled();
 });
 
+test('accepts lat and lng coordinate aliases from the nearby memories endpoint', async () => {
+  global.fetch.mockResolvedValue({
+    ok: true,
+    json: async () => [{
+      id: 11,
+      location_id: 70,
+      lat: '0,001',
+      lng: '0,002',
+      title: 'Alias coordinates',
+      type: 'discovery',
+      assets: [],
+      objects: [{ id: 1, properties: { text: 'Hello' } }],
+    }],
+  });
+
+  let result;
+  await act(async () => { result = await radar.loadNearbyMemories(); });
+
+  expect(result.memories[0]).toMatchObject({
+    id: 0,
+    location_id: 70,
+    lat: 0.001,
+    lng: 0.002,
+    latitude: 0.001,
+    longitude: 0.002,
+  });
+});
+
 test('assigns game indexes within each location before exposing map and AR records', async () => {
   const memory = {
     id: 1,
