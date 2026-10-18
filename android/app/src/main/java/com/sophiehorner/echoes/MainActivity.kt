@@ -27,7 +27,7 @@ class MainActivity : ReactActivity() {
 
   /**
    * Returns the instance of the [ReactActivityDelegate]. We use [DefaultReactActivityDelegate]
-   * to enable the New Architecture with the [fabricEnabled] boolean flag.
+   * which allows you to enable New Architecture with a single boolean flags [fabricEnabled]
    */
   override fun createReactActivityDelegate(): ReactActivityDelegate {
     return ReactActivityDelegateWrapper(
@@ -41,7 +41,8 @@ class MainActivity : ReactActivity() {
   }
 
   /**
-    * Match Android S back behavior by moving root activities to the background instead of finishing.
+    * Align the back button behavior with Android S
+    * where moving root activities to background instead of finishing activities.
     * @see <a href="https://developer.android.com/reference/android/app/Activity#onBackPressed()">onBackPressed</a>
     */
   override fun invokeDefaultOnBackPressed() {
@@ -53,7 +54,8 @@ class MainActivity : ReactActivity() {
           return
       }
 
-      // Android S and later provide this root-activity behavior through the default implementation.
+      // Use the default back button implementation on Android S
+      // because it's doing more than [Activity.moveTaskToBack] in fact.
       super.invokeDefaultOnBackPressed()
   }
 }

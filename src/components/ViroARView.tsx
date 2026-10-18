@@ -5,8 +5,6 @@ import * as React from 'react';
 import {
   ViroARScene,
   ViroARSceneNavigator,
-  ViroAmbientLight,
-  ViroDirectionalLight,
   ViroNode,
   ViroMaterials,
   ViroSphere,
@@ -68,13 +66,6 @@ function MemoryARScene({
         onCameraTransformUpdate={aimingScene.onCameraTransformUpdate}
         onClickState={aimingScene.onClickState}
       >
-        <ViroAmbientLight color="#FFFFFF" intensity={500} />
-        <ViroDirectionalLight
-          color="#FFFFFF"
-          direction={[0, -1, -0.5]}
-          intensity={800}
-        />
-
         {/* Keep memory droplets available so another bubble can switch the game. */}
         {(arMemories || []).map(memory => {
             let material = 'pinkDroplet';
