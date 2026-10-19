@@ -13,6 +13,7 @@ interface AimingSceneState {
   fire: React.RefObject<((heldMs?: number) => void) | null>;
   trackingReady: boolean;
   onClickState: (state: number) => void;
+  tapVisible: boolean;
   cancelCharge: () => void;
 }
 
@@ -28,9 +29,12 @@ export function useAimingScene(mode: 'ar' | 'viewer') {
     startedAt: number;
     fire: (heldMs?: number) => void;
   } | null>(null);
+  const [tapVisible, setTapVisible] = React.useState(true);
   const [trackingReady, setTrackingReady] = React.useState(mode === 'viewer');
   const cancelCharge = React.useCallback(() => { charge.current = null; }, []);
   const onClickState = React.useCallback((state: number) => {
+    if (state === 1) setTapVisible(true);
+    if (state === 2) setTapVisible(false);
     if (state === 1 && !charge.current && fire.current) {
       charge.current = { startedAt: Date.now(), fire: fire.current };
     }
@@ -42,8 +46,10 @@ export function useAimingScene(mode: 'ar' | 'viewer') {
       held.fire(Date.now() - held.startedAt);
   }, []);
   const value = React.useMemo(
-    () => ({ camera, fire, trackingReady, onClickState, cancelCharge }),
-    [trackingReady, onClickState, cancelCharge],
+    () => ({
+      camera, fire, tapVisible, trackingReady, onClickState, cancelCharge,
+    }),
+    [tapVisible, trackingReady, onClickState, cancelCharge],
   );
   return {
     value,

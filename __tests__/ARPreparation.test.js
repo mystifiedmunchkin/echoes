@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ExperienceControls } from '../src/experiences/ExperienceControls';
 
 jest.mock('react-native', () => ({
-  View: 'View', Text: 'Text', ActivityIndicator: 'ActivityIndicator',
+  View: 'View', Text: 'Text', Image: 'Image', ActivityIndicator: 'ActivityIndicator',
   TouchableOpacity: 'TouchableOpacity',
   StyleSheet: { create: (styles) => styles, absoluteFillObject: {} },
   BackHandler: { addEventListener: jest.fn(() => ({ remove: jest.fn() })) },
@@ -191,7 +191,7 @@ test('selecting an experience routes to its template without entering legacy pla
   const arView = renderer.root.findByType('ViroARView');
   expect(arView.props.experience.games[0].type).toBe('images');
   expect(arView.props.memoryToPlace).toBeNull();
-  expect(JSON.stringify(renderer.toJSON())).toContain('experienceHint_images');
+  expect(JSON.stringify(renderer.toJSON())).not.toContain('experienceHint_images');
   act(() =>
     renderer.root
       .findByProps({ accessibilityLabel: 'closeExperience' })

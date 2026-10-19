@@ -9,26 +9,32 @@ export function ExperienceControls({
   gameIndex,
   onSelect,
   mode,
+  showTitle = true,
+  showHint = true,
 }: {
   experience: Experience;
   gameIndex: number;
   onSelect: (index: number) => void;
   mode: 'ar' | 'viewer';
+  showTitle?: boolean;
+  showHint?: boolean;
 }) {
   const { t } = useI18n();
   const game = experience.games[gameIndex];
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>{t(`experience_${game.type}`)}</Text>
-      <Text style={styles.text}>
-        {t(
-          game.settings && mode === 'viewer'
-            ? 'aimingViewerHint'
-            : game.type === 'images' && mode === 'viewer'
-            ? 'experienceImagesPreview'
-            : `experienceHint_${game.type}`,
-        )}
-      </Text>
+      {showTitle && <Text style={styles.text}>{t(`experience_${game.type}`)}</Text>}
+      {showHint && (
+        <Text style={styles.text}>
+          {t(
+            game.settings && mode === 'viewer'
+              ? 'aimingViewerHint'
+              : game.type === 'images' && mode === 'viewer'
+              ? 'experienceImagesPreview'
+              : `experienceHint_${game.type}`,
+          )}
+        </Text>
+      )}
       {experience.games.length > 1 && (
         <View style={styles.games}>
           {experience.games.map((item, index) => (

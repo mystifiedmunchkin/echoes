@@ -2,7 +2,7 @@
  * Active application shell: owns map/radar state, AR entry/exit, and modal orchestration.
  */
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { StyleSheet, Text, View, ActivityIndicator, TouchableOpacity, BackHandler, Alert } from 'react-native';
+import { StyleSheet, Text, View, Image, ActivityIndicator, TouchableOpacity, BackHandler, Alert } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import DeviceInfo from 'react-native-device-info';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -171,6 +171,7 @@ function AppContent() {
   const [isPreparingModelViewer, setIsPreparingModelViewer] = useState(false);
   const [experienceGameIndex, setExperienceGameIndex] = useState(0);
   const [experienceInteraction, setExperienceInteraction] = useState(null);
+  const [showAimingHint, setShowAimingHint] = useState(true);
   const [aimingPlaneReady, setAimingPlaneReady] = useState(false);
   const arExperience = useMemo(() => readExperience(selectedArMemory), [selectedArMemory]);
   const viewerExperience = useMemo(() => readExperience(modelViewerMemory), [modelViewerMemory]);
@@ -196,6 +197,7 @@ function AppContent() {
   const selectExperienceGame = useCallback((index) => {
     setExperienceGameIndex(index);
     setExperienceInteraction(null);
+    setShowAimingHint(true);
     setAimingPlaneReady(false);
   }, []);
   const handleExperienceEvent = useCallback((event) => {
@@ -214,32 +216,34 @@ function AppContent() {
       });
     }
     if (event.name === 'press') setExperienceInteraction(event);
+    if (event.name === 'projectileHint') {
+      setShowAimingHint(event.data?.visible === true);
+    }
     if (event.name === 'planeCandidate') setAimingPlaneReady(false);
     if (event.name === 'planeReady') setAimingPlaneReady(true);
     if (
       event.name === 'collision' &&
       event.data?.scoringContact === true &&
-      Number.isSafeInteger(event.data?.projectileId) &&
-      event.data.projectileId < 0 &&
       memory
     ) {
+      const points = Number(event.data.points);
+      const awardedPoints = Number.isFinite(points) && points > 0 ? points : 1;
+      const previousScore = scores.find(score =>
+        score.location_id === memory.location_id && score.gameType === event.type,
+      )?.points ?? 0;
+      const totalScore = previousScore + awardedPoints;
       addScore({
         location_id: memory.location_id, name: memory.name, gameType: event.type,
-        points: event.data.points ?? 1,
+        points: awardedPoints,
       });
       Alert.alert(
         t('scoreAddedTitle'),
-        t('scoreAdded', { points: event.data.points ?? 1 }),
+        t('scoreAdded', { points: awardedPoints, total: totalScore }),
       );
-      if (selectedArMemory) {
-        handleCollectMemory({
-          ...selectedArMemory,
-          creatorName: selectedArMemory.creatorName || selectedArMemory.creator_name || '',
-        });
-      }
     }
   }, [addScore, arExperience, collectObject, experienceGameIndex, modelViewerMemory,
-    handleCollectMemory, requireAuthentication, selectedArMemory, t, viewerExperience]);
+    scores,
+    requireAuthentication, selectedArMemory, t, viewerExperience]);
   const modelViewerRequestKey = useRef(0);
   const modelViewerTransitionTimer = useRef(null);
   const [mediaViewer, setMediaViewer] = useState(null);
@@ -737,6 +741,15 @@ function AppContent() {
           onExperienceError={reportExperienceError}
         />
 
+        {arExperience?.games[experienceGameIndex]?.type === 'aiming' && showAimingHint && (
+          <Image
+            source={require('./assets/long-tap.png')}
+            style={styles.aimingHintImage}
+            pointerEvents="none"
+            accessibilityLabel={t('aimingViewerHint')}
+          />
+        )}
+
         {/* Animated particle overlaid when a memory is collected. */}
         {activeParticle && (
           <CollectionParticle
@@ -794,12 +807,15 @@ function AppContent() {
               !aimingPlaneReady && (
                 <Text style={styles.placingHint}>{t('aimingScanPlane')}</Text>
               )}
-            <ExperienceControls experience={arExperience} gameIndex={experienceGameIndex}
-              onSelect={selectExperienceGame} mode="ar" />
-            {arExperience.games[experienceGameIndex]?.objects.some(object => object.properties.collectible) &&
-              <Text style={styles.loaderText}>{t('collectibleHint')}</Text>}
-            {experienceInteraction && (
-              <Text style={styles.loaderText}>{experienceInteraction.objectId}</Text>
+            {arExperience.games.length > 1 && (
+              <ExperienceControls
+                experience={arExperience}
+                gameIndex={experienceGameIndex}
+                onSelect={selectExperienceGame}
+                mode="ar"
+                showTitle={false}
+                showHint={false}
+              />
             )}
             <TouchableOpacity onPress={() => {
               setSelectedArMemory(null);
@@ -1154,6 +1170,17 @@ const styles = StyleSheet.create({
   memoryMarkerCard: { flex: 1, minWidth: 0, marginRight: 10, backgroundColor: COLORS.overlayDark, borderRadius: 12, paddingBottom: 8 },
   memoryMarkerCreator: { color: COLORS.textOnDark, fontFamily: 'monospace', fontSize: 11, paddingHorizontal: 12, paddingTop: 5 },
   memoryMarkerDescription: { color: COLORS.textOnDarkMuted, fontSize: 11, lineHeight: 15, paddingHorizontal: 12, paddingTop: 5 },
+  aimingHintImage: {
+    position: 'absolute',
+    top: '45%',
+    left: '62%',
+    height: '5%',
+    width: '5%',
+    resizeMode: 'contain',
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    borderRadius: 999,
+    opacity: 0.9,
+  },
 
   arCenterOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20, zIndex: 30, elevation: 30 },
   centerPrompt: { alignItems: 'center', gap: 10, maxWidth: '100%' },

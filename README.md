@@ -1,16 +1,20 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# The aim of the game 
 
-# Getting Started
+This app reads 3D games and contents that have been added to locations in places around the world to play in AR. For now it's available for testing basic aiming games. The games appear in AR, you can enter the game by clicking on a bubble then clicking on the floor, which places the game in your surroundings.
 
-This app reads games and contents added to locations on the map.
-Make your own contents for wherever you are by creating an account here :
+The games have be added through a user account online. You can make and place your own games or contents for wherever you are (using GPS coordinates) by creating an account here :
+
 https://echoes.sophiehorner.art
-Payment test mode is on, you'll be able to "pay" for subscriptions by giving the test credit card number:
-4242 4242 4242 4242 - Put whatever you like in the other fields, it'll pass.
-Editor account creation isn't quite intuitive yet. 
+
+Payment test mode is installed and enabled through a Stripe environment, you'll be able to "pay" for a test subscription by giving the test credit card number: 4242 4242 4242 4242 - Put whatever you like in the other fields, it'll pass.
+
+The game creation account isn't quite intuitive yet. The Laravel server is still being improved on and expanding with new features.
+
 Note : Only "aiming" type games can be read by the app for now.
 Send me inquireries or bug reports through my contact page here :
 https://sophiehorner.art/?page_id=228
+
+Fill in the settings and upload 3D objects to use as targets or projectiles for your game, the available types of games are : 'bowling' where you have to tip over the target, 'dartboard' which freezes the projectile and counts points from the center of the target and 'basket' where you aim to throw an object into a box.
 
 
 ## Source guide
@@ -45,14 +49,14 @@ Source comments are written in English; user-facing strings remain localized in
   rather than the 100 m balanced mode, for the 50 m discovery radius. Actual
   accuracy still depends on device conditions and the user's location settings.
 
-## Memory discovery
+## Game discovery
 
 - The nearby endpoint is queried with the current latitude and longitude; the map
   shows both the 2,500 m search circle and the 50 m discovery circle.
 - Once a GPS position is available, the map displays the native user-location marker with a compass heading indicator (subject to device sensor availability).
-- Before opening AR, the app obtains a fresh GPS fix, fetches nearby memories, filters them to a maximum of 50 m, and downloads their media. An unsuccessful preparation does not open AR.
-- Map and history details show only a title and description for distant memories. Within 50 m, full viewer access is reserved for Samsung Galaxy A devices (Galaxy A names or SM-A model identifiers), where AR is disabled. Other devices discover content in AR.
-- Legacy collected memories can still be placed again from the collection.
+- Before opening AR, the app obtains a fresh GPS fix, fetches nearby games, filters them to a maximum of 50 m, and downloads their media. An unsuccessful preparation does not open AR.
+- Map and history details show only a title and description for distant games. Within 50 m, full viewer access is reserved for Samsung Galaxy A devices (Galaxy A names or SM-A model identifiers), where AR is disabled. Other devices discover content in AR.
+- Legacy collected games can still be placed again from the collection.
   Individual game objects appear in the inventory without a placement action.
 
 ## Customizable experiences
@@ -448,140 +452,3 @@ by the server; server IDs are non-negative integers.
 Tracking, contact accuracy, model alignment, and fast/small projectile behavior
 must still be verified on physical ARCore/ARKit devices.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
-
-## Step 1: Start Metro
-
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
-
-To start the Metro dev server, run the following command from the root of your React Native project:
-
-```sh
-# Using npm
-npm start
-
-# OR using Yarn
-yarn start
-```
-
-## Step 2: Build and run your app
-
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
-```
-
-### iOS
-
-#### Requirements
-
-- A Mac with Xcode and its command-line tools, a supported Node.js version
-  (Node 22.21+ within the 22.x line, or another version allowed by
-  [`package.json`](package.json)), Ruby/Bundler and CocoaPods 1.16.2+.
-  A current Ruby 3.x installation is recommended instead of macOS's system Ruby.
-- A **physical ARKit-capable iPhone or iPad running iOS/iPadOS 17.6 or later**.
-  The installed ViroKit framework is an arm64 **device** binary with a 17.6
-  deployment minimum, not a simulator framework. A simulator, including an
-  Apple Silicon simulator, is not supported by this dependency set.
-- ViroKit was built with the iOS 27 SDK. Check compatibility with the Mac's
-  Xcode version; React Native's own minimum Xcode version alone is not enough
-  to certify this prebuilt framework.
-- An Apple signing team that can use `com.sophiehorner.echoes`. Select the
-  team locally in Xcode; no personal team ID or signing credentials are stored
-  in the repository. The app's display name is `echoes`, version `3.0.0`.
-
-This is a custom native application, **not an Expo Go application**. The tracked
-[`ios/`](ios/) project integrates Expo modules, Viro and MapLibre. Its internal
-target/scheme remains `TestApp` to preserve existing project references.
-
-#### Install native dependencies on the Mac
-
-```sh
-npm ci
-bundle install
-cd ios
-bundle exec pod install
-cd ..
-```
-
-Run `pod install` again after changing native dependencies. Open the generated
-`ios/TestApp.xcworkspace`, not the `.xcodeproj`, when using Xcode. On first use,
-select the `TestApp` target, configure **Signing & Capabilities**, connect and
-trust the device, and enable its Developer Mode if requested.
-
-#### Build commands (manual, on the Mac only)
-
-The following commands **perform a native build**; dependency installation or
-source checks do not require running them.
-
-```sh
-# Debug: choose the connected physical device, not a simulator.
-npm run ios
-
-# Release: verify startup without Metro before distribution.
-npm run ios -- --configuration Release
-```
-
-`npm start` runs Expo's Metro server for the custom native app, not Expo Go.
-Debug uses the Expo entry resolver and Release bundles through Expo CLI.
-The JavaScript root component is `main` on both platforms.
-
-Before distributing, test first-launch permission grants and denials, return
-from Settings, GPS outside near a known location, map position/heading, AR plane
-and image tracking, aiming/collection, cached models, audio/video playback,
-account switching and progress uploads. Check both Debug and standalone Release.
-JavaScript tests do not replace these physical-device checks or Xcode validation.
-
-#### Regenerating the native project
-
-For ordinary builds, use the tracked native project; no prebuild is required.
-If regeneration is necessary, first save native changes in version control,
-then use `npx expo prebuild --clean --platform ios --no-install` and reinstall
-pods. **This replaces the iOS project** and may change the internal target name;
-open the newly generated workspace. Keep `--platform ios` to avoid regenerating
-Android. The configuration in [`app.json`](app.json) carries the bundle ID,
-minimum OS, ARKit requirement, permissions, and Viro/MapLibre plugins. Nitro's
-native dependencies are explicit in [`package.json`](package.json).
-Do not repeatedly apply a non-clean prebuild to the manually integrated
-Podfile: Viro's plugin can append duplicate pod declarations.
-
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.

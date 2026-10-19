@@ -61,6 +61,23 @@ export interface BodyTransform {
   rotation: Vector3;
 }
 
+export function distanceAdjustedPoints(
+  distanceMeters: number,
+  points: number,
+  referenceDistanceMeters = 1,
+  minimumScore = 1,
+): number {
+  if (!Number.isFinite(distanceMeters) || distanceMeters >= referenceDistanceMeters) {
+    return points;
+  }
+  return Math.max(
+    minimumScore,
+    Math.round(points * Math.max(0, distanceMeters) / referenceDistanceMeters),
+  );
+}
+
+export const bowlingPoints = distanceAdjustedPoints;
+
 export function hasImpactRules(settings: AimingSettings): boolean {
   return ['reward', 'freeze', 'multiplier', 'fall'].some(
     key => settings[key as keyof AimingSettings] !== undefined,
@@ -162,27 +179,29 @@ export function isBottomContact(
     )
   )
     return false;
-  const localPoint = inverseRotate(
-    [
-      point[0] - transform.position[0],
-      point[1] - transform.position[1],
-      point[2] - transform.position[2],
-    ],
-    transform.rotation,
-  );
   const localNormal = inverseRotate(normal, transform.rotation);
   const [width, height, length] = colliderSize(collider);
   const thickness = basketThickness(collider);
   // Bullet contact points may penetrate slightly into the top face.
   const tolerance = Math.min(0.01, thickness / 4);
+  const bottomY = -height / 2 + thickness;
+  const isBottomPoint = (localPoint: Vector3) =>
+    Math.abs(localPoint[1] - bottomY) <= tolerance &&
+    Math.abs(localPoint[0]) < width / 2 - thickness &&
+    Math.abs(localPoint[2]) < length / 2 - thickness;
   // Only the interior top face of the bottom scores, not the walls, rim, or underside.
   return (
     Math.abs(localNormal[1]) > 0 &&
     Math.abs(localNormal[1]) >
       Math.max(Math.abs(localNormal[0]), Math.abs(localNormal[2])) &&
-    Math.abs(localPoint[1] - (-height / 2 + thickness)) <= tolerance &&
-    Math.abs(localPoint[0]) < width / 2 - thickness &&
-    Math.abs(localPoint[2]) < length / 2 - thickness
+    (
+      isBottomPoint(inverseRotate([
+        point[0] - transform.position[0],
+        point[1] - transform.position[1],
+        point[2] - transform.position[2],
+      ], transform.rotation)) ||
+      isBottomPoint(inverseRotate(point, transform.rotation))
+    )
   );
 }
 

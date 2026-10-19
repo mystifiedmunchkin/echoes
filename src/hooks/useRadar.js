@@ -640,6 +640,8 @@ export function useRadar(initialRadius = MAP_RADIUS_METERS) {
     // AR preparation needs a new location request and propagated API errors, not stale map data.
     const currentLoc = await Location.getCurrentPositionAsync({
       timeout: 20000,
+      enableHighAccuracy: true,
+      maximumAge: 0,
     });
     if (!currentLoc?.coords)
       throw new Error(translate('gpsLocationUnavailable'));

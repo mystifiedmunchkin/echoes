@@ -78,6 +78,7 @@ export interface ExperienceEvent {
     | 'targetRemoved'
     | 'planeCandidate'
     | 'planeReady'
+    | 'projectileHint'
     | 'shot'
     | 'shotBlocked';
   data?: unknown;

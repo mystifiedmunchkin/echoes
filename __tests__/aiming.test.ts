@@ -1,5 +1,7 @@
 import {
   colliderShape,
+  bowlingPoints,
+  distanceAdjustedPoints,
   colliderSize,
   isBottomContact,
   launchSpeed,
@@ -75,6 +77,20 @@ test('reads impact rules and preserves explicit false values', () => {
   })!.games[0].settings).toMatchObject({
     reward: 20, freeze: false, multiplier: 10, fall: false,
   });
+});
+
+test.each([
+  [0, 100, 1],
+  [0.5, 100, 50],
+  [1, 100, 100],
+  [2, 100, 100],
+])('scales bowling points by distance below one metre', (distance, multiplier, expected) => {
+  expect(bowlingPoints(distance, multiplier)).toBe(expected);
+});
+
+test('applies the same distance rule to every aiming score', () => {
+  expect(distanceAdjustedPoints(0.5, 7)).toBe(4);
+  expect(distanceAdjustedPoints(1, 7)).toBe(7);
 });
 
 test.each(['basket', 'dartboard', 'bowling'] as const)(

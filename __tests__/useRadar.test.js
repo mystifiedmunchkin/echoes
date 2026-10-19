@@ -81,7 +81,11 @@ test('refreshes GPS and downloads the nearby records with a 2500 m request cap',
   await act(async () => {
     result = await radar.loadNearbyMemories();
   });
-  expect(getCurrentPositionAsync).toHaveBeenCalledWith({ timeout: 20000 });
+  expect(getCurrentPositionAsync).toHaveBeenCalledWith({
+    timeout: 20000,
+    enableHighAccuracy: true,
+    maximumAge: 0,
+  });
   expect(global.fetch.mock.calls[0][0]).toMatch(/\?latitude=0&longitude=0$/);
   expect(radar.radius).toBe(2500);
   expect(result.location).toEqual(origin);

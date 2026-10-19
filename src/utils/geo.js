@@ -56,10 +56,15 @@ export function getRelativeARPosition(
   worldRadiusMeters = 2.5,
 ) {
   const bearingRadians = (bearingDeg * Math.PI) / 180;
-  const distanceScale = Math.min(
+  const normalizedDistance = Math.min(
     Math.max(distanceMeters, 0) / maxRadiusMeters,
     1,
-  ) * worldRadiusMeters;
+  );
+  // Never place a marker at the camera origin: a memory at the GPS fix would
+  // otherwise be inside the camera and could not be seen or selected.
+  const minimumDistanceScale = 0.1;
+  const distanceScale = Math.max(normalizedDistance, minimumDistanceScale)
+    * worldRadiusMeters;
 
   return [
     Math.sin(bearingRadians) * distanceScale,

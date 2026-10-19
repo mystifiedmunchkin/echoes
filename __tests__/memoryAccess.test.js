@@ -58,6 +58,7 @@ describe('memory discovery limits', () => {
     expect(session.every(({ distanceMeters }) => distanceMeters <= 50)).toBe(true);
     expect(session[2].relativePosition[0]).toBeCloseTo(2.5);
     expect(session[0].relativePosition).not.toEqual(session[1].relativePosition);
+    expect(createARSession([memoryAt(0)], origin)[0].relativePosition).not.toEqual([0, 0, 0]);
     expect(createARSession([memoryAt(0)], null)).toEqual([]);
   });
 
