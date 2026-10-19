@@ -1,4 +1,16 @@
-ECHOES lets you create, place, and discover personal memories in augmented reality.
+This app reads 3D games and contents that have been added to locations in places around the world to play in AR. For now it's available for testing basic aiming games. The games appear in AR, you can enter the game by clicking on a bubble then clicking on the floor, which places the game in your surroundings.
 
-Save memories with photos, audio, and 3D content, then revisit them at the place where they were created. Use the map to find nearby memories and the camera to explore them in the world around you.
+The games have be added through a user account online. You can make and place your own games or contents for wherever you are (using GPS coordinates) by creating an account here :
+
+https://echoes.sophiehorner.art
+
+Payment test mode is installed and enabled through a Stripe environment, for mow you'll be able to "pay" for a test subscription by giving the test credit card number: 4242 4242 4242 4242 - Put whatever you like in the other fields, it'll pass.
+
+The game creation account isn't quite intuitive yet. The Laravel server is still being improved on and expanding with new features.
+
+Note : Only "aiming" type games can be read by the app for now.
+Send me inquireries or bug reports through my contact page here :
+https://sophiehorner.art/?page_id=228
+
+Fill in the settings and upload 3D objects to use as targets or projectiles for your game, the available types of games are : 'bowling' where you have to tip over the target, 'dartboard' which freezes the projectile and counts points from the center of the target and 'basket' where you aim to throw an object into a box.
 
