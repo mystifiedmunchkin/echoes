@@ -1,26 +1,25 @@
 # The aim of the game 
 
-This app reads 3D games and contents that have been added to locations in places around the world to play in AR. For now it's available for testing basic aiming games. The games appear in AR, you can enter the game by clicking on a bubble then clicking on the floor, which places the game in your surroundings.
+- This app reads 3D games and contents that have been added to locations in places around the world to play in AR. For now it's available for testing basic aiming games. The games appear in AR, you can enter the game by clicking on a bubble then clicking on the floor, which places the game in your surroundings.
 
-The games have be added through a user account online. You can make and place your own games or contents for wherever you are (using GPS coordinates) by creating an account here :
+# Adding games to the map
+- The games have be added through a user account online. You can make and place your own games or contents for wherever you are (using GPS coordinates) by creating an account here :
 
 https://echoes.sophiehorner.art
 
 Payment test mode is installed and enabled through a Stripe environment, you'll be able to "pay" for a test subscription by giving the test credit card number: 4242 4242 4242 4242 - Put whatever you like in the other fields, it'll pass.
 
-The game creation account isn't quite intuitive yet. The Laravel server is still being improved on and expanding with new features.
+- The game creation account isn't very intuitive yet. The Laravel server is still being improved on and expanding with new features.
 
-Note : Only "aiming" type games can be read by the app for now.
-Send me inquireries or bug reports through my contact page here :
-https://sophiehorner.art/?page_id=228
+**Note** : Only "aiming" type games can be read by the app for now. Send me inquireries or bug reports through my contact page here : https://sophiehorner.art/?page_id=228
 
-Fill in the settings and upload 3D objects to use as targets or projectiles for your game, the available types of games are : 'bowling' where you have to tip over the target, 'dartboard' which freezes the projectile and counts points from the center of the target and 'basket' where you aim to throw an object into a box.
+- Fill in the settings and upload 3D objects to use as targets or projectiles for your game, the available types of games are : 'bowling' where you have to tip over the target, 'dartboard' which freezes the projectile and counts points from the center of the target and 'basket' where you aim to throw an object into a box.
 
 
-## Source guide
+# Source guide
 
 Source comments are written in English; user-facing strings remain localized in
-[`constants/i18n.js`](constants/i18n.js).
+[`constants/i18n.js`](constants/i18n.js). French version is available.
 
 - [`App.js`](App.js) coordinates map discovery, authentication, viewer transitions,
   and AR preparation. An AR session snapshots nearby memories only after location
