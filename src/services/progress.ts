@@ -71,14 +71,23 @@ export function progressId(value: unknown): number {
   return id;
 }
 
+export function progressLocationId(value: unknown): number {
+  // Negative location keys are reserved for on-device bundled games, never API IDs.
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value < 0) return value;
+  return progressId(value);
+}
+
 export function emptyProgress(): Progress {
   return { scores: [], visitedPlaces: [], collectedItems: [], collectedMemories: [] };
 }
 
-export function progressPayload(progress: Progress): ProgressPayload {
+export function progressPayload(
+  progress: Progress,
+  scoreOnlyLocationIds: readonly number[] = [],
+): ProgressPayload {
   // Keep display names, timestamps, coordinates, and legacy memories out of the API payload.
   return {
-    scores: progress.scores.map(item => {
+    scores: progress.scores.flatMap(item => {
       if (
         !['aiming', 'treasure', 'discovery', 'images'].includes(item.gameType) ||
         !Number.isSafeInteger(item.points) ||
@@ -86,21 +95,29 @@ export function progressPayload(progress: Progress): ProgressPayload {
       ) {
         throw new Error('Invalid progress score');
       }
-      return {
-        location_id: progressId(item.location_id),
+      const locationId = progressLocationId(item.location_id);
+      if (locationId < 0) return [];
+      return [{
+        location_id: locationId,
         game_type: item.gameType,
         score: item.points,
-      };
+      }];
     }),
-    visited_location_ids: [...new Set(progress.visitedPlaces.map(place => progressId(place.location_id)))],
-    collected_items: progress.collectedItems.map(item => {
+    visited_location_ids: [...new Set(progress.visitedPlaces
+      .map(place => progressLocationId(place.location_id))
+      .filter(id => id >= 0 && !scoreOnlyLocationIds.includes(id)))],
+    collected_items: progress.collectedItems.flatMap(item => {
       if (item.quantity !== 1) throw new Error('Invalid collected quantity');
-      return {
-        location_id: progressId(item.location_id),
-        game_id: progressId(item.game_id),
-        item_id: progressId(item.item_id),
+      const locationId = progressLocationId(item.location_id);
+      const gameId = progressId(item.game_id);
+      const itemId = progressId(item.item_id);
+      if (locationId < 0 || scoreOnlyLocationIds.includes(locationId)) return [];
+      return [{
+        location_id: locationId,
+        game_id: gameId,
+        item_id: itemId,
         quantity: item.quantity,
-      };
+      }];
     }),
   };
 }

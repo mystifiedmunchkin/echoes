@@ -1,0 +1,83 @@
+{
+  "id": null,
+  "location_id": null,
+  "name": "Demo 2 - Licorne au panier",
+  "description": "Lancer la licorne dans le panier pour marquer des points.",
+  "creatorName": "",
+  "lat": 0,
+  "lng": 0,
+  "interactive": {
+    "logic": {
+      "gravity": [0, -9.81, 0],
+      "games": [
+        {
+          "id": null,
+          "type": "aiming",
+          "subtype": "basket",
+          "assets": [
+            { "id": 1, "name": "Unicorn", "type": "GLB", "url": "bundle:demo2_unicorn.glb" },
+            { "id": 2, "name": "Basket", "type": "GLB", "url": "bundle:demo2_basket.glb" }
+          ],
+          "objects": [
+            {
+              "id": 1,
+              "properties": {
+                "asset": 1,
+                "active": true,
+                "collectible": false,
+                "position": [0, 0, 0],
+                "rotation": [0, 0, 0],
+                "scale": [0.35, 0.35, 0.35],
+                "collider": { "type": "bounding", "size": [0.15, 0.12, 0.09] },
+                "physics": {
+                  "type": "Dynamic",
+                  "mass": 0.5,
+                  "friction": 0.5,
+                  "restitution": 0.1,
+                  "useGravity": true
+                }
+              }
+            },
+            {
+              "id": 2,
+              "properties": {
+                "asset": 2,
+                "active": true,
+                "collectible": false,
+                "position": [0, 0.3, -2],
+                "rotation": [0, 0, 0],
+                "scale": [1, 1, 1],
+                "collider": {
+                  "type": "basket",
+                  "size": [0.6, 0.6, 0.6],
+                  "thickness": 0.03
+                },
+                "physics": {
+                  "type": "Static",
+                  "mass": 0,
+                  "friction": 0.6,
+                  "restitution": 0.1,
+                  "useGravity": false
+                }
+              }
+            }
+          ],
+          "settings": {
+            "plane": { "minWidth": 1, "minLength": 3, "stableMs": 1000 },
+            "projectile": {
+              "objectId": 1,
+              "speed": 5,
+              "spawnDistance": 0.3,
+              "lifetimeMs": null,
+              "maxActive": 12
+            },
+            "targets": [2],
+            "freeze": false,
+            "fall": false,
+            "multiplier": 5
+          }
+        }
+      ]
+    }
+  }
+}

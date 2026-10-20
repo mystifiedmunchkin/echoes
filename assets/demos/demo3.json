@@ -1,0 +1,79 @@
+{
+  "id": null,
+  "location_id": null,
+  "name": "Demo 3 - Flechettes",
+  "description": "Viser la cible avec la flechette, qui se fige au point d'impact.",
+  "creatorName": "",
+  "lat": 0,
+  "lng": 0,
+  "interactive": {
+    "logic": {
+      "gravity": [0, -9.81, 0],
+      "games": [
+        {
+          "id": null,
+          "type": "aiming",
+          "subtype": "dartboard",
+          "assets": [
+            { "id": 1, "name": "Dart", "type": "GLB", "url": "bundle:demo3_dart.glb" },
+            { "id": 2, "name": "Dartboard", "type": "GLB", "url": "bundle:demo3_dartboard.glb" }
+          ],
+          "objects": [
+            {
+              "id": 1,
+              "properties": {
+                "asset": 1,
+                "active": true,
+                "collectible": false,
+                "position": [0, 0, 0],
+                "rotation": [0, 0, 0],
+                "scale": [0.18, 0.18, 0.18],
+                "collider": { "type": "bounding", "size": [0.36, 0.1, 0.1] },
+                "physics": {
+                  "type": "Dynamic",
+                  "mass": 0.1,
+                  "friction": 0.3,
+                  "restitution": 0,
+                  "useGravity": true
+                }
+              }
+            },
+            {
+              "id": 2,
+              "properties": {
+                "asset": 2,
+                "active": true,
+                "collectible": false,
+                "position": [0, 1.3, -2],
+                "rotation": [0, -90, 0],
+                "scale": [0.4, 0.4, 0.4],
+                "collider": { "type": "bounding", "size": [0.16, 0.8, 0.8] },
+                "physics": {
+                  "type": "Static",
+                  "mass": 0,
+                  "friction": 0.5,
+                  "restitution": 0,
+                  "useGravity": false
+                }
+              }
+            }
+          ],
+          "settings": {
+            "plane": { "minWidth": 1, "minLength": 3, "stableMs": 1000 },
+            "projectile": {
+              "objectId": 1,
+              "speed": 8,
+              "spawnDistance": 0.5,
+              "lifetimeMs": null,
+              "maxActive": 12
+            },
+            "targets": [2],
+            "freeze": true,
+            "fall": false,
+            "multiplier": 10
+          }
+        }
+      ]
+    }
+  }
+}

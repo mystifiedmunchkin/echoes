@@ -23,6 +23,8 @@ export const MemoryInfoModal = ({
   onViewImage,
   onViewModel,
   onViewVideo,
+  onCollectGame,
+  canCollectGame = false,
   canViewContent = false,
   previewMessage,
 }) => {
@@ -72,6 +74,16 @@ export const MemoryInfoModal = ({
           )}
 
           <View style={styles.buttonRow}>
+            {canCollectGame && hasExperience(memory) && onCollectGame && (
+              <TouchableOpacity
+                style={styles.modelButton}
+                onPress={() => onCollectGame(memory)}
+                accessibilityRole="button"
+                accessibilityLabel={t('addGameToCollection')}
+              >
+                <Text style={styles.modelButtonText}>{t('addGameToCollection')}</Text>
+              </TouchableOpacity>
+            )}
             {canViewContent && (!!memory.model_url || hasExperience(memory)) && (
               <TouchableOpacity
                 style={styles.modelButton}

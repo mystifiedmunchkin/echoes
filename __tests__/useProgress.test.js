@@ -30,7 +30,7 @@ let renderer;
 let errorLog;
 const originalFetch = global.fetch;
 function Probe({ user = mockAuth.user, token = mockAuth.token }) {
-  progress = useProgress(user, token);
+  progress = useProgress(user, token, [900]);
   return null;
 }
 beforeEach(() => {
@@ -48,6 +48,34 @@ afterEach(() => {
 const mount = async () => {
   await act(async () => { renderer = TestRenderer.create(<Probe />); });
 };
+
+test.each([null, { id: 1 }])('persists local demo scores without uploading them for user %j', async user => {
+  mockAuth = { user, token: user ? 'token-1' : null };
+  await mount();
+  await act(async () => {
+    progress.addScore({ location_id: -1, name: 'Local bowling', gameType: 'aiming', points: 10 });
+    progress.addScore({ location_id: -2, name: 'Local basket', gameType: 'aiming', points: 5 });
+    progress.collectObject({ location_id: -1, game_id: 0, item_id: 2 });
+    progress.finishGame({ scoreOnlyLocationId: -1 });
+    progress.finishGame({ scoreOnlyLocationId: -2 });
+  });
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(Alert.alert).not.toHaveBeenCalledWith('progressError', expect.anything());
+  act(() => renderer.unmount());
+  await mount();
+  expect(progress.scores.map(score => score.points)).toEqual([10, 5]);
+  expect(progress.collectedItems[0].location_id).toBe(-1);
+  if (user) {
+    await act(async () => {
+      progress.addScore({ location_id: 12, name: 'Server game', gameType: 'aiming', points: 2 });
+      progress.finishGame();
+    });
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
+      scores: [{ location_id: 12, game_type: 'aiming', score: 2 }],
+      visited_location_ids: [], collected_items: [],
+    });
+  }
+});
 
 test('queues last-moment score, visit and collection writes before sending the final snapshot', async () => {
   await mount();
@@ -269,4 +297,70 @@ test('keeps old account progression untouched and uploads only the corrected nam
     scores: [{ location_id: 7, game_type: 'aiming', score: 2 }],
     visited_location_ids: [], collected_items: [],
   });
+});
+
+test('retains a complete collected game and upgrades an earlier model-only collection entry', async () => {
+    await mount();
+    const partial = { id: 101, location_id: 7, name: 'Basket', model_url: 'file://basket.glb' };
+    const game = {
+      ...partial,
+      interactive: { logic: { games: [{
+        id: 101, type: 'aiming', assets: [{ id: 1, type: 'GLB', url: 'file://ball.glb' }],
+        objects: [{ id: 1, properties: { asset: 1 } }],
+      }] } },
+    };
+    await act(async () => { progress.handleCollectMemory(partial); });
+    const collectedAt = progress.collectedMemories[0].collectedAt;
+    await act(async () => {
+      progress.handleCollectMemory(game);
+      progress.handleCollectMemory(game);
+    });
+    expect(progress.collectedMemories).toEqual([{ ...game, collectedAt }]);
+    act(() => renderer.unmount());
+    await mount();
+    expect(progress.collectedMemories[0].interactive).toEqual(game.interactive);
+  });
+
+test('saves guest demo points locally and restores them without an authenticated upload', async () => {
+    mockAuth = { user: null, token: null };
+    await mount();
+    await act(async () => {
+      progress.addScore({ location_id: 900, gameType: 'aiming', points: 5 });
+      progress.finishGame({ scoreOnlyLocationId: 900 });
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+    act(() => renderer.unmount());
+    await mount();
+    expect(progress.scores[0].points).toBe(5);
+    expect(AsyncStorage.storage.has(progressKey(null))).toBe(true);
+    mockAuth = { user: { id: 1 }, token: 'token-1' };
+    await act(async () => { renderer.update(<Probe />); });
+    expect(progress.scores).toEqual([]);
+  });
+
+test('uploads only the demo score snapshot and never sends its visits or collected objects later', async () => {
+    await mount();
+    await act(async () => {
+      progress.markPlaceVisited({ id: 101, location_id: 900, lat: 0, lng: 0 });
+      progress.collectObject({ location_id: 900, game_id: 101, item_id: 1 });
+      progress.markPlaceVisited({ id: 102, location_id: 7 });
+      progress.collectObject({ location_id: 7, game_id: 102, item_id: 2 });
+      progress.addScore({ location_id: 900, gameType: 'aiming', points: 5 });
+      progress.addScore({ location_id: 7, gameType: 'aiming', points: 2 });
+      progress.finishGame({ scoreOnlyLocationId: 900 });
+    });
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
+      scores: [{ location_id: 900, game_type: 'aiming', score: 5 }],
+      visited_location_ids: [], collected_items: [],
+    });
+    expect(progress.collectedItems).toHaveLength(2);
+    await act(async () => { progress.finishGame(); });
+    expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual({
+      scores: [
+        { location_id: 900, game_type: 'aiming', score: 5 },
+        { location_id: 7, game_type: 'aiming', score: 2 },
+      ],
+      visited_location_ids: [7],
+      collected_items: [{ location_id: 7, game_id: 102, item_id: 2, quantity: 1 }],
+    });
 });

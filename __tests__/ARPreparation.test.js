@@ -22,7 +22,9 @@ jest.mock('react-native-device-info', () => ({
 }));
 jest.mock('react-native-gesture-handler', () => ({ GestureHandlerRootView: 'GestureHandlerRootView' }));
 jest.mock('react-native-vision-camera', () => ({
-  useCameraPermission: () => ({ hasPermission: true, requestPermission: jest.fn() }),
+  useCameraPermission: () => ({
+    hasPermission: mockCameraPermission, requestPermission: mockRequestCameraPermission,
+  }),
 }));
 jest.mock('@maplibre/maplibre-react-native', () => ({
   Camera: 'Camera', CircleLayer: 'CircleLayer', FillLayer: 'FillLayer',
@@ -32,6 +34,9 @@ jest.mock('@maplibre/maplibre-react-native', () => ({
 jest.mock('../src/hooks/useRadar', () => ({ useRadar: () => mockRadar }));
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => mockAuth,
+}));
+jest.mock('../src/services/bundledGames', () => ({
+  loadBundledGames: () => mockBundledGames,
 }));
 jest.mock('../src/services/auth', () => ({
   getAuthToken: async () => mockAuth.token,
@@ -80,17 +85,25 @@ const mockRadar = {
 };
 let renderer;
 let mockAuth;
+let mockBundledGames;
+let mockCameraPermission;
+const mockRequestCameraPermission = jest.fn();
 const originalFetch = global.fetch;
 
 beforeEach(async () => {
   jest.clearAllMocks();
   mockAuth = { user: null, token: null };
+  mockBundledGames = [];
+  mockCameraPermission = true;
+  mockRequestCameraPermission.mockResolvedValue(true);
   AsyncStorage.getItem.mockResolvedValue(null);
+  AsyncStorage.setItem.mockResolvedValue();
   global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 204 });
   DeviceInfo.getManufacturerSync.mockReturnValue('Google');
   DeviceInfo.getModel.mockReturnValue('Pixel 8');
   mockRadar.memories = [];
   mockRadar.location = origin;
+  mockRadar.cacheMemoryAssets.mockImplementation(async memory => memory);
   mockRadar.loadNearbyMemories.mockResolvedValue({
     location: origin, memories: [memoryAt(49), memoryAt(51)],
   });
@@ -490,4 +503,193 @@ test('selects separate games at one location and sends location IDs rather than 
   expect(renderer.root.findByType('MemoryInfoModal').props.memory).toMatchObject({
     id: 102, location_id: 7, name: 'Game 102',
   });
+});
+
+const demoMemory = () => ({
+  ...progressMemory(),
+  id: 100, location_id: 900, name: 'Included basket',
+  lat: 0, lng: 0, isBundled: true, is_collectible: false,
+});
+
+async function mountCollectionDemo(user = null) {
+  jest.useFakeTimers();
+  mockAuth = { user, token: user ? 'test-token' : null };
+  mockBundledGames = [demoMemory()];
+  mockRadar.location = null;
+  mockRadar.loadNearbyMemories.mockRejectedValue(new Error('No GPS or network'));
+  mockRadar.cacheMemoryAssets.mockRejectedValue(new Error('Must use bundled assets'));
+  await act(async () => {
+    renderer.unmount();
+    renderer = TestRenderer.create(<App />);
+  });
+}
+
+async function playCollectionItem(item) {
+  act(() => renderer.root.findByType('InventoryModal').props.onReplace(item));
+  expect(renderer.root.findAllByType('ViroARView')).toHaveLength(0);
+  await act(async () => { jest.advanceTimersByTime(500); });
+}
+
+test.each(['ar', 'viewer'])('plays a local-only demo in %s without sending its score on switch or close', async mode => {
+  if (mode === 'viewer') {
+    DeviceInfo.getManufacturerSync.mockReturnValue('samsung');
+    DeviceInfo.getModel.mockReturnValue('Galaxy A55');
+  }
+  await mountCollectionDemo({ id: 1 });
+  const demo = { ...demoMemory(), location_id: -1, localOnly: true };
+  mockBundledGames = [demo];
+  await act(async () => {
+    renderer.unmount();
+    renderer = TestRenderer.create(<App />);
+  });
+  await playCollectionItem(demo);
+  if (mode === 'viewer') await act(async () => { jest.advanceTimersByTime(500); });
+  await act(async () => {
+    const event = { type: 'aiming', gameId: 100, name: 'collision', data: { scoringContact: true, points: 10 } };
+    if (mode === 'ar') renderer.root.findByType('ViroARView').props.onExperienceEvent(event);
+    else renderer.root.findByType('ExperienceViewer').props.onEvent(event);
+    renderer.root.findByType(ExperienceControls).props.onSelect(1);
+  });
+  expect(global.fetch).not.toHaveBeenCalled();
+  await act(async () => renderer.root.findByProps({
+    accessibilityLabel: mode === 'ar' ? 'closeCamera' : 'closeModelViewer',
+  }).props.onPress());
+  if (mode === 'viewer') await act(async () => { jest.advanceTimersByTime(500); });
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(renderer.root.findByType('MenuModal').props.scores).toEqual([
+    { location_id: -1, name: 'Included basket', gameType: 'aiming', points: 10 },
+  ]);
+  expect(mockRadar.cacheMemoryAssets).not.toHaveBeenCalled();
+  expect(mockRadar.loadNearbyMemories).not.toHaveBeenCalled();
+});
+
+test('opens the Collection without an account and plays a complete bundled game offline without GPS', async () => {
+  await mountCollectionDemo();
+  act(() => renderer.root.findByProps({ accessibilityLabel: 'openCollection' }).props.onPress());
+  const inventory = renderer.root.findByType('InventoryModal');
+  expect(inventory.props.visible).toBe(true);
+  expect(inventory.props.items).toEqual([demoMemory()]);
+  await playCollectionItem(inventory.props.items[0]);
+  const ar = renderer.root.findByType('ViroARView');
+  expect(ar.props.experience.games).toHaveLength(2);
+  expect(ar.props.experience.games[0].settings.targets).toEqual([2]);
+  expect(ar.props.memoryToPlace).toBeNull();
+  expect(ar.props.arMemories).toEqual([]);
+  expect(mockRadar.loadNearbyMemories).not.toHaveBeenCalled();
+  expect(mockRadar.cacheMemoryAssets).not.toHaveBeenCalled();
+  await act(async () => {
+    ar.props.onExperienceEvent({
+      type: 'aiming', gameId: 100, name: 'collision',
+      data: { scoringContact: true, points: 5 },
+    });
+    ar.props.onExperienceEvent({ type: 'aiming', gameId: 100, objectId: 2, name: 'collect' });
+  });
+  expect(renderer.root.findByType('AccountModal').props.visible).toBe(false);
+  await act(async () => renderer.root.findByProps({ accessibilityLabel: 'closeCamera' }).props.onPress());
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(renderer.root.findByType('MenuModal').props.scores).toEqual([
+    { location_id: 900, name: 'Included basket', gameType: 'aiming', points: 5 },
+  ]);
+  expect(mockBundledGames[0]).toMatchObject({ lat: 0, lng: 0, location_id: 900 });
+  await act(async () => renderer.root.findByType('InventoryModal').props.onClear());
+  expect(renderer.root.findByType('InventoryModal').props.items).toEqual([demoMemory()]);
+  expect(renderer.root.findByType('MenuModal').props.scores[0].points).toBe(5);
+});
+
+test('uploads demo scores under their original server location without visits or object uploads', async () => {
+  await mountCollectionDemo({ id: 1 });
+  await playCollectionItem(demoMemory());
+  await act(async () => {
+    const ar = renderer.root.findByType('ViroARView');
+    ar.props.onExperienceEvent({ type: 'aiming', gameId: 100, objectId: 2, name: 'collect' });
+    ar.props.onExperienceEvent({
+      type: 'aiming', gameId: 100, name: 'collision',
+      data: { scoringContact: true, points: 3 },
+    });
+    renderer.root.findByProps({ accessibilityLabel: 'closeCamera' }).props.onPress();
+  });
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+  expect(global.fetch.mock.calls[0][0]).toBe('https://echoes.sophiehorner.art/api/progress');
+  expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
+    scores: [{ location_id: 900, game_type: 'aiming', score: 3 }],
+    visited_location_ids: [], collected_items: [],
+  });
+  expect(renderer.root.findByType('MenuModal').props.places).toEqual([]);
+});
+
+test('opens a bundled game in the Galaxy A fallback without proximity checks', async () => {
+  DeviceInfo.getManufacturerSync.mockReturnValue('samsung');
+  DeviceInfo.getModel.mockReturnValue('Galaxy A55');
+  await mountCollectionDemo();
+  await playCollectionItem(demoMemory());
+  await act(async () => { jest.advanceTimersByTime(500); });
+  expect(renderer.root.findByType('ExperienceViewer').props.experience.games).toHaveLength(2);
+  expect(renderer.root.findAllByType('ViroARView')).toHaveLength(0);
+  expect(mockRadar.loadNearbyMemories).not.toHaveBeenCalled();
+  expect(mockRadar.cacheMemoryAssets).not.toHaveBeenCalled();
+});
+
+test('adds a discovered whole game to Collection and replays its saved settings anywhere', async () => {
+  jest.useFakeTimers();
+  mockAuth = { user: { id: 1 }, token: 'test-token' };
+  const game = progressMemory();
+  const saved = new Map();
+  AsyncStorage.getItem.mockImplementation(async key => saved.get(key) || null);
+  AsyncStorage.setItem.mockImplementation(async (key, value) => { saved.set(key, value); });
+  await act(async () => {
+    renderer.unmount();
+    renderer = TestRenderer.create(<App />);
+  });
+  await act(async () => renderer.root.findByType('MemoryInfoModal').props.onCollectGame(game));
+  expect(renderer.root.findByType('InventoryModal').props.items[0].interactive).toEqual(game.interactive);
+  mockRadar.location = null;
+  mockRadar.memories = [];
+  await act(async () => {
+    renderer.unmount();
+    renderer = TestRenderer.create(<App />);
+  });
+  const collected = renderer.root.findByType('InventoryModal').props.items[0];
+  expect(collected.interactive).toEqual(game.interactive);
+  mockRadar.loadNearbyMemories.mockRejectedValue(new Error('No GPS'));
+  await playCollectionItem(collected);
+  expect(renderer.root.findByType('ViroARView').props.experience.games).toHaveLength(2);
+  expect(mockRadar.loadNearbyMemories).not.toHaveBeenCalled();
+});
+
+test('does not save an incomplete game or open Collection playback when preparation fails', async () => {
+  mockAuth = { user: { id: 1 }, token: 'test-token' };
+  await act(async () => renderer.update(<App />));
+  await act(async () => renderer.root.findByType('MemoryInfoModal').props.onCollectGame(memoryAt(10)));
+  expect(Alert.alert).toHaveBeenCalledWith('experienceError', 'gameDefinitionRequired');
+  expect(renderer.root.findByType('InventoryModal').props.items).toEqual([]);
+  jest.useFakeTimers();
+  mockRadar.cacheMemoryAssets.mockRejectedValue(new Error('Missing game asset'));
+  await playCollectionItem(progressMemory());
+  expect(Alert.alert).toHaveBeenCalledWith('arPreparationError', 'Missing game asset');
+  expect(renderer.root.findAllByType('ViroARView')).toHaveLength(0);
+});
+
+test('asks for camera permission before playing a game from Collection', async () => {
+  mockCameraPermission = false;
+  mockRequestCameraPermission.mockResolvedValue(false);
+  await mountCollectionDemo();
+  await playCollectionItem(demoMemory());
+  expect(mockRequestCameraPermission).toHaveBeenCalledTimes(1);
+  expect(Alert.alert).toHaveBeenCalledWith('error', 'cameraPermissionDenied');
+  expect(renderer.root.findAllByType('ViroARView')).toHaveLength(0);
+  expect(mockRadar.cacheMemoryAssets).not.toHaveBeenCalled();
+});
+
+test('does not publish a demo placement when closed without a score', async () => {
+  await mountCollectionDemo({ id: 1 });
+  await playCollectionItem(demoMemory());
+  await act(async () => renderer.root.findByProps({ accessibilityLabel: 'closeCamera' }).props.onPress());
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
+test('requires an account to add a discovered game while leaving included games accessible', async () => {
+  await act(async () => renderer.root.findByType('MemoryInfoModal').props.onCollectGame(progressMemory()));
+  expect(renderer.root.findByType('AccountModal').props.visible).toBe(true);
+  expect(mockRadar.cacheMemoryAssets).not.toHaveBeenCalled();
+  expect(renderer.root.findByType('InventoryModal').props.items).toEqual([]);
 });

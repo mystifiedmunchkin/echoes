@@ -1,4 +1,4 @@
-/** Inventory UI for reviewing, clearing, and returning collected memories to AR. */
+/** Collection of replayable games/memories, permanent demos and individual objects. */
 import React from 'react';
 import {
   StyleSheet,
@@ -22,17 +22,19 @@ export default function InventoryModal({ visible, onClose, items, onClear, onRep
           {!!item.creatorName && <Text style={styles.creatorName}>{item.creatorName}</Text>}
         </View>
         <Text style={styles.itemDate}>
-          {item.collectedAt ? new Date(item.collectedAt).toLocaleDateString() : t('anchored')}
+          {item.isBundled ? t(item.localOnly ? 'bundledLocalGame' : 'bundledGame') : item.collectedAt
+            ? new Date(item.collectedAt).toLocaleDateString() : t('anchored')}
         </Text>
       </View>
 
       {!item.isGameObject && <View style={styles.actionsRow}>
-        {/* Only legacy memories can be re-placed; individual game objects stay in the inventory. */}
         <TouchableOpacity
           style={styles.replaceButton}
-          onPress={() => onReplace && onReplace(item)}
+          onPress={() => onReplace(item)}
+          accessibilityRole="button"
+          accessibilityLabel={t(item.isBundled ? 'playHere' : 'replaceHere')}
         >
-          <Text style={styles.replaceButtonText}>📍 {t('replaceHere')}</Text>
+          <Text style={styles.replaceButtonText}>📍 {t(item.isBundled ? 'playHere' : 'replaceHere')}</Text>
         </TouchableOpacity>
       </View>}
     </View>
@@ -73,7 +75,7 @@ export default function InventoryModal({ visible, onClose, items, onClear, onRep
           )}
 
           {/* Footer with the clear button. */}
-          {items.length > 0 && (
+          {items.some(item => !item.isBundled) && (
             <TouchableOpacity style={styles.clearButton} onPress={onClear}>
               <Text style={styles.clearButtonText}>{t('clearCollection')}</Text>
             </TouchableOpacity>

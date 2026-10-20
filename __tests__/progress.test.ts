@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  emptyProgress, loadProgress, postProgress, progressKey, progressPayload,
+  emptyProgress, loadProgress, postProgress, progressId, progressKey, progressPayload,
 } from '../src/services/progress';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -19,6 +19,29 @@ beforeEach(() => {
   globalThis.fetch = fetchMock;
 });
 afterAll(() => { globalThis.fetch = originalFetch; });
+
+test('never serializes local-only scores, visits or objects as server progression', () => {
+  expect(progressPayload({
+    scores: [
+      { location_id: -1, name: 'Local demo', gameType: 'aiming', points: 20 },
+      { location_id: 12, name: 'Server game', gameType: 'aiming', points: 5 },
+    ],
+    visitedPlaces: [
+      { id: 0, location_id: -1, name: 'Local demo', firstSeenAt: '', lastSeenAt: '' },
+      { id: 100, location_id: 12, name: 'Server game', firstSeenAt: '', lastSeenAt: '' },
+    ],
+    collectedItems: [
+      { location_id: -1, game_id: 0, item_id: 2, quantity: 1, name: '', collectedAt: '' },
+      { location_id: 12, game_id: 100, item_id: 2, quantity: 1, name: '', collectedAt: '' },
+    ],
+    collectedMemories: [],
+  })).toEqual({
+    scores: [{ location_id: 12, game_type: 'aiming', score: 5 }],
+    visited_location_ids: [12],
+    collected_items: [{ location_id: 12, game_id: 100, item_id: 2, quantity: 1 }],
+  });
+  expect(() => progressId(-1)).toThrow('Invalid progress identifier');
+});
 
 test('builds the exact API payload without UI metadata', () => {
   expect(progressPayload({

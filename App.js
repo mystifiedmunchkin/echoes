@@ -36,8 +36,9 @@ import { hasExperience, readExperience } from './src/experiences/experience';
 import { ExperienceControls } from './src/experiences/ExperienceControls';
 import ExperienceViewer from './src/experiences/ExperienceViewer';
 import { useAuth } from './src/hooks/useAuth'
+import { loadBundledGames } from './src/services/bundledGames';
 import { COLORS } from './theme';
-import { useI18n } from './constants/i18n';
+import { translate, useI18n } from './constants/i18n';
 const MAP_NEIGHBORHOOD_ZOOM = 12;
 const DEFAULT_MAP_CENTER = [1.3553, 44.0175];
 const AR_SESSION_RELEASE_MS = 1500;
@@ -94,14 +95,30 @@ function AppContent() {
 
   // --- Inventory management ---
   const [showInventory, setShowInventory] = useState(false);
+  const [bundledGames, setBundledGames] = useState([]);
+  useEffect(() => {
+    try {
+      setBundledGames(loadBundledGames());
+    } catch (error) {
+      console.error('Bundled game loading failed', error);
+      Alert.alert(translate('experienceError'), error.message);
+    }
+  }, []);
+  const bundledLocationIds = useMemo(
+    () => [...new Set(bundledGames.map(game => game.location_id))],
+    [bundledGames],
+  );
+  const isBundledGame = useCallback(memory =>
+    bundledGames.some(game => memoryKey(game) === memoryKey(memory)), [bundledGames]);
   const { user, token, signIn, signUp, signOut, deleteAccount } = useAuth();
   const {
     scores, addScore, visitedPlaces, markPlaceVisited, collectedItems,
     collectObject, clearCollectedItems: clearCollection, finishGame,
     collectedMemories, handleCollectMemory,
-  } = useProgress(user, token);
-  // Legacy memories can be placed again; game objects use a composite inventory ID.
-  const collectionItems = useMemo(() => [...collectedMemories.map((item) => {
+  } = useProgress(user, token, bundledLocationIds);
+  // Whole games and memories can be replayed; individual objects keep composite IDs.
+  const collectionItems = useMemo(() => [...bundledGames, ...collectedMemories
+    .filter(item => !isBundledGame(item)).map((item) => {
     const sourceMemory = memories.find((memory) => memoryKey(memory) === memoryKey(item));
     return sourceMemory?.creatorName && !item.creatorName
       ? { ...item, creatorName: sourceMemory.creatorName }
@@ -110,7 +127,7 @@ function AppContent() {
     ...item,
     id: `${item.location_id}:${item.game_id}:${item.item_id}`,
     isGameObject: true,
-  }))], [collectedMemories, memories, collectedItems]);
+  }))], [bundledGames, isBundledGame, collectedMemories, memories, collectedItems]);
 
   // --- Places/games already seen by the player, listed in the menu ---
   const [showMenu, setShowMenu] = useState(false);
@@ -182,7 +199,11 @@ function AppContent() {
   useEffect(() => {
     const previous = gameSession.current;
     const current = activeGame && activeMemory
-      ? { locationId: activeMemory.location_id, gameId: activeGame.id, userId: user?.id, finishGame }
+      ? {
+        locationId: activeMemory.location_id, gameId: activeGame.id, userId: user?.id,
+        finishGame: () => finishGame(isBundledGame(activeMemory)
+          ? { scoreOnlyLocationId: activeMemory.location_id } : undefined),
+      }
       : null;
     if (
       previous &&
@@ -190,7 +211,7 @@ function AppContent() {
       (previous.locationId !== current?.locationId || previous.gameId !== current?.gameId)
     ) previous.finishGame();
     gameSession.current = current;
-  }, [activeGame, activeMemory, finishGame, user?.id]);
+  }, [activeGame, activeMemory, finishGame, isBundledGame, user?.id]);
   const reportExperienceError = useCallback((message) => {
     Alert.alert(t('experienceError'), message);
   }, [t]);
@@ -208,7 +229,8 @@ function AppContent() {
     if (!game || event.gameId !== game.id || event.type !== game.type) return;
     if (event.name === 'collect') {
       const object = game.objects.find(item => item.id === event.objectId);
-      if (object?.properties.collectible !== true || !requireAuthentication()) return;
+      if (object?.properties.collectible !== true ||
+        (!isBundledGame(memory) && !requireAuthentication())) return;
       const asset = game.assets.find(item => item.id === object.properties.asset);
       collectObject({
         location_id: memory.location_id, game_id: game.id, item_id: object.id,
@@ -243,9 +265,10 @@ function AppContent() {
     }
   }, [addScore, arExperience, collectObject, experienceGameIndex, modelViewerMemory,
     scores,
-    requireAuthentication, selectedArMemory, t, viewerExperience]);
+    isBundledGame, requireAuthentication, selectedArMemory, t, viewerExperience]);
   const modelViewerRequestKey = useRef(0);
   const modelViewerTransitionTimer = useRef(null);
+  const collectionLaunchTimer = useRef(null);
   const [mediaViewer, setMediaViewer] = useState(null);
   const [isPreparingMediaViewer, setIsPreparingMediaViewer] = useState(false);
   const mediaViewerRequestKey = useRef(0);
@@ -291,10 +314,13 @@ function AppContent() {
     if (mediaViewerTransitionTimer.current) {
       clearTimeout(mediaViewerTransitionTimer.current);
     }
+    if (collectionLaunchTimer.current) {
+      clearTimeout(collectionLaunchTimer.current);
+    }
   }, []);
 
-  const openModelViewer = useCallback(async (memory) => {
-    if (!canViewContent(memory)) {
+  const openModelViewer = useCallback(async (memory, fromCollection = false) => {
+    if (!fromCollection && !canViewContent(memory)) {
       Alert.alert(t('contentPreview'), t('contentDiscoveryHint'));
       return;
     }
@@ -310,13 +336,13 @@ function AppContent() {
     setIsPreparingModelViewer(true);
 
     try {
-      const cachedMemory = await cacheMemoryAssets(memory);
+      const cachedMemory = isBundledGame(memory) ? memory : await cacheMemoryAssets(memory);
       if (modelViewerRequestKey.current !== requestKey) return;
 
       modelViewerTransitionTimer.current = setTimeout(() => {
         if (modelViewerRequestKey.current !== requestKey) return;
         setModelViewerMemory(cachedMemory);
-        markPlaceVisited(cachedMemory);
+        if (!isBundledGame(cachedMemory)) markPlaceVisited(cachedMemory);
         selectExperienceGame(0);
         setIsPreparingModelViewer(false);
       }, MODEL_VIEWER_RELEASE_MS);
@@ -328,7 +354,7 @@ function AppContent() {
         error instanceof Error ? error.message : t('modelPreparationError'),
       );
     }
-  }, [cacheMemoryAssets, canViewContent, markPlaceVisited, selectExperienceGame, t]);
+  }, [cacheMemoryAssets, canViewContent, isBundledGame, markPlaceVisited, selectExperienceGame, t]);
 
   const closeModelViewer = useCallback(() => {
     const requestKey = ++modelViewerRequestKey.current;
@@ -433,7 +459,7 @@ function AppContent() {
   }, []);
 
   // --- AR camera opening ---
-  const openARCamera = useCallback(async () => {
+  const openARCamera = useCallback(async (collectionMemory = null) => {
     if (isGalaxyA) {
       Alert.alert(
         t('arUnavailable'),
@@ -450,14 +476,25 @@ function AppContent() {
     preparingAR.current = true;
     setIsPreparingAR(true);
     try {
-      const nearby = await loadNearbyMemories();
-      const session = createARSession(nearby.memories, nearby.location);
-      // Mount AR only after a fresh location, proximity filtering, and all downloads succeed.
-      const preparedSession = await Promise.all(session.map(async (entry) => ({
-        ...entry,
-        memory: await cacheMemoryAssets(entry.memory),
-      })));
-      setArSessionMemories(preparedSession);
+      if (collectionMemory) {
+        const cachedMemory = isBundledGame(collectionMemory)
+          ? collectionMemory : await cacheMemoryAssets(collectionMemory);
+        const experience = readExperience(cachedMemory);
+        setArSessionMemories([]);
+        setSelectedMemoryToPlace(cachedMemory);
+        setSelectedArMemory(experience ? cachedMemory : null);
+        setIsPlacingMode(!experience);
+        selectExperienceGame(0);
+      } else {
+        const nearby = await loadNearbyMemories();
+        const session = createARSession(nearby.memories, nearby.location);
+        // Discovery still requires fresh GPS and prepared nearby assets; Collection does not.
+        const preparedSession = await Promise.all(session.map(async (entry) => ({
+          ...entry,
+          memory: await cacheMemoryAssets(entry.memory),
+        })));
+        setArSessionMemories(preparedSession);
+      }
       setCameraKey((prev) => prev + 1);
       setShowCamera(true);
       return true;
@@ -468,11 +505,15 @@ function AppContent() {
       preparingAR.current = false;
       setIsPreparingAR(false);
     }
-  }, [isGalaxyA, loadNearbyMemories, cacheMemoryAssets, t]);
+  }, [isGalaxyA, isBundledGame, loadNearbyMemories, cacheMemoryAssets, selectExperienceGame, t]);
 
   // --- Request camera permission before preparing the AR session ---
-  const requestCameraAndStart = useCallback(async () => {
+  const requestCameraAndStart = useCallback(async (collectionMemory = null) => {
     if (isGalaxyA) {
+      if (collectionMemory) {
+        await openModelViewer(collectionMemory, true);
+        return;
+      }
       await openARCamera();
       return;
     }
@@ -488,13 +529,13 @@ function AppContent() {
     }
     if (!granted) return Alert.alert(t('error'), t('cameraPermissionDenied'));
 
-    if (!location) {
+    if (!collectionMemory && !location) {
       Alert.alert(t('error'), t('initializingRadar'));
       return;
     }
 
-    await openARCamera();
-  }, [hasPermission, requestPermission, location, openARCamera, isGalaxyA, t]);
+    await openARCamera(collectionMemory);
+  }, [hasPermission, requestPermission, location, openARCamera, openModelViewer, isGalaxyA, t]);
 
   const handleOpenARCamera = useCallback(async () => {
     await requestCameraAndStart();
@@ -526,33 +567,38 @@ function AppContent() {
       setSelectedArMemory((currentMemory) => {
         const refreshedMemory = currentMemory
           && arMemories.find((memory) => memoryKey(memory) === memoryKey(currentMemory));
-        return refreshedMemory || null;
+        return currentMemory?.fromCollection ? currentMemory : refreshedMemory || null;
       });
     };
     syncSelected();
   }, [arMemories]);
 
-  // Re-place a legacy collected memory without making it collectible a second time.
-  const handleReplaceFromInventory = async (memory) => {
+  // Preserve the original game/location IDs; re-playing never creates a new location.
+  const handleReplaceFromInventory = (memory) => {
+    if (collectionLaunchTimer.current || preparingAR.current) return;
     setShowInventory(false);
-    const sourceMemory = memories.find((item) => memoryKey(item) === memoryKey(memory));
-    setIsPreparingPlacement(true);
-    try {
-      const cachedMemory = await cacheMemoryAssets(sourceMemory || memory);
-      setSelectedMemoryToPlace({ ...cachedMemory, is_collectible: false });
-      if (!(await openARCamera())) {
-        setSelectedMemoryToPlace(null);
-      } else if (hasExperience(cachedMemory)) {
-        setSelectedArMemory(cachedMemory);
-        selectExperienceGame(0);
+    setIsPreparingAR(true);
+    // Let the native Collection modal dismiss before mounting an AR/3D navigator.
+    collectionLaunchTimer.current = setTimeout(async () => {
+      collectionLaunchTimer.current = null;
+      try {
+        await requestCameraAndStart({ ...memory, is_collectible: false, fromCollection: true });
+      } finally {
+        setIsPreparingAR(false);
       }
-    } catch (error) {
-      setSelectedMemoryToPlace(null);
-      Alert.alert(t('modelLoadError'), error.message);
-    } finally {
-      setIsPreparingPlacement(false);
-    }
+    }, MODEL_VIEWER_RELEASE_MS);
   };
+
+  const handleCollectGame = useCallback(async memory => {
+    if (isBundledGame(memory) || !requireAuthentication()) return;
+    try {
+      const cachedMemory = await cacheMemoryAssets(memory);
+      if (!readExperience(cachedMemory)) throw new Error(t('gameDefinitionRequired'));
+      handleCollectMemory(cachedMemory);
+    } catch (error) {
+      Alert.alert(t('experienceError'), error.message);
+    }
+  }, [cacheMemoryAssets, handleCollectMemory, isBundledGame, requireAuthentication, t]);
 
   const handleMemorySelected = useCallback(async (selectedGame) => {
     const memory = arMemories.find((item) =>
@@ -652,6 +698,15 @@ function AppContent() {
             <View style={[styles.experiencePanel, { bottom: insets.bottom + 20 }]}>
               <ExperienceControls experience={viewerExperience} gameIndex={experienceGameIndex}
                 onSelect={selectExperienceGame} mode="viewer" />
+              {!isBundledGame(modelViewerMemory) && !modelViewerMemory.fromCollection && (
+                <TouchableOpacity
+                  onPress={() => handleCollectGame(modelViewerMemory)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('addGameToCollection')}
+                >
+                  <Text style={styles.cancelPromptText}>{t('addGameToCollection')}</Text>
+                </TouchableOpacity>
+              )}
               {viewerExperience.games[experienceGameIndex]?.objects.some(object => object.properties.collectible) &&
                 <Text style={styles.loaderText}>{t('collectibleHint')}</Text>}
               {experienceInteraction && (
@@ -817,6 +872,15 @@ function AppContent() {
                 showHint={false}
               />
             )}
+            {!isBundledGame(selectedArMemory) && !selectedArMemory?.fromCollection && (
+              <TouchableOpacity
+                onPress={() => handleCollectGame(selectedArMemory)}
+                accessibilityRole="button"
+                accessibilityLabel={t('addGameToCollection')}
+              >
+                <Text style={styles.cancelPromptText}>{t('addGameToCollection')}</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity onPress={() => {
               setSelectedArMemory(null);
               setSelectedMemoryToPlace(null);
@@ -878,16 +942,15 @@ function AppContent() {
             <Text style={styles.bottomActionText}>⌄ {t('placeShort')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.bottomAction, !user && styles.disabledAction]}
+            style={styles.bottomAction}
             onPress={() => {
-              if (!requireAuthentication()) return;
               closeARCamera();
               setShowInventory(true);
             }}
             accessibilityRole="button"
             accessibilityLabel={t('openCollection')}
           >
-            <Text style={styles.bottomActionText}>{t('collection')} ({collectedMemories.length})</Text>
+            <Text style={styles.bottomActionText}>{t('collection')} ({collectionItems.length})</Text>
           </TouchableOpacity>
         </View>
 
@@ -1026,15 +1089,14 @@ function AppContent() {
 
       <View style={[styles.mapBottomBar, { bottom: insets.bottom + 14 }]}>
         <TouchableOpacity
-          style={[styles.bottomAction, styles.mapBottomAction, !user && styles.disabledAction]}
+          style={[styles.bottomAction, styles.mapBottomAction]}
           onPress={() => {
-            if (!requireAuthentication()) return;
             setShowInventory(true);
           }}
           accessibilityRole="button"
           accessibilityLabel={t('openCollection')}
         >
-          <Text style={styles.bottomActionText}>{t('collection')} ({collectedMemories.length})</Text>
+          <Text style={styles.bottomActionText}>{t('collection')} ({collectionItems.length})</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.bottomAction, styles.mapBottomAction]}
@@ -1090,6 +1152,9 @@ function AppContent() {
         onViewImage={(memory) => openMediaViewer(memory, 'image')}
         onViewModel={openModelViewer}
         onViewVideo={(memory) => openMediaViewer(memory, 'video')}
+        canCollectGame={!isBundledGame(selectedMemoryToInspect) &&
+          getMemoryDistance(location, selectedMemoryToInspect) <= DISCOVERY_RADIUS_METERS}
+        onCollectGame={handleCollectGame}
         onClose={() => {
           setShowInfoModal(false);
           setSelectedMemoryToInspect(null);

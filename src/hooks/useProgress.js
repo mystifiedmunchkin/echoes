@@ -3,12 +3,13 @@ import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useI18n } from '../../constants/i18n';
 import { getAuthToken, getStoredUser } from '../services/auth';
+import { hasExperience } from '../experiences/experience';
 import {
-  emptyProgress, loadProgress, postProgress, progressId, progressKey, progressPayload,
+  emptyProgress, loadProgress, postProgress, progressId, progressLocationId, progressKey, progressPayload,
 } from '../services/progress';
 
 /** Owns per-user local progression and queues authenticated uploads when a game ends. */
-export function useProgress(user, token) {
+export function useProgress(user, token, scoreOnlyLocationIds = []) {
   const { t } = useI18n();
   const userId = user?.id ?? null;
   const [view, setView] = useState(null);
@@ -55,7 +56,7 @@ export function useProgress(user, token) {
 
   const addScore = useCallback(({ location_id, name, gameType, points = 1 }) => {
     update(data => {
-      const locationId = progressId(location_id);
+      const locationId = progressLocationId(location_id);
       const index = data.scores.findIndex(item => item.location_id === locationId && item.gameType === gameType);
       const scores = index < 0
         ? [...data.scores, { location_id: locationId, name, gameType, points }]
@@ -96,7 +97,7 @@ export function useProgress(user, token) {
   const collectObject = useCallback(item => {
     update(data => {
       const entry = {
-        location_id: progressId(item.location_id),
+        location_id: progressLocationId(item.location_id),
         game_id: progressId(item.game_id),
         item_id: progressId(item.item_id),
         quantity: 1,
@@ -110,12 +111,20 @@ export function useProgress(user, token) {
     }, () => Alert.alert(t('collection'), t('memoryAdded', { name: item.name })));
   }, [update, t]);
 
-  const finishGame = useCallback(() => {
+  const finishGame = useCallback(({ scoreOnlyLocationId } = {}) => {
     if (session.userId == null) return;
     const authToken = token;
     enqueue(async current => {
       await AsyncStorage.setItem(progressKey(current.userId), JSON.stringify(current.data));
-      const payload = progressPayload(current.data);
+      if (scoreOnlyLocationId != null && progressLocationId(scoreOnlyLocationId) < 0) return;
+      const payload = progressPayload(current.data, scoreOnlyLocationIds);
+      if (scoreOnlyLocationId != null) {
+        payload.scores = payload.scores.filter(score =>
+          score.location_id === progressId(scoreOnlyLocationId));
+        payload.visited_location_ids = [];
+        payload.collected_items = [];
+        if (!payload.scores.length) return;
+      }
       // Snapshot the saved payload, then serialize uploads separately from local UI mutations.
       current.uploads = current.uploads.then(async () => {
         const [storedToken, storedUser] = await Promise.all([getAuthToken(), getStoredUser()]);
@@ -126,7 +135,7 @@ export function useProgress(user, token) {
         await postProgress(authToken, payload);
       }).catch(reportError);
     });
-  }, [enqueue, session, token, t, reportError]);
+  }, [enqueue, session, token, t, reportError, scoreOnlyLocationIds]);
 
   const clearCollectedItems = useCallback(() => {
     update(data => ({ ...data, collectedItems: [], collectedMemories: [] }));
@@ -134,13 +143,16 @@ export function useProgress(user, token) {
 
   const handleCollectMemory = useCallback(memory => {
     update(data => {
-      if (data.collectedMemories.some(item => String(item.id) === String(memory.id))) return data;
+      const existing = data.collectedMemories.find(item =>
+        String(item.id) === String(memory.id) &&
+        String(item.location_id) === String(memory.location_id));
+      if (existing && !hasExperience(memory)) return data;
+      const collected = { ...memory, collectedAt: existing?.collectedAt || new Date().toISOString() };
       return {
         ...data,
-        collectedMemories: [
-          ...data.collectedMemories,
-          { ...memory, collectedAt: new Date().toISOString() },
-        ],
+        collectedMemories: existing
+          ? data.collectedMemories.map(item => item === existing ? collected : item)
+          : [...data.collectedMemories, collected],
       };
     }, () => Alert.alert(t('collection'), t('memoryAdded', { name: memory.name })));
   }, [update, t]);

@@ -55,7 +55,8 @@ Source comments are written in English; user-facing strings remain localized in
 - Once a GPS position is available, the map displays the native user-location marker with a compass heading indicator (subject to device sensor availability).
 - Before opening AR, the app obtains a fresh GPS fix, fetches nearby games, filters them to a maximum of 50 m, and downloads their media. An unsuccessful preparation does not open AR.
 - Map and history details show only a title and description for distant games. Within 50 m, full viewer access is reserved for Samsung Galaxy A devices (Galaxy A names or SM-A model identifiers), where AR is disabled. Other devices discover content in AR.
-- Legacy collected games can still be placed again from the collection.
+- Complete collected games and legacy memories can be replayed from the Collection
+  without a new GPS search. Bundled demos remain available there even to guests.
   Individual game objects appear in the inventory without a placement action.
 
 ## Customizable experiences
@@ -404,6 +405,15 @@ immediate synthetic floor centered at `[0, -1, -2]` and the configured minimum
 dimensions; it does not claim to track a real plane.
 
 ### Collection and progress API
+
+The Collection now retains complete games as well as legacy models and collected
+objects. Nearby game details and active AR games offer **Add game to Collection**;
+saved games can be replayed elsewhere without another GPS/nearby search.
+Bundled demos can also be registered as permanent, offline-ready Collection
+entries, available to guests. See [bundled games and Collection replay](docs/bundled-games.md)
+for the JSON/asset registry, server IDs at `0,0`, and score-only demo uploads.
+The three supplied demos are currently registered in local-only mode: no server
+IDs are required and their scores are never uploaded, even when signed in.
 
 Set `properties.collectible: true` on a game object to enable collection after
 a 600 ms press. The field must be a boolean; omission means not collectible.

@@ -1,0 +1,117 @@
+{
+  "id": null,
+  "location_id": null,
+  "name": "Demo 1 - Bowling",
+  "description": "Lancer la balle pour renverser les trois quilles en rangee.",
+  "creatorName": "",
+  "lat": 0,
+  "lng": 0,
+  "interactive": {
+    "logic": {
+      "gravity": [0, -9.81, 0],
+      "games": [
+        {
+          "id": null,
+          "type": "aiming",
+          "subtype": "bowling",
+          "assets": [
+            { "id": 1, "name": "Ball", "type": "GLB", "url": "bundle:demo1_ball.glb" },
+            { "id": 2, "name": "Skittle", "type": "GLB", "url": "bundle:demo1_skittle.glb" }
+          ],
+          "objects": [
+            {
+              "id": 1,
+              "properties": {
+                "asset": 1,
+                "active": true,
+                "collectible": false,
+                "position": [0, 0, 0],
+                "rotation": [0, 0, 0],
+                "scale": [0.25, 0.25, 0.25],
+                "collider": { "type": "sphere", "size": [0.1, 0.1, 0.1] },
+                "physics": {
+                  "type": "Dynamic",
+                  "mass": 1,
+                  "friction": 0.5,
+                  "restitution": 0.1,
+                  "useGravity": true
+                }
+              }
+            },
+            {
+              "id": 2,
+              "properties": {
+                "asset": 2,
+                "active": true,
+                "collectible": false,
+                "position": [-0.15, 0.18, -2],
+                "rotation": [0, 0, 0],
+                "scale": [1, 1, 1],
+                "collider": { "type": "bounding", "size": [0.09, 0.36, 0.09] },
+                "physics": {
+                  "type": "Dynamic",
+                  "mass": 0.2,
+                  "friction": 0.5,
+                  "restitution": 0.05,
+                  "useGravity": true
+                }
+              }
+            },
+            {
+              "id": 3,
+              "properties": {
+                "asset": 2,
+                "active": true,
+                "collectible": false,
+                "position": [0, 0.18, -2],
+                "rotation": [0, 0, 0],
+                "scale": [1, 1, 1],
+                "collider": { "type": "bounding", "size": [0.09, 0.36, 0.09] },
+                "physics": {
+                  "type": "Dynamic",
+                  "mass": 0.2,
+                  "friction": 0.5,
+                  "restitution": 0.05,
+                  "useGravity": true
+                }
+              }
+            },
+            {
+              "id": 4,
+              "properties": {
+                "asset": 2,
+                "active": true,
+                "collectible": false,
+                "position": [0.15, 0.18, -2],
+                "rotation": [0, 0, 0],
+                "scale": [1, 1, 1],
+                "collider": { "type": "bounding", "size": [0.09, 0.36, 0.09] },
+                "physics": {
+                  "type": "Dynamic",
+                  "mass": 0.2,
+                  "friction": 0.5,
+                  "restitution": 0.05,
+                  "useGravity": true
+                }
+              }
+            }
+          ],
+          "settings": {
+            "plane": { "minWidth": 1, "minLength": 3, "stableMs": 1000 },
+            "projectile": {
+              "objectId": 1,
+              "speed": 4,
+              "spawnDistance": 0.3,
+              "lifetimeMs": null,
+              "maxActive": 12
+            },
+            "targets": [2, 3, 4],
+            "freeze": false,
+            "fall": true,
+            "multiplier": 10
+          }
+        }
+      ]
+    }
+  }
+}

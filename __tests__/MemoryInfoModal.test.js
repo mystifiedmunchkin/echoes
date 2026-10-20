@@ -86,8 +86,27 @@ test('an experience without a legacy model can open in the authorized fallback v
       />,
     );
   });
+
   expect(JSON.stringify(renderer.toJSON())).toContain('openExperience');
   act(() => renderer.root.findAllByType('TouchableOpacity')[0].props.onPress());
   expect(onViewModel).toHaveBeenCalledWith(interactiveMemory);
   act(() => renderer.unmount());
+});
+
+test('offers adding a nearby whole game without requiring the 3D viewer to be unlocked', () => {
+    const game = { ...memory, interactive: { logic: { games: [{ id: 1 }] } } };
+    const onCollectGame = jest.fn();
+    let renderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <MemoryInfoModal visible memory={game} canCollectGame onCollectGame={onCollectGame} />,
+      );
+    });
+    act(() => renderer.root.findByProps({ accessibilityLabel: 'addGameToCollection' }).props.onPress());
+    expect(onCollectGame).toHaveBeenCalledWith(game);
+    act(() => renderer.update(
+      <MemoryInfoModal visible memory={game} onCollectGame={onCollectGame} />,
+    ));
+    expect(renderer.root.findAllByProps({ accessibilityLabel: 'addGameToCollection' })).toHaveLength(0);
+    act(() => renderer.unmount());
 });
