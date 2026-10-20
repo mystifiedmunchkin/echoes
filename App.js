@@ -1103,6 +1103,7 @@ function AppContent() {
         onSignIn={signIn}
         onSignUp={signUp}
         onSignOut={signOut}
+        onDeleteAccount={deleteAccount}
       />
     </View>
   );

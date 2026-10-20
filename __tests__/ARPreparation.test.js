@@ -110,6 +110,15 @@ test('shows the native user marker with a compass heading indicator', () => {
   expect(marker.props.showsUserHeadingIndicator).toBe(true);
 });
 
+test('wires account deletion from the map', async () => {
+  mockAuth = { user: { id: 1 }, token: 'test-token', deleteAccount: jest.fn() };
+  await act(async () => { renderer.update(<App />); });
+  await act(async () => {
+    await renderer.root.findByType('AccountModal').props.onDeleteAccount();
+  });
+  expect(mockAuth.deleteAccount).toHaveBeenCalledTimes(1);
+});
+
 test('waits for a GPS position before mounting the user marker', async () => {
   mockRadar.location = null;
   await act(async () => { renderer.update(<App />); });
@@ -307,7 +316,7 @@ const progressMemory = () => ({
 });
 
 async function openProgressExperience() {
-  mockAuth = { user: { id: 1 }, token: 'test-token' };
+  mockAuth = { user: { id: 1 }, token: 'test-token', deleteAccount: jest.fn() };
   const memory = progressMemory();
   mockRadar.loadNearbyMemories.mockResolvedValue({ location: origin, memories: [memory] });
   mockRadar.cacheMemoryAssets.mockImplementation(async item => item);
@@ -322,6 +331,14 @@ async function openProgressExperience() {
     await renderer.root.findByType('ViroARView').props.onMemorySelected({ nativeEvent: { id: 10 } });
   });
 }
+
+test('wires account deletion from the AR camera', async () => {
+  await openProgressExperience();
+  await act(async () => {
+    await renderer.root.findByType('AccountModal').props.onDeleteAccount();
+  });
+  expect(mockAuth.deleteAccount).toHaveBeenCalledTimes(1);
+});
 
 test('POSTs on game switch and close, including final scores and deduplicated named object IDs', async () => {
   await openProgressExperience();

@@ -32,6 +32,8 @@ export function SceneObject({
   freeze = false,
   onBodyCollision,
   onSampleTransform,
+  physicsPosition,
+  visualOffset,
 }: Omit<TemplateProps, 'mode'> & {
   object: ExperienceObject;
   sourceObjectId?: number;
@@ -43,6 +45,8 @@ export function SceneObject({
     transform: BodyTransform,
   ) => void;
   onSampleTransform?: (transform: BodyTransform) => void;
+  physicsPosition?: Vector3;
+  visualOffset?: Vector3;
   onPress?: () => void;
   onClickState?: React.ComponentProps<typeof ViroNode>['onClickState'];
   scoreOnBottom?: boolean;
@@ -297,7 +301,7 @@ export function SceneObject({
       key={frozen ? 'frozen' : 'live'}
       ref={node}
       viroTag={String(object.id)}
-      position={frozen?.position ?? properties.position ?? [0, 0, 0]}
+      position={frozen?.position ?? physicsPosition ?? properties.position ?? [0, 0, 0]}
       rotation={frozen?.rotation ?? properties.rotation ?? [0, 0, 0]}
       scale={physicsBody ? undefined : properties.scale || [1, 1, 1]}
       physicsBody={frozen ? {
@@ -323,7 +327,10 @@ export function SceneObject({
       onClickState={properties.collectible === true ? handleClickState : onClickState}
     >
       {/* Scale visual geometry separately so explicit colliders retain their meter dimensions. */}
-      <ViroNode scale={physicsBody ? properties.scale : undefined}>
+      <ViroNode
+        position={visualOffset}
+        scale={physicsBody ? properties.scale : undefined}
+      >
         {asset &&
           (asset.type === 'GLB' ||
             asset.type === 'GLTF' ||

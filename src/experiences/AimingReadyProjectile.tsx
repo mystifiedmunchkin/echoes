@@ -8,6 +8,7 @@ import { AimingSceneContext } from './AimingScene';
 import { SceneObject } from './SceneObject';
 import type { TemplateProps } from './ExperienceTemplates';
 import type { ExperienceObject } from './experience';
+import { colliderSize } from './aiming';
 const READY_PROJECTILE_SCALE = 0.05;
 
 export function AimingReadyProjectile({
@@ -19,17 +20,18 @@ export function AimingReadyProjectile({
   visible: boolean;
 }) {
   const scene = React.useContext(AimingSceneContext);
+  const { game, onEvent } = props;
   const distance = props.game.settings!.projectile.spawnDistance;
   const hintVisible = scene?.tapVisible !== false;
 
   React.useEffect(() => {
-    props.onEvent?.({
+    onEvent?.({
       type: 'aiming',
-      gameId: props.game.id,
+      gameId: game.id,
       name: 'projectileHint',
       data: { visible: hintVisible },
     });
-  }, [hintVisible, props.game.id, props.onEvent]);
+  }, [hintVisible, game.id, onEvent]);
 
   const content = visible && hintVisible ? (
     <>
@@ -42,7 +44,7 @@ export function AimingReadyProjectile({
             ...projectile,
             properties: {
               ...projectile.properties,
-              position: [0, 0, 0],
+              position: [0, colliderSize(projectile.properties.collider!)[1] / 2, 0],
               rotation: [0, 0, 0],
               scale: (projectile.properties.scale || [1, 1, 1]).map(
                 value => value * READY_PROJECTILE_SCALE,

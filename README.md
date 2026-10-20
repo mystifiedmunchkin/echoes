@@ -272,7 +272,9 @@ contains the mobile consumer, not a server editor or backend.
   from its center. Later plane updates do not move the floor. Choose a clear physical
   floor: a sufficiently large tabletop is also a valid horizontal plane to the
   tracker. The floor is an invisible collider, not a rendered ground mesh.
-- Targets use positions/rotations relative to the locked floor center.
+- Targets use positions/rotations relative to the locked floor center. Positions
+  are the base of each collider; the runtime centers the collider and model by
+  raising them by half the collider height.
   Their GLB, GLTF or OBJ geometry should be centered on the configured collider. Targets
   default to `Static`; optional `physics` can specify `Static`, `Dynamic` or
   `Kinematic` and the usual physical parameters. All configured targets must
@@ -320,6 +322,10 @@ contains the mobile consumer, not a server editor or backend.
   the contact position and normal in the body's current native world transform,
   including moved/rotated targets; wall faces, top rims, the underside and
   non-projectile bodies do not score. Native transform failures are reported.
+  Static containers use separate wall and bottom physics bodies: Viro reports
+  collision entry per body pair, so an earlier wall contact must not hide the
+  later scoring contact with the bottom. The five physical parts keep the same
+  geometry; dynamic legacy containers retain their compound body.
   Scores persist per account, location and game type and appear in the menu's
   Scores tab; in AR, a scoring contact also adds the memory to the legacy collection.
 - `subtype` belongs to the game, not to `settings` or the collider:
@@ -450,4 +456,3 @@ Runtime-generated projectile instance IDs are negative and must not be supplied
 by the server; server IDs are non-negative integers.
 Tracking, contact accuracy, model alignment, and fast/small projectile behavior
 must still be verified on physical ARCore/ARKit devices.
-

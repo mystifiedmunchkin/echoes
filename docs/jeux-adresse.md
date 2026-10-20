@@ -361,7 +361,7 @@ Les URL `example.test` sont des placeholders a remplacer par de vraies ressource
 | `projectile.spawnDistance` | Distance devant la camera au moment du relachement, en metres. |
 | `projectile.lifetimeMs` | Champ valide pour compatibilite, mais actuellement ignore par le runtime : tous les projectiles ont une duree illimitee, meme si le serveur envoie `1000`. |
 | `projectile.maxActive` | Nombre maximal de projectiles physiques presents, y compris ceux ayant deja touche un obstacle. |
-| `position` / `rotation` des cibles | Position en metres et rotation en degres, relatives au sol verrouille. |
+| `position` / `rotation` des cibles | Base en metres et rotation en degres, relatives au sol verrouillees ; le runtime centre le collider en remontant l'objet de la moitie de sa hauteur. |
 | `collider.size` | Dimensions physiques explicites, independantes de la taille native du modele 3D ; remplacees par `base`, `middle`, `height` pour `diamond`. |
 | `scale` | Pour les projectiles et cibles configures, modifie seulement le visuel, pas le collider. |
 

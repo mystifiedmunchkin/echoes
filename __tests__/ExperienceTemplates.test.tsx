@@ -561,6 +561,100 @@ describe('configured aiming runtime', () => {
     },
   );
 
+  test.each([
+    ['ar', 'legacy'], ['ar', 'basket'], ['ar', 'bounding'],
+    ['viewer', 'legacy'], ['viewer', 'basket'], ['viewer', 'bounding'],
+  ] as const)(
+    '%s %s basket scores a bottom entry after an earlier wall entry',
+    async (mode, kind) => {
+      const configured = kind === 'legacy' ? aiming : withSubtype('basket');
+      if (kind === 'basket') {
+        configured.games[0].objects[1].properties.collider = {
+          type: 'basket', size: [1, 1, 1], thickness: 0.05,
+        };
+      }
+      if (mode === 'ar') {
+        await mountAR(configured);
+        detectFloor();
+        tap();
+      } else {
+        await act(async () => {
+          renderer = TestRenderer.create(
+            <ExperienceViewer
+              experience={configured}
+              gameIndex={0}
+              onEvent={onEvent}
+              onError={onError}
+            />,
+            {
+              createNodeMock: element => element.type === 'ViroNode'
+                ? { getTransformAsync: getBodyTransform } : null,
+            },
+          );
+        });
+        const viewer = host('ViroScene')[0];
+        act(() => viewer.props.onCameraTransformUpdate(camera));
+        tap(viewer);
+      }
+      const bottom = targetBody();
+      const walls = host('ViroNode').find(node => node.props.viroTag === '404:walls')!;
+      expect(walls).toBeDefined();
+      expect(walls.props.physicsBody.type).toBe('Static');
+      expect(walls.props.position).toEqual(bottom.props.position);
+      expect(walls.props.rotation).toEqual(bottom.props.rotation);
+      expect(walls.props.physicsBody.shape.children).toHaveLength(4);
+      expect(bottom.props.physicsBody.shape.children).toHaveLength(1);
+      // Native Viro emits only the first contact per body pair, not each compound face.
+      const entered = new Set<string>();
+      const collide = async (body: TestRenderer.ReactTestInstance, point: number[], normal: number[]) => {
+        const tag = body.props.viroTag;
+        if (entered.has(tag)) return;
+        entered.add(tag);
+        projectiles()[0].props.onCollision(tag, point, normal);
+        await body.props.onCollision?.('-1', point, normal);
+      };
+      await act(async () => { await collide(walls, bottomPoint, [1, 0, 0]); });
+      expect(scoringEvents()).toHaveLength(0);
+      expect(projectiles()).toHaveLength(1);
+      await act(async () => { await collide(bottom, bottomPoint, [0, 1, 0]); });
+      expect(scoringEvents()).toHaveLength(1);
+      expect(scoringEvents()[0]).toMatchObject({
+        objectId: 404,
+        data: { scoringContact: true, projectileId: -1 },
+      });
+      expect(projectiles()).toHaveLength(kind === 'legacy' ? 1 : 0);
+      expect(onError).not.toHaveBeenCalled();
+    },
+  );
+
+  test('keeps a dynamic legacy container as one compound body', async () => {
+    const game = aiming.games[0];
+    const configured = {
+      ...aiming,
+      games: [{
+        ...game,
+        objects: game.objects.map(object => object.id !== 404 ? object : ({
+          ...object,
+          properties: {
+            ...object.properties,
+            physics: {
+              type: 'Dynamic' as const, mass: 2,
+              shape: { type: 'Box' as const, params: [1, 1, 1] },
+            },
+          },
+        })),
+      }],
+    };
+    await mountAR(configured);
+    detectFloor();
+    expect(targetBody().props.physicsBody).toMatchObject({
+      type: 'Dynamic', mass: 2,
+      shape: { type: 'Compound' },
+    });
+    expect(targetBody().props.physicsBody.shape.children).toHaveLength(5);
+    expect(host('ViroNode').some(node => node.props.viroTag === '404:walls')).toBe(false);
+  });
+
   test('dartboard subtype keeps multiple darts frozen and scores center, half-radius and edge hits', async () => {
     const configured = withSubtype('dartboard', { reward: 406 });
     configured.games[0].settings!.projectile.maxActive = 3;
@@ -1122,7 +1216,11 @@ describe('configured aiming runtime', () => {
       targetNode.findAll(node => String(node.type) === 'ViroNode')[1].props
         .position,
     ).toBeUndefined();
-    expect(targetNode.props.physicsBody.shape.children).toHaveLength(5);
+    expect(targetNode.props.physicsBody.shape.children).toHaveLength(1);
+    expect(
+      host('ViroNode').find(node => node.props.viroTag === '404:walls')!
+        .props.physicsBody.shape.children,
+    ).toHaveLength(4);
     expect(targetNode.props.onCollision).toEqual(expect.any(Function));
     expect(host('Viro3DObject').map(node => node.props.type)).toEqual([
       'OBJ',

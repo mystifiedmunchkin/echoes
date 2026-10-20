@@ -20,8 +20,16 @@ import { AimingSceneContext, useAimingScene } from '../experiences/AimingScene';
 ViroMaterials.createMaterials({
   planeMaterial: { diffuseColor: '#FFFFFF', lightingModel: 'Lambert' },
   aimingPlaneIndicator: {
-    diffuseColor: '#29B6F6',
+    diffuseTexture: require('../../assets/plane-dots.png'),
+    diffuseColor: '#FFFFFF',
     lightingModel: 'Constant',
+    alpha: 1,
+    blendMode: 'Alpha',
+    writesToDepthBuffer: false,
+    wrapS: 'Repeat',
+    wrapT: 'Repeat',
+    minificationFilter: 'Nearest',
+    magnificationFilter: 'Nearest',
   },
   blueDroplet: {
     diffuseColor: '#0000FF',

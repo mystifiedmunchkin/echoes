@@ -4,8 +4,8 @@ import { ViroARPlane, ViroNode, ViroQuad } from '@reactvision/react-viro';
 import { AimingSceneContext } from './AimingScene';
 import { AimingReadyProjectile } from './AimingReadyProjectile';
 import {
-  colliderShape, distanceAdjustedPoints, hasFallen, hasImpactRules, impactPoints,
-  isBottomContact, launchSpeed,
+  basketThickness, colliderShape, colliderSize, distanceAdjustedPoints, hasFallen,
+  hasImpactRules, impactPoints, isBottomContact, launchSpeed,
 } from './aiming';
 import type { BodyTransform } from './aiming';
 import type { ExperienceObject, Vector3 } from './experience';
@@ -89,11 +89,12 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
       : null,
   );
   const [candidate, setCandidate] = React.useState<Floor | null>(null);
-  const [planes, setPlanes] = React.useState<Floor[]>([]);
   const latestCandidate = React.useRef<Floor | null>(null);
+  const stableCandidate = React.useRef<Floor | null>(null);
+  const stabilityTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [shots, setShots] = React.useState<Shot[]>([]);
   const activeShots = React.useRef<Shot[]>([]);
-  const scoredShots = React.useRef(new Set<number>());
+  const scoredContacts = React.useRef(new Set<string>());
   const scoredTargets = React.useRef(new Set<number>());
   const [fallenTargets, setFallenTargets] = React.useState(new Set<number>());
   const pendingFalls = React.useRef(new Map<number, Impact>());
@@ -104,26 +105,32 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
   const projectile = game.objects.find(
     object => object.id === config.projectile.objectId,
   )!;
+  const projectileCollider = projectile.properties.collider!;
   const projectilePhysics = { ...projectile.properties.physics };
   // Launch velocity is applied once via instantVelocity, rather than overriding gravity each render.
   delete projectilePhysics.velocity;
-  const claimScore = (tag?: string) => {
+  const claimScore = (targetId: number, tag?: string) => {
     const id = Number(tag);
+    const contactId = `${id}:${targetId}`;
     if (
       !activeShots.current.some(shot => shot.id === id) ||
-      scoredShots.current.has(id)
+      scoredContacts.current.has(contactId)
     )
       return false;
-    scoredShots.current.add(id);
+    scoredContacts.current.add(contactId);
     return true;
   };
   const award = (targetId: number, impact: Impact) => {
     // Fall rules score each target once; other impact rules score each projectile once.
-    const claimed = config.fall ? scoredTargets.current : scoredShots.current;
-    const key = config.fall ? targetId : impact.projectileId;
-    if (claimed.has(key)) return;
-    claimed.add(key);
-    if (config.fall) setFallenTargets(new Set(claimed));
+    if (config.fall) {
+      if (scoredTargets.current.has(targetId)) return;
+      scoredTargets.current.add(targetId);
+      setFallenTargets(new Set(scoredTargets.current));
+    } else {
+      const key = `${impact.projectileId}:${targetId}`;
+      if (scoredContacts.current.has(key)) return;
+      scoredContacts.current.add(key);
+    }
     if (config.reward !== undefined) {
       const reward = { id: -++sequence.current, point: impact.point };
       setRewards(current => [...current, reward]);
@@ -163,7 +170,7 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
     const otherId = Number(tag);
     const collider = object.properties.collider!;
     if ((basketGame || collider.type === 'basket') &&
-      !isBottomContact(collider, point, normal, transform)) return;
+      !isBottomContact(collider, point, normal, transform, true)) return;
     const basePoints = game.subtype === 'bowling' || basketGame
       ? config.multiplier ?? 1
       : impactPoints(collider, point, normal, transform, config.multiplier ?? 1);
@@ -191,7 +198,8 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
       || (activeShots.current.length === 1 ? activeShots.current[0] : undefined);
     if (!projectile) return;
     const projectileId = projectile.id;
-    if (!config.fall && scoredShots.current.has(projectileId)) return;
+    if (!config.fall && scoredContacts.current.has(`${projectileId}:${object.id}`))
+      return;
     if (config.freeze) setFrozenShots(current =>
       current.has(projectileId) ? current : new Set([...current, projectileId]),
     );
@@ -218,6 +226,12 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
     [game.id, onEvent],
   );
 
+  const clearStabilityTimer = React.useCallback(() => {
+    if (stabilityTimer.current) clearTimeout(stabilityTimer.current);
+    stabilityTimer.current = null;
+    stableCandidate.current = null;
+  }, []);
+
   const lockPlane = React.useCallback((plane: Floor | null) => {
     if (floor) return;
     if (!plane) return;
@@ -241,17 +255,29 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
     );
     latestCandidate.current = next;
     emit('planeCandidate', next);
-    if (next?.anchorId) {
-      setPlanes(previous => {
-        const withoutCurrent = previous.filter(
-          plane => plane.anchorId !== next.anchorId,
-        );
-        return [...withoutCurrent, next];
-      });
-    } else if (anchor.anchorId) {
-      setPlanes(previous =>
-        previous.filter(plane => plane.anchorId !== anchor.anchorId),
-      );
+    const previousStable = stableCandidate.current;
+    const stable =
+      next &&
+      previousStable &&
+      next.anchorId === previousStable.anchorId &&
+      Math.hypot(
+        ...next.position.map((value, index) => value - previousStable.position[index]),
+      ) <= 0.03 &&
+      Math.abs(
+        ((next.rotation[1] - previousStable.rotation[1] + 540) % 360) - 180,
+      ) <= 3;
+    if (!stable) {
+      if (stabilityTimer.current) clearTimeout(stabilityTimer.current);
+      stabilityTimer.current = null;
+      stableCandidate.current = next;
+      if (next) {
+        stabilityTimer.current = setTimeout(() => {
+          stabilityTimer.current = null;
+          if (!trackingReady || floor || latestCandidate.current !== stableCandidate.current)
+            return;
+          lockPlane(stableCandidate.current);
+        }, config.plane.stableMs);
+      }
     }
     setCandidate(previous => {
       if (!next || !previous) return next;
@@ -270,9 +296,11 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
   React.useEffect(() => {
     if (trackingReady || floor) return;
     latestCandidate.current = null;
+    clearStabilityTimer();
     setCandidate(null);
-    setPlanes([]);
-  }, [trackingReady, floor]);
+  }, [trackingReady, floor, clearStabilityTimer]);
+
+  React.useEffect(() => clearStabilityTimer, [clearStabilityTimer]);
 
   const fire = React.useCallback(
     (heldMs = 0) => {
@@ -294,7 +322,8 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
       const direction = camera.forward.map(n => n / magnitude);
       const position: Vector3 = [
         camera.position[0] + direction[0] * config.projectile.spawnDistance,
-        camera.position[1] + direction[1] * config.projectile.spawnDistance,
+        camera.position[1] + direction[1] * config.projectile.spawnDistance +
+          colliderSize(projectileCollider)[1] / 2,
         camera.position[2] + direction[2] * config.projectile.spawnDistance,
       ];
       const speed = launchSpeed(config.projectile.speed, heldMs);
@@ -319,7 +348,10 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
         shot.id,
       );
     },
-    [scene?.camera, floor, trackingReady, config.projectile, projectile.id, emit],
+    [
+      scene?.camera, floor, trackingReady, config.projectile, projectile.id,
+      projectileCollider, emit,
+    ],
   );
 
   React.useEffect(() => {
@@ -359,57 +391,100 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
       />
       {game.objects
         .filter(object => object.id !== projectile.id)
-        .map(object =>
-          config.targets.includes(object.id) ? (
-            <SceneObject
-              key={object.id}
-              {...props}
-              object={physicalObject(object)}
-              onClickState={scene?.onClickState}
-              claimScore={impactRules ? undefined : claimScore}
-              onBodyCollision={impactRules ? (tag, point, normal, transform) =>
-                handleImpact(object, tag, point, normal, transform) : undefined}
-              onSampleTransform={config.fall && shots.length > 0 && !fallenTargets.has(object.id)
-                ? transform => checkFall(object, transform) : undefined}
-              scoreOnBottom={
-                !impactRules && (object.properties.collider?.type === 'basket' ||
-                object.properties.collider?.type === 'bounding')
-                  ? true
-                  : undefined
-              }
-              physicsBody={(() => {
-                const targetBodyType = basketGame
-                  ? 'Static'
-                  : object.properties.physics?.type ?? 'Static';
-                return {
-                  ...object.properties.physics,
-                  type: targetBodyType,
-                  mass: targetBodyType === 'Dynamic'
-                    ? object.properties.physics?.mass ?? 1
-                    : 0,
-                  useGravity: targetBodyType === 'Dynamic'
-                    ? object.properties.physics?.useGravity
-                    : false,
-                  velocity: targetBodyType === 'Dynamic'
-                    ? object.properties.physics?.velocity
-                    : undefined,
-                  instantVelocity: undefined,
-                  shape: colliderShape(object.properties.collider!, {
-                    targetBottom:
-                      (basketGame || !impactRules) && object.properties.collider!.type === 'bounding',
-                  }),
-                };
-              })()}
-            />
-          ) : (
+        .map(object => {
+          if (!config.targets.includes(object.id)) return (
             <SceneObject
               key={object.id}
               {...props}
               object={object}
               onClickState={scene?.onClickState}
             />
-          ),
-        )}
+          );
+          const targetBodyType = basketGame
+            ? 'Static'
+            : object.properties.physics?.type ?? 'Static';
+          const targetBottom = (basketGame || !impactRules) &&
+            object.properties.collider!.type === 'bounding';
+          const splitContainer = targetBodyType === 'Static' &&
+            (targetBottom || object.properties.collider!.type === 'basket');
+          const objectPosition = object.properties.position ?? [0, 0, 0];
+          const objectHeight = colliderSize(object.properties.collider!)[1];
+          const targetPosition: Vector3 = [
+            objectPosition[0],
+            objectPosition[1] + objectHeight / 2,
+            objectPosition[2],
+          ];
+          const targetPhysics = {
+            ...object.properties.physics,
+            type: targetBodyType,
+            mass: targetBodyType === 'Dynamic'
+              ? object.properties.physics?.mass ?? 1
+              : 0,
+            useGravity: targetBodyType === 'Dynamic'
+              ? object.properties.physics?.useGravity
+              : false,
+            velocity: targetBodyType === 'Dynamic'
+              ? object.properties.physics?.velocity
+              : undefined,
+            instantVelocity: undefined,
+          };
+          return (
+            <React.Fragment key={object.id}>
+              {/* Separate bodies let a bottom contact enter after an earlier wall contact. */}
+              {splitContainer && (
+                <ViroNode
+                  viroTag={`${object.id}:walls`}
+                  position={targetPosition}
+                  rotation={object.properties.rotation ?? [0, 0, 0]}
+                  physicsBody={{
+                    ...targetPhysics,
+                    shape: colliderShape(object.properties.collider!, {
+                      targetBottom, containerPart: 'walls',
+                    }),
+                  }}
+                />
+              )}
+              <SceneObject
+                {...props}
+                object={physicalObject(object)}
+                onClickState={scene?.onClickState}
+                claimScore={impactRules ? undefined : tag => claimScore(object.id, tag)}
+                onBodyCollision={impactRules ? (tag, point, normal, transform) =>
+                  handleImpact(object, tag, point, normal, transform) : undefined}
+                onSampleTransform={config.fall && shots.length > 0 && !fallenTargets.has(object.id)
+                  ? transform => checkFall(object, transform) : undefined}
+                scoreOnBottom={
+                  !impactRules && (object.properties.collider?.type === 'basket' ||
+                  object.properties.collider?.type === 'bounding')
+                    ? true
+                    : undefined
+                }
+                physicsBody={{
+                  ...targetPhysics,
+                  shape: colliderShape(object.properties.collider!, {
+                    targetBottom,
+                    containerPart: splitContainer ? 'bottomAtOrigin' : undefined,
+                  }),
+                }}
+                physicsPosition={splitContainer
+                  ? [
+                      targetPosition[0],
+                      targetPosition[1] -
+                        (objectHeight - basketThickness(object.properties.collider!)) / 2,
+                      targetPosition[2],
+                    ]
+                  : targetPosition}
+                visualOffset={splitContainer
+                  ? [
+                      0,
+                      (objectHeight - basketThickness(object.properties.collider!)) / 2,
+                      0,
+                    ]
+                  : undefined}
+              />
+            </React.Fragment>
+          );
+        })}
     </ViroNode>
   );
   return (
@@ -430,29 +505,25 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
           onAnchorUpdated={updatePlane}
           onClick={() => lockPlane(latestCandidate.current)}
           onAnchorRemoved={() => {
-            const removedId = latestCandidate.current?.anchorId;
             latestCandidate.current = null;
+            clearStabilityTimer();
             setCandidate(null);
-            if (removedId)
-              setPlanes(previous =>
-                previous.filter(plane => plane.anchorId !== removedId),
-              );
             emit('planeCandidate');
           }}
-        />
+        >
+          {candidate && (
+            <ViroQuad
+              position={[0, 0, 0]}
+              rotation={[-90, 0, 0]}
+              width={candidate.width}
+              height={candidate.length}
+              materials={['aimingPlaneIndicator']}
+              opacity={0.7}
+              onClick={() => lockPlane(candidate)}
+            />
+          )}
+        </ViroARPlane>
       )}
-      {mode === 'ar' && !floor && (planes.length ? planes : candidate ? [candidate] : []).map(plane => (
-        <ViroQuad
-          key={plane.anchorId || `${plane.position.join(':')}`}
-          position={plane.position}
-          rotation={[90, plane.rotation[1], 0]}
-          width={plane.width}
-          height={plane.length}
-          materials={['aimingPlaneIndicator']}
-          opacity={0.35}
-          onClick={() => lockPlane(plane)}
-        />
-      ))}
       {worldFloor}
       {shots.map(shot => (
         <SceneObject
@@ -472,7 +543,7 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
             ...projectilePhysics,
             type: 'Dynamic',
             mass: projectile.properties.physics?.mass ?? 1,
-            shape: colliderShape(projectile.properties.collider!),
+            shape: colliderShape(projectileCollider),
             useGravity: projectile.properties.physics?.useGravity ?? true,
             instantVelocity: shot.velocity,
           }}

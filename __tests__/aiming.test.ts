@@ -432,6 +432,22 @@ test('generates explicit bounds, sphere and an open basket with no top collider'
   ).toBe(true);
 });
 
+test.each(['basket', 'bounding'] as const)(
+  'separates the %s container bottom and walls without changing its geometry',
+  type => {
+    const collider = type === 'basket'
+      ? { type, size: [1, 1, 1] as [number, number, number], thickness: 0.05 }
+      : { type, size: [1, 1, 1] as [number, number, number] };
+    const options = { targetBottom: true };
+    const complete = colliderShape(collider, options);
+    const bottom = colliderShape(collider, { ...options, containerPart: 'bottom' });
+    const walls = colliderShape(collider, { ...options, containerPart: 'walls' });
+    expect(bottom.children).toHaveLength(1);
+    expect(walls.children).toHaveLength(4);
+    expect([...bottom.children!, ...walls.children!]).toEqual(complete.children);
+  },
+);
+
 test('scores only the interior top face of the bottom, not walls, rims or underside', () => {
   const collider = {
     type: 'basket' as const,

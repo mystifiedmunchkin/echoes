@@ -54,6 +54,7 @@ export type ColliderShape = {
 };
 export interface ColliderShapeOptions {
   targetBottom?: boolean;
+  containerPart?: 'bottom' | 'bottomAtOrigin' | 'walls';
 }
 
 export interface BodyTransform {
@@ -172,6 +173,7 @@ export function isBottomContact(
   point: Vector3,
   normal: Vector3,
   transform: BodyTransform,
+  bottomBody = false,
 ): boolean {
   if (
     ![...point, ...normal, ...transform.position, ...transform.rotation].every(
@@ -184,9 +186,9 @@ export function isBottomContact(
   const thickness = basketThickness(collider);
   // Bullet contact points may penetrate slightly into the top face.
   const tolerance = Math.min(0.01, thickness / 4);
-  const bottomY = -height / 2 + thickness;
+  const bottomY = bottomBody ? 0 : -height / 2 + thickness;
   const isBottomPoint = (localPoint: Vector3) =>
-    Math.abs(localPoint[1] - bottomY) <= tolerance &&
+    Math.abs(localPoint[1] - bottomY) <= (bottomBody ? thickness / 2 + tolerance : tolerance) &&
     Math.abs(localPoint[0]) < width / 2 - thickness &&
     Math.abs(localPoint[2]) < length / 2 - thickness;
   // Only the interior top face of the bottom scores, not the walls, rim, or underside.
@@ -449,5 +451,17 @@ export function colliderShape(
       position: [0, 0, 0],
     });
   }
-  return { type: 'Compound', params: [], children };
+  if (options.containerPart === 'bottomAtOrigin') {
+    const thickness = basketThickness(collider);
+    return { type: 'Box', params: [w, thickness, l] };
+  }
+  return {
+    type: 'Compound',
+    params: [],
+    children: options.containerPart === 'bottom'
+      ? children.slice(0, 1)
+      : options.containerPart === 'walls'
+        ? children.slice(1)
+        : children,
+  };
 }
