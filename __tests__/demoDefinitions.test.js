@@ -36,10 +36,20 @@ test.each([
   const game = readExperience(memory).games[0];
   expect(game.subtype).toBe(subtype);
   expect(game.settings).toMatchObject({ freeze, fall, targets, projectile: { objectId: 1 } });
+  const orientation = subtype === 'dartboard' ? 'vertical' : 'horizontal';
+  expect(draft.interactive.logic.games[0].settings.plane.orientation).toBe(orientation);
+  expect(game.settings.plane.orientation).toBe(orientation);
   expect(game.objects.find(object => object.id === 1).properties.physics.type).toBe('Dynamic');
   expect(game.objects.find(object => object.id === 2).properties.physics.type)
     .toBe(fall ? 'Dynamic' : 'Static');
   expect(game.assets).toHaveLength(2);
+});
+
+test('demo3 centers its dartboard collider on the wall', () => {
+  const game = demo3.interactive.logic.games[0];
+  const target = game.objects.find(object => object.id === game.settings.targets[0]);
+  const [x, y, z] = target.properties.position;
+  expect([x, y + target.properties.collider.size[1] / 2, z]).toEqual([0, 0, 0]);
 });
 
 test('demo1 has three identical dynamic skittles in one evenly spaced row', () => {

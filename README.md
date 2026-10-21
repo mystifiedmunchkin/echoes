@@ -1,6 +1,6 @@
 # The aim of the game 
 
-- This app reads 3D games and contents that have been added to locations in places around the world to play in AR. For now it's available for testing basic aiming games. The games appear in AR, you can enter the game by clicking on a bubble then clicking on the floor, which places the game in your surroundings.
+- This app reads 3D games and contents that have been added to locations in places around the world to play in AR. For now it's available for testing basic aiming games. The games appear in AR, you can enter the game by clicking on a bubble then tapping a detected horizontal surface or wall, which places the game at the exact point touched.
 
 # Adding games to the map
 - The games have be added through a user account online. You can make and place your own games or contents for wherever you are (using GPS coordinates) by creating an account here :
@@ -15,6 +15,26 @@ Payment test mode is installed and enabled through a Stripe environment, you'll 
 
 - Fill in the settings and upload 3D objects to use as targets or projectiles for your game, the available types of games are : 'bowling' where you have to tip over the target, 'dartboard' which freezes the projectile and counts points from the center of the target and 'basket' where you aim to throw an object into a box.
 
+
+# Android build environment
+
+Install JDK 17 and set `JAVA_HOME` to its installation directory. In Android
+Studio, select JDK 17 as the Gradle JDK. The daemon criteria in
+[`android/gradle/gradle-daemon-jvm.properties`](android/gradle/gradle-daemon-jvm.properties)
+also pin Java 17; these criteria take precedence over `JAVA_HOME`.
+No automatic JDK download is configured.
+
+Do not regenerate these criteria for Java 25: Android's native Prefab tooling
+can fail at `react-native-worklets:configureCMakeRelWithDebInfo[arm64-v8a]` with
+`WARNING: A restricted method in java.lang.System has been called`.
+
+From PowerShell, verify the daemon JVM and build with:
+
+```powershell
+Set-Location android
+.\gradlew.bat --version
+.\gradlew.bat assembleRelease
+```
 
 # Source guide
 
@@ -225,7 +245,12 @@ contains the mobile consumer, not a server editor or backend.
       }
     ],
     "settings": {
-      "plane": { "minWidth": 2, "minLength": 3, "stableMs": 1000 },
+      "plane": {
+        "orientation": "horizontal",
+        "minWidth": 2,
+        "minLength": 3,
+        "stableMs": 1000
+      },
       "projectile": {
         "objectId": 103,
         "speed": 5,
@@ -261,18 +286,21 @@ contains the mobile consumer, not a server editor or backend.
 ]
 ```
 
-- AR waits for normal tracking and an upward-facing horizontal plane meeting
-  **both** minimum dimensions. During `stableMs` (default 1000 ms), a change of
-  anchor, a displacement over 3 cm, a yaw change over 3 degrees, anchor removal
-  or loss of tracking restarts preparation. This is a pose-stability heuristic,
-  not a guarantee of tracking accuracy.
-- Once ready, the runtime snapshots the plane's center and yaw into a fixed
-  world-space static box, **100 x 100 m and 1 m deep**, with its upper face at floor
-  height. Its dimensions are independent of the detected plane's extents. This
-  approximates an infinite ground for nearby AR play, but has finite edges 50 m
-  from its center. Later plane updates do not move the floor. Choose a clear physical
-  floor: a sufficiently large tabletop is also a valid horizontal plane to the
-  tracker. The floor is an invisible collider, not a rendered ground mesh.
+- AR waits for normal tracking and a detected plane meeting **both** minimum
+  dimensions. Set `plane.orientation` to `horizontal` (the default) for an
+  upward-facing surface, or to `vertical` for a wall. Horizontal games use
+  `HorizontalUpward` plane detection; vertical games use `Vertical` detection.
+  `stableMs` remains accepted for configuration compatibility, but it never
+  locks the plane automatically: the runtime waits for a tap on the detected
+  surface or its indicator and uses that exact world-space hit.
+- After the tap, the runtime snapshots the hit position and plane yaw into a
+  fixed world-space origin. For horizontal games, this origin carries an
+  invisible static floor collider **100 x 100 m and 1 m deep**, with its upper
+  face at the clicked height. Its dimensions are independent of the detected
+  plane's extents, and later plane updates do not move it. For vertical games,
+  no floor collider is created: the origin is aligned to the wall and targets
+  remain upright while projectiles are simulated in world space. Later plane
+  updates do not move either scene.
 - Targets use positions/rotations relative to the locked floor center. Positions
   are the base of each collider; the runtime centers the collider and model by
   raising them by half the collider height.

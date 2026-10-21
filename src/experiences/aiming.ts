@@ -35,7 +35,12 @@ export interface AimingSettings {
   freeze?: boolean;
   multiplier?: number;
   fall?: boolean;
-  plane: { minWidth: number; minLength: number; stableMs: number };
+  plane: {
+    orientation?: 'horizontal' | 'vertical';
+    minWidth: number;
+    minLength: number;
+    stableMs: number;
+  };
   projectile: {
     objectId: number;
     speed: number;
@@ -85,7 +90,7 @@ export function hasImpactRules(settings: AimingSettings): boolean {
   );
 }
 
-function rotate(vector: Vector3, rotation: Vector3): Vector3 {
+export function rotate(vector: Vector3, rotation: Vector3): Vector3 {
   let [x, y, z] = vector;
   const [rx, ry, rz] = rotation.map(angle => (angle * Math.PI) / 180);
   [y, z] = [y * Math.cos(rx) - z * Math.sin(rx), y * Math.sin(rx) + z * Math.cos(rx)];
@@ -288,6 +293,11 @@ export function readAiming(
 ): AimingSettings {
   const source = record(value);
   const plane = record(source.plane);
+  const orientation = plane.orientation === undefined ? 'horizontal' : plane.orientation;
+  requireValue(
+    orientation === 'horizontal' || orientation === 'vertical',
+    `${path}.plane.orientation`,
+  );
   const projectile = record(source.projectile);
   const objectId = projectile.objectId;
   requireValue(
@@ -394,6 +404,7 @@ export function readAiming(
   return {
     ...rules,
     plane: {
+      orientation,
       minWidth: positive(plane.minWidth, `${path}.plane.minWidth`),
       minLength: positive(plane.minLength, `${path}.plane.minLength`),
       stableMs,

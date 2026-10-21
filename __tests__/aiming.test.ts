@@ -47,7 +47,7 @@ const readGame = (value: unknown) =>
 test('reads and defaults a server-configured aiming game without mutating it', () => {
   const parsed = readGame(game)!.games[0];
   expect(parsed.settings).toEqual({
-    plane: { minWidth: 2, minLength: 3, stableMs: 1000 },
+    plane: { orientation: 'horizontal', minWidth: 2, minLength: 3, stableMs: 1000 },
     projectile: {
       objectId: 1,
       speed: 5,
@@ -68,6 +68,27 @@ test.each(['GLB', 'OBJ'])('accepts a %s projectile', type => {
       assets: [{ ...game.assets[0], type }, game.assets[1]],
     }),
   ).not.toBeNull();
+});
+
+test.each(['horizontal', 'vertical'])('reads and caches %s plane orientation', async orientation => {
+  const definition = {
+    logic: { games: [{
+      ...game,
+      settings: { ...game.settings, plane: { ...game.settings.plane, orientation } },
+    }] },
+  };
+  const parsed = readExperience(definition)!;
+  expect(parsed.games[0].settings?.plane.orientation).toBe(orientation);
+  const cached = await cacheExperience(definition, async url => url);
+  expect(cached?.games[0].settings?.plane.orientation).toBe(orientation);
+  expect(definition.logic.games[0].settings.plane).not.toHaveProperty('stableMs');
+});
+
+test.each(['Vertical', 'diagonal', '', null, 1])('rejects invalid plane orientation %j', orientation => {
+  expect(() => readGame({
+    ...game,
+    settings: { ...game.settings, plane: { ...game.settings.plane, orientation } },
+  })).toThrow('plane.orientation');
 });
 
 test('reads impact rules and preserves explicit false values', () => {

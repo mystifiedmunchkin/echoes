@@ -16,7 +16,8 @@ identity. Collection contents remain account-scoped.
 **Place here again** opens that saved definition without another nearby search
 or GPS position. The original server IDs and coordinates are retained. Nothing
 is published or duplicated at the player's physical position. AR still requires
-camera permission and a suitable tracked floor for aiming games. Galaxy A
+camera permission and a suitable tracked plane for aiming games (floor or wall,
+according to `settings.plane.orientation`). Galaxy A
 devices use the existing 3D game viewer instead. Ordinary map discovery keeps
 its proximity restrictions.
 
@@ -29,6 +30,13 @@ are registered and playable in **local-only mode**:
 [demo3.json](../assets/demos/demo3.json) (dart/dartboard with freezing).
 They reference the six `demo*.glb` files in `assets/models/` through `bundle:`
 keys matching their filenames.
+
+Each demo explicitly sets `settings.plane.orientation`: `horizontal` for bowling
+and basket, `vertical` for darts. Missing orientation defaults to `horizontal`
+for older definitions; other values are rejected. Vertical games use the wall
+hit point as their origin when tapped (wall center for automatic placement),
+keep objects upright and do not create a synthetic floor.
+The dartboard collider is centered on that origin.
 
 Each entry has a stable positive `localId` (`1`, `2`, `3`). This explicitly
 disables server synchronization, even for signed-in users. The loader uses
@@ -124,7 +132,7 @@ real, reserved server identifiers. Example server-backed definition below:
             }
           ],
           "settings": {
-            "plane": { "minWidth": 1, "minLength": 1 },
+            "plane": { "orientation": "horizontal", "minWidth": 1, "minLength": 1 },
             "projectile": { "objectId": 1, "speed": 5 },
             "targets": [2],
             "multiplier": 5

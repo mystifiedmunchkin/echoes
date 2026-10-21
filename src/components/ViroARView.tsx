@@ -25,6 +25,7 @@ ViroMaterials.createMaterials({
     lightingModel: 'Constant',
     alpha: 1,
     blendMode: 'Alpha',
+    cullMode: 'None',
     writesToDepthBuffer: false,
     wrapS: 'Repeat',
     wrapT: 'Repeat',

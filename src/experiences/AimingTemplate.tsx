@@ -5,7 +5,7 @@ import { AimingSceneContext } from './AimingScene';
 import { AimingReadyProjectile } from './AimingReadyProjectile';
 import {
   basketThickness, colliderShape, colliderSize, distanceAdjustedPoints, hasFallen,
-  hasImpactRules, impactPoints, isBottomContact, launchSpeed,
+  hasImpactRules, impactPoints, isBottomContact, launchSpeed, rotate,
 } from './aiming';
 import type { BodyTransform } from './aiming';
 import type { ExperienceObject, Vector3 } from './experience';
@@ -18,6 +18,11 @@ interface Floor {
   rotation: Vector3;
   width: number;
   length: number;
+}
+
+interface PlaneCandidate extends Floor {
+  center: Vector3;
+  surfaceRotation: Vector3;
 }
 
 type PlaneAnchor = Parameters<
@@ -43,12 +48,15 @@ function floorFromAnchor(
   anchor: PlaneAnchor,
   minWidth: number,
   minLength: number,
-): Floor | null {
+  vertical: boolean,
+): PlaneCandidate | null {
   const { width, height, position, rotation, center = [0, 0, 0] } = anchor;
   if (
     anchor.type !== 'plane' ||
-    (anchor.alignment !== 'Horizontal' &&
-      anchor.alignment !== 'HorizontalUpward') ||
+    (vertical
+      ? anchor.alignment !== 'Vertical'
+      : anchor.alignment !== 'Horizontal' &&
+        anchor.alignment !== 'HorizontalUpward') ||
     !width ||
     !height ||
     width < minWidth ||
@@ -56,24 +64,31 @@ function floorFromAnchor(
     ![...position, ...rotation, ...center, width, height].every(Number.isFinite)
   )
     return null;
-  const yaw = (rotation[1] * Math.PI) / 180;
+  const offset = rotate(center, rotation);
+  const normal = rotate([0, 1, 0], rotation);
+  const yaw = vertical
+    ? Math.atan2(normal[0], normal[2]) * 180 / Math.PI
+    : rotation[1];
   // The anchor center is plane-local; rotate its offset into world space before locking.
   return {
     anchorId: anchor.anchorId,
+    center: [...center],
+    surfaceRotation: [...rotation],
     position: [
-      position[0] + center[0] * Math.cos(yaw) + center[2] * Math.sin(yaw),
-      position[1] + center[1],
-      position[2] - center[0] * Math.sin(yaw) + center[2] * Math.cos(yaw),
+      position[0] + offset[0],
+      position[1] + offset[1],
+      position[2] + offset[2],
     ],
-    rotation: [0, rotation[1], 0],
+    rotation: [0, yaw, 0],
     width,
     length: height,
   };
 }
 
 export function ConfiguredAimingTemplate(props: TemplateProps) {
-  const { game, mode, onEvent } = props;
+  const { game, mode, onEvent, onError } = props;
   const config = game.settings!;
+  const vertical = config.plane.orientation === 'vertical';
   const impactRules = hasImpactRules(config);
   const basketGame = game.subtype === 'basket';
   const scene = React.useContext(AimingSceneContext);
@@ -81,25 +96,31 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
   const [floor, setFloor] = React.useState<Floor | null>(
     mode === 'viewer'
       ? {
-          position: [0, -1, -2],
+          position: [0, vertical ? 0 : -1, -2],
           rotation: [0, 0, 0],
           width: config.plane.minWidth,
           length: config.plane.minLength,
         }
       : null,
   );
-  const [candidate, setCandidate] = React.useState<Floor | null>(null);
-  const latestCandidate = React.useRef<Floor | null>(null);
-  const stableCandidate = React.useRef<Floor | null>(null);
-  const stabilityTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [candidate, setCandidate] = React.useState<PlaneCandidate | null>(null);
+  const latestCandidate = React.useRef<PlaneCandidate | null>(null);
+  const planeLocked = React.useRef(mode === 'viewer');
+  const trackingReadyRef = React.useRef(trackingReady);
+  trackingReadyRef.current = trackingReady;
   const [shots, setShots] = React.useState<Shot[]>([]);
   const activeShots = React.useRef<Shot[]>([]);
   const scoredContacts = React.useRef(new Set<string>());
   const scoredTargets = React.useRef(new Set<number>());
+  const [frozenShots, setFrozenShots] = React.useState(new Set<number>());
   const [fallenTargets, setFallenTargets] = React.useState(new Set<number>());
   const pendingFalls = React.useRef(new Map<number, Impact>());
   const targetContacts = React.useRef(new Map<number, Map<number, Contact>>());
-  const [frozenShots, setFrozenShots] = React.useState(new Set<number>());
+  const freezeRequests = React.useRef(new Set<number>());
+  const projectileContactTransforms = React.useRef(new Map<number, BodyTransform>());
+  const [frozenTransforms, setFrozenTransforms] = React.useState(
+    new Map<number, BodyTransform>(),
+  );
   const [rewards, setRewards] = React.useState<{ id: number; point: Vector3 }[]>([]);
   const sequence = React.useRef(0);
   const projectile = game.objects.find(
@@ -163,6 +184,20 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
       transform.rotation, object.properties.rotation ?? [0, 0, 0], floor.rotation,
     )) award(object.id, impact);
   };
+  const captureProjectileContact = (
+    shotId: number,
+    tag: string | undefined,
+    transform: BodyTransform,
+  ) => {
+    if (!config.freeze || !config.targets.includes(Number(tag))) return;
+    projectileContactTransforms.current.set(shotId, transform);
+    if (freezeRequests.current.has(shotId)) {
+    setFrozenTransforms(current => {
+      if (current.has(shotId)) return current;
+      return new Map(current).set(shotId, transform);
+    });
+    }
+  };
   const handleImpact = (
     object: ExperienceObject, tag: string | undefined, point: Vector3,
     normal: Vector3, transform: BodyTransform,
@@ -200,9 +235,23 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
     const projectileId = projectile.id;
     if (!config.fall && scoredContacts.current.has(`${projectileId}:${object.id}`))
       return;
-    if (config.freeze) setFrozenShots(current =>
-      current.has(projectileId) ? current : new Set([...current, projectileId]),
-    );
+    if (config.freeze) {
+      freezeRequests.current.add(projectileId);
+      const contactTransform = projectileContactTransforms.current.get(projectileId);
+      if (contactTransform) {
+        setFrozenTransforms(current => {
+          if (current.has(projectileId)) return current;
+          return new Map(current).set(projectileId, contactTransform);
+        });
+      } else {
+        // Keep the existing fallback for runtimes that only report the target
+        // side of a collision; native projectile callbacks provide the exact
+        // contact pose whenever available.
+        setFrozenShots(current =>
+          current.has(projectileId) ? current : new Set([...current, projectileId]),
+        );
+      }
+    }
     const impact: Impact = {
       projectileId, ...contact,
     };
@@ -226,81 +275,49 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
     [game.id, onEvent],
   );
 
-  const clearStabilityTimer = React.useCallback(() => {
-    if (stabilityTimer.current) clearTimeout(stabilityTimer.current);
-    stabilityTimer.current = null;
-    stableCandidate.current = null;
-  }, []);
-
-  const lockPlane = React.useCallback((plane: Floor | null) => {
-    if (floor) return;
-    if (!plane) return;
+  const lockPlane = React.useCallback((position?: Vector3) => {
+    const plane = latestCandidate.current;
+    if (planeLocked.current || !trackingReadyRef.current || !plane) return;
+    planeLocked.current = true;
     // Keep the exact pose selected by the user; subsequent anchor updates must
     // not move the playable scene.
     const locked = {
-      ...plane,
-      position: [...plane.position] as Vector3,
+      anchorId: plane.anchorId,
+      width: plane.width,
+      length: plane.length,
+      position: [...(position ?? plane.position)] as Vector3,
       rotation: [...plane.rotation] as Vector3,
     };
     setFloor(locked);
     emit('planeReady', locked);
-  }, [emit, floor]);
+  }, [emit]);
+
+  const selectPlane = React.useCallback((position: Vector3) => {
+    if (!Array.isArray(position) || position.length !== 3 || !position.every(Number.isFinite)) {
+      onError('Invalid AR plane selection: missing or invalid world-space hit position');
+      return;
+    }
+    lockPlane(position);
+  }, [lockPlane, onError]);
 
   const updatePlane = (anchor: PlaneAnchor) => {
-    if (floor) return;
-    const next = floorFromAnchor(
+    if (planeLocked.current) return;
+    const next = trackingReadyRef.current ? floorFromAnchor(
       anchor,
       config.plane.minWidth,
       config.plane.minLength,
-    );
+      vertical,
+    ) : null;
     latestCandidate.current = next;
     emit('planeCandidate', next);
-    const previousStable = stableCandidate.current;
-    const stable =
-      next &&
-      previousStable &&
-      next.anchorId === previousStable.anchorId &&
-      Math.hypot(
-        ...next.position.map((value, index) => value - previousStable.position[index]),
-      ) <= 0.03 &&
-      Math.abs(
-        ((next.rotation[1] - previousStable.rotation[1] + 540) % 360) - 180,
-      ) <= 3;
-    if (!stable) {
-      if (stabilityTimer.current) clearTimeout(stabilityTimer.current);
-      stabilityTimer.current = null;
-      stableCandidate.current = next;
-      if (next) {
-        stabilityTimer.current = setTimeout(() => {
-          stabilityTimer.current = null;
-          if (!trackingReady || floor || latestCandidate.current !== stableCandidate.current)
-            return;
-          lockPlane(stableCandidate.current);
-        }, config.plane.stableMs);
-      }
-    }
-    setCandidate(previous => {
-      if (!next || !previous) return next;
-      const distance = Math.hypot(
-        ...next.position.map((n, i) => n - previous.position[i]),
-      );
-      const angle = Math.abs(
-        ((next.rotation[1] - previous.rotation[1] + 540) % 360) - 180,
-      );
-      return next.anchorId !== previous.anchorId || distance > 0.03 || angle > 3
-        ? next
-        : previous;
-    });
+    setCandidate(next);
   };
 
   React.useEffect(() => {
     if (trackingReady || floor) return;
     latestCandidate.current = null;
-    clearStabilityTimer();
     setCandidate(null);
-  }, [trackingReady, floor, clearStabilityTimer]);
-
-  React.useEffect(() => clearStabilityTimer, [clearStabilityTimer]);
+  }, [trackingReady, floor]);
 
   const fire = React.useCallback(
     (heldMs = 0) => {
@@ -377,8 +394,8 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
     },
   });
   const worldFloor = floor && (
-    <ViroNode position={floor.position} rotation={floor.rotation}>
-      <ViroNode
+    <ViroNode viroTag="aiming-origin" position={floor.position} rotation={floor.rotation}>
+      {!vertical && <ViroNode
         viroTag="aiming-floor"
         position={[0, -0.5, 0]}
         physicsBody={{
@@ -388,7 +405,7 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
           shape: { type: 'Box', params: [100, 1, 100] },
         }}
         onCollision={() => undefined}
-      />
+      />}
       {game.objects
         .filter(object => object.id !== projectile.id)
         .map(object => {
@@ -500,26 +517,25 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
         <ViroARPlane
           minWidth={config.plane.minWidth}
           minHeight={config.plane.minLength}
-          alignment="HorizontalUpward"
+          alignment={vertical ? 'Vertical' : 'HorizontalUpward'}
           onAnchorFound={updatePlane}
           onAnchorUpdated={updatePlane}
-          onClick={() => lockPlane(latestCandidate.current)}
+          onClick={selectPlane}
           onAnchorRemoved={() => {
             latestCandidate.current = null;
-            clearStabilityTimer();
             setCandidate(null);
             emit('planeCandidate');
           }}
         >
           {candidate && (
             <ViroQuad
-              position={[0, 0, 0]}
+              position={candidate.center}
               rotation={[-90, 0, 0]}
               width={candidate.width}
               height={candidate.length}
               materials={['aimingPlaneIndicator']}
               opacity={0.7}
-              onClick={() => lockPlane(candidate)}
+              onClick={selectPlane}
             />
           )}
         </ViroARPlane>
@@ -531,7 +547,9 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
           {...props}
           object={physicalObject(projectile, shot)}
           sourceObjectId={projectile.id}
-          freeze={frozenShots.has(shot.id)}
+          freeze={frozenTransforms.get(shot.id) ?? frozenShots.has(shot.id)}
+          onBodyCollision={config.freeze ? (tag, _point, _normal, transform) =>
+            captureProjectileContact(shot.id, tag, transform) : undefined}
           onClickState={scene?.onClickState}
           projectileDiagnostics={{
             floorY: floor!.position[1],

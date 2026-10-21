@@ -200,6 +200,7 @@ classDiagram
         boolean fall_optional
     }
     class PlaneSettings {
+        string orientation_optional
         number minWidth
         number minLength
         number stableMs
@@ -319,6 +320,7 @@ Les URL `example.test` sont des placeholders a remplacer par de vraies ressource
               ],
               "settings": {
                 "plane": {
+                  "orientation": "horizontal",
                   "minWidth": 2,
                   "minLength": 3,
                   "stableMs": 1000
@@ -355,8 +357,9 @@ Les URL `example.test` sont des placeholders a remplacer par de vraies ressource
 | `settings.freeze` | Booleen facultatif : immobiliser le projectile au premier impact eligible. |
 | `settings.multiplier` | Entier strictement positif facultatif : maximum radial pour dartboard (10 par defaut), valeur constante pour basket/bowling (1 par defaut). Sans subtype : maximum radial, 1 par defaut. |
 | `settings.fall` | Booleen facultatif : attendre le renversement des cibles Dynamic pour valider le score. |
-| `plane.minWidth`, `plane.minLength` | Dimensions minimales du plane detecte, en metres ; pas la taille du sol physique final. |
-| `plane.stableMs` | Delai de stabilite avant verrouillage automatique ; un tap sur l'indicateur peut aussi verrouiller le plane. |
+| `plane.orientation` | `horizontal` (defaut si absent) ou `vertical`. Toute autre valeur est rejetee. |
+| `plane.minWidth`, `plane.minLength` | Dimensions minimales du plan detecte, en metres : largeur et longueur au sol, ou largeur et hauteur sur un mur ; pas la taille du sol physique final. |
+| `plane.stableMs` | Delai de stabilite conserve dans la configuration pour compatibilite ; le verrouillage se fait uniquement au tap sur la surface ou la grille blanche. |
 | `projectile.speed` | Vitesse de base, en m/s ; la charge du geste applique ensuite un multiplicateur de 1 a 2. |
 | `projectile.spawnDistance` | Distance devant la camera au moment du relachement, en metres. |
 | `projectile.lifetimeMs` | Champ valide pour compatibilite, mais actuellement ignore par le runtime : tous les projectiles ont une duree illimitee, meme si le serveur envoie `1000`. |
@@ -368,6 +371,49 @@ Les URL `example.test` sont des placeholders a remplacer par de vraies ressource
 Le sol **100 x 100 x 1 m**, la charge maximale **2 s**, le multiplicateur maximal
 **x2** et le mode diagnostic `drawBounds` sont actuellement definis dans le client.
 Ils ne sont pas des parametres JSON serveur.
+
+En AR, `minWidth` et `minLength` filtrent la surface estimee par ARKit/ARCore,
+pas la taille des objets ni celle du sol physique cree apres verrouillage.
+Les deux seuils sont transmis a Viro et verifies a nouveau en JavaScript,
+y compris lors des mises a jour : un plan trop petit ne montre pas la grille
+et ne peut pas etre valide, meme au toucher. Les dimensions exactes au seuil
+sont acceptees.
+
+Le compte a rebours `stableMs` commence seulement avec un tracking normal
+et un plan de dimensions suffisantes. Les mises a jour restent stables si
+le centre reste a 3 cm et chaque angle a 3 degres maximum de la pose au debut
+du delai. Un depassement ou un changement d'ancre recommence le delai ;
+une surface trop petite, un retrait d'ancre ou une perte de tracking l'annule.
+Les petites mises a jour ne bloquent pas le verrouillage : la pose valide
+la plus recente est utilisee a l'expiration du delai. Une fois verrouillee,
+la scene ne suit plus les changements du plan.
+
+La meme grille de points blancs couvre les plans horizontaux et verticaux
+valides avant verrouillage, centree sur leur centre local et visible des deux
+cotes. Ses dimensions suivent celles du plan detecte.
+
+Un toucher sur cette grille ou sur le plan verrouille l'origine de la scene
+au point d'intersection 3D du toucher avec la surface, fourni par Viro en
+coordonnees monde. Ce point est utilise directement, sans le recentrer ni lui
+appliquer une seconde transformation. L'orientation reste celle du plan.
+Sans tap valide, aucun verrouillage automatique n'est effectue : la cible n'est
+jamais placee au centre par defaut.
+Un point de toucher manquant ou non fini est signale comme erreur et ne
+declenche pas de placement. Les positions des objets du JSON restent des
+decalages relatifs a l'origine choisie.
+
+Pour `settings.plane.orientation: "vertical"`, seul un mur peut etre verrouille.
+L'origine de la scene est le point monde renvoye par le hit-test du tap ;
+seul le cap autour de Y est
+conserve, avec l'axe +Z vers la normale du mur. Les objets restent debout et
+la gravite globale ne change pas. Aucun sol physique artificiel n'est cree.
+Les positions des objets sont relatives a cette origine : pour centrer un collider
+de hauteur 0.8 m sur le mur, utiliser `position: [0, -0.4, 0]`, car le runtime
+ajoute toujours la demi-hauteur du collider. Le viewer 3D applique aussi ce mode,
+avec une origine synthetique `[0, 0, -2]`.
+Les demos bowling et panier utilisent `horizontal` ; les flechettes utilisent
+`vertical`. Le formulaire serveur doit proposer ces deux valeurs dans
+`settings.plane.orientation`, independamment du sous-type de jeu.
 
 Les colliders acceptes sont `sphere`, `bounding`, `basket`, `capsule` et
 `diamond`. Sans regles d'impact, une cible `bounding` ou `basket` est ouverte en haut et possede un fond
@@ -602,13 +648,13 @@ flowchart TD
     Config -->|Oui| Mode{"Mode ?"}
 
     subgraph Preparation["Preparation du terrain"]
-        Mode -->|AR| Scan["Tracking et detection ViroARPlane horizontal"]
-        Scan --> Candidate["Plane candidat : evenement planeCandidate et indicateur bleu"]
+        Mode -->|AR| Scan["Tracking et detection ViroARPlane horizontal ou vertical"]
+        Scan --> Candidate["Plane candidat : evenement planeCandidate et grille de points blancs"]
         Candidate --> Selection{"Tap sur l'indicateur<br/>ou stabilite avec tracking normal ?"}
         Selection -->|Non| Scan
-        Selection -->|Oui| Lock["Verrouiller centre et orientation : planeReady"]
+        Selection -->|Oui| Lock["Verrouiller le point touche et l'orientation : planeReady"]
         Mode -->|Viewer 3D| Synthetic["Sol synthetique immediat"]
-        Lock --> Floor["Sol Static : 100 x 100 x 1 m<br/>Face superieure au niveau du plane"]
+        Lock --> Floor["Horizontal : sol Static 100 x 100 x 1 m<br/>Vertical : origine sur le mur, sans sol"]
         Synthetic --> Floor
         Floor --> Targets["Monter les cibles<br/>bounding plein avec les nouvelles regles"]
     end
@@ -683,7 +729,8 @@ flowchart TD
 
 - Le sol est fini : ses bords sont a 50 m du centre. Il simule un terrain tres
   grand a l'echelle AR, pas un plan mathematiquement infini.
-- Le verrouillage automatique du plane reste actif ; le tap n'est pas obligatoire.
+- Le verrouillage du plane exige un tap valide ; sans tap, le jeu ne se place pas
+  automatiquement au centre du plane detecte.
 - Une perte du tracking ne retire pas le sol verrouille ni les projectiles deja
   presents. Elle bloque les nouveaux tirs et annule le geste en cours.
 - Un contact avec une paroi peut devier le projectile vers le fond : la physique

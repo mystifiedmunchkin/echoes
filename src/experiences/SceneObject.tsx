@@ -37,7 +37,7 @@ export function SceneObject({
 }: Omit<TemplateProps, 'mode'> & {
   object: ExperienceObject;
   sourceObjectId?: number;
-  freeze?: boolean;
+  freeze?: boolean | BodyTransform;
   onBodyCollision?: (
     tag: string | undefined,
     point: Vector3,
@@ -101,6 +101,10 @@ export function SceneObject({
   const sampling = onSampleTransform !== undefined;
   React.useEffect(() => {
     if (!freeze) return;
+    if (freeze !== true) {
+      setFrozen(freeze);
+      return;
+    }
     // Capture the simulated world pose before replacing the dynamic body with a static one.
     let cancelled = false;
     const freezeBody = async () => {

@@ -1,6 +1,6 @@
 import * as React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { ViroARTrackingTargets, ViroAnimations } from '@reactvision/react-viro';
+import { ViroARTrackingTargets, ViroAnimations, ViroMaterials } from '@reactvision/react-viro';
 import { ExperienceContent } from '../src/experiences/ExperienceTemplates';
 import ExperienceViewer from '../src/experiences/ExperienceViewer';
 import ViroARView from '../src/components/ViroARView';
@@ -105,12 +105,25 @@ const onError = jest.fn();
 const onEvent = jest.fn();
 const host = (name: string) =>
   renderer.root.findAll(node => node.type === name);
+const planeIndicatorMaterial = jest.mocked(ViroMaterials.createMaterials).mock.calls
+  .map(([materials]) => materials.aimingPlaneIndicator)
+  .find(Boolean);
 
 beforeEach(() => {
   jest.clearAllMocks();
 });
 afterEach(() => {
   if (renderer) act(() => renderer.unmount());
+});
+
+test('uses a double-sided white dotted material for floor and wall indicators', () => {
+  expect(planeIndicatorMaterial).toMatchObject({
+    diffuseTexture: require('../assets/plane-dots.png'),
+    diffuseColor: '#FFFFFF',
+    lightingModel: 'Constant',
+    blendMode: 'Alpha',
+    cullMode: 'None',
+  });
 });
 
 test('registers native image target before mounting its marker and cleans up on unmount', async () => {
@@ -373,7 +386,7 @@ describe('configured aiming runtime', () => {
   const detectFloor = () => {
     act(() => scene().props.onTrackingUpdated(3));
     act(() => host('ViroARPlane')[0].props.onAnchorFound(anchor));
-    act(() => host('ViroARPlane')[0].props.onClick());
+    act(() => host('ViroARPlane')[0].props.onClick([1.25, -1, -3.5]));
     act(() => scene().props.onCameraTransformUpdate(camera));
   };
   const withRules = (rules: Partial<AimingSettings>, secondTarget = false) => {
@@ -949,7 +962,7 @@ describe('configured aiming runtime', () => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
-  test('requires normal tracking, a valid plane and an explicit tap before creating a static world-space floor', async () => {
+  test('requires normal tracking and a valid plane, and allows a tap before the stability deadline', async () => {
     await mountAR();
     const detector = host('ViroARPlane')[0];
     expect(detector.props).toMatchObject({
@@ -985,9 +998,7 @@ describe('configured aiming runtime', () => {
     );
     act(() => jest.advanceTimersByTime(999));
     expect(floor()).toBeUndefined();
-    act(() => jest.advanceTimersByTime(1));
-    expect(floor()).toBeUndefined();
-    act(() => detector.props.onClick());
+    act(() => detector.props.onClick([1.35, -1, -3.5]));
     expect(floor()!.props.physicsBody).toEqual({
       type: 'Static',
       friction: 0.7,
@@ -1002,6 +1013,325 @@ describe('configured aiming runtime', () => {
     expect(onEvent).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'planeReady' }),
     );
+  });
+
+  test.each([
+    ['horizontal', 'ViroARPlane'], ['horizontal', 'ViroQuad'],
+    ['vertical', 'ViroARPlane'], ['vertical', 'ViroQuad'],
+  ] as const)('anchors a %s game at the exact world-space hit on %s', async (orientation, surface) => {
+    await mountAR(withRules({
+      plane: { orientation, minWidth: 2, minLength: 3, stableMs: 2500 },
+    }));
+    act(() => scene().props.onTrackingUpdated(3));
+    const plane = {
+      ...anchor,
+      alignment: orientation === 'vertical' ? 'Vertical' : 'HorizontalUpward',
+      rotation: orientation === 'vertical' ? [90, 90, 0] : [0, 90, 0],
+    };
+    act(() => host('ViroARPlane')[0].props.onAnchorFound(plane));
+    const select = host(surface)[0].props.onClick;
+    const hit = orientation === 'vertical' ? [1, -0.8, -3.9] : [1.65, -1, -3.25];
+    const expected = [...hit];
+    act(() => select(hit, 'touch'));
+    const origin = host('ViroNode').find(node => node.props.viroTag === 'aiming-origin')!;
+    expect(origin.props.position).toEqual(expected);
+    expect(origin.props.rotation[0]).toBe(0);
+    expect(origin.props.rotation[1]).toBeCloseTo(90);
+    expect(origin.props.rotation[2]).toBe(0);
+    expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'planeReady',
+      data: expect.objectContaining({ anchorId: plane.anchorId, position: expected }),
+    }));
+    expect(host('ViroARPlane')).toHaveLength(0);
+    hit[0] = 100;
+    act(() => {
+      select([10, 10, 10], 'touch');
+      jest.advanceTimersByTime(5000);
+    });
+    expect(origin.props.position).toEqual(expected);
+    expect(onEvent.mock.calls.filter(([event]) => event.name === 'planeReady')).toHaveLength(1);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  test('does not place the game at the detected plane center before a tap', async () => {
+    await mountAR(withRules({
+      plane: { minWidth: 2, minLength: 3, stableMs: 100 },
+    }));
+    act(() => scene().props.onTrackingUpdated(3));
+    const detector = host('ViroARPlane')[0];
+    act(() => detector.props.onAnchorFound(anchor));
+    act(() => jest.advanceTimersByTime(1000));
+    expect(host('ViroARPlane')).toHaveLength(1);
+    expect(floor()).toBeUndefined();
+    expect(onEvent.mock.calls.some(([event]) => event.name === 'planeReady')).toBe(false);
+    act(() => detector.props.onClick([1.65, -1, -3.25]));
+    expect(floor()!.parent!.props.position).toEqual([1.65, -1, -3.25]);
+  });
+
+  test.each([
+    { point: undefined }, { point: null }, { point: [0, 0] },
+    { point: [NaN, 0, 0] }, { point: [0, Infinity, 0] },
+  ])('reports invalid plane hit $point instead of placing at the center', async ({ point }) => {
+    await mountAR();
+    act(() => scene().props.onTrackingUpdated(3));
+    act(() => host('ViroARPlane')[0].props.onAnchorFound(anchor));
+    act(() => host('ViroQuad')[0].props.onClick(point));
+    expect(onError).toHaveBeenCalledWith(
+      'Invalid AR plane selection: missing or invalid world-space hit position',
+    );
+    expect(host('ViroARPlane')).toHaveLength(1);
+    expect(floor()).toBeUndefined();
+    expect(onEvent.mock.calls.some(([event]) => event.name === 'planeReady')).toBe(false);
+  });
+
+  test.each(['horizontal', 'vertical'] as const)(
+    'enforces both minimum dimensions and updates the white grid on %s planes',
+    async orientation => {
+      const stableMs = 2500;
+      await mountAR(withRules({
+        plane: { orientation, minWidth: 2, minLength: 3, stableMs },
+      }));
+      act(() => scene().props.onTrackingUpdated(3));
+      const detector = host('ViroARPlane')[0];
+      expect(detector.props).toMatchObject({
+        minWidth: 2, minHeight: 3,
+        alignment: orientation === 'vertical' ? 'Vertical' : 'HorizontalUpward',
+      });
+      const plane = {
+        ...anchor,
+        alignment: orientation === 'vertical' ? 'Vertical' : 'HorizontalUpward',
+        rotation: orientation === 'vertical' ? [90, 90, 0] : [0, 90, 0],
+      };
+      for (const dimensions of [
+        { width: 1.99, height: 3 },
+        { width: 2, height: 2.99 },
+        { width: NaN, height: 3 },
+        { width: 2, height: Infinity },
+      ]) {
+        act(() => detector.props.onAnchorUpdated({ ...plane, ...dimensions }));
+        expect(host('ViroQuad')).toHaveLength(0);
+        act(() => detector.props.onClick([1.25, -1, -3.5]));
+        act(() => jest.advanceTimersByTime(stableMs * 2));
+        expect(host('ViroARPlane')).toHaveLength(1);
+        expect(onEvent.mock.calls.some(([event]) => event.name === 'planeReady')).toBe(false);
+      }
+      act(() => detector.props.onAnchorUpdated(plane));
+      expect(host('ViroQuad')[0].props).toMatchObject({
+        position: plane.center,
+        rotation: [-90, 0, 0],
+        width: 2,
+        height: 3,
+        materials: ['aimingPlaneIndicator'],
+      });
+      act(() => detector.props.onAnchorUpdated({ ...plane, width: 2.5, height: 3.5 }));
+      expect(host('ViroQuad')[0].props).toMatchObject({ width: 2.5, height: 3.5 });
+      act(() => detector.props.onAnchorUpdated({ ...plane, width: 1.99 }));
+      expect(host('ViroQuad')).toHaveLength(0);
+      act(() => detector.props.onClick([1.25, -1, -3.5]));
+      act(() => jest.advanceTimersByTime(stableMs));
+      expect(host('ViroARPlane')).toHaveLength(1);
+    },
+  );
+
+  test.each(['horizontal', 'vertical'] as const)(
+    'restarts the %s countdown after a plane shrinks below its minimum dimensions',
+    async orientation => {
+      await mountAR(withRules({
+        plane: { orientation, minWidth: 2, minLength: 3, stableMs: 1500 },
+      }));
+      act(() => scene().props.onTrackingUpdated(3));
+      const plane = {
+        ...anchor,
+        alignment: orientation === 'vertical' ? 'Vertical' : 'HorizontalUpward',
+        rotation: orientation === 'vertical' ? [90, 90, 0] : [0, 90, 0],
+      };
+      const detector = host('ViroARPlane')[0];
+      act(() => detector.props.onAnchorFound(plane));
+      const staleClick = host('ViroQuad')[0].props.onClick;
+      act(() => jest.advanceTimersByTime(1400));
+      act(() => detector.props.onAnchorUpdated({ ...plane, height: 2.99 }));
+      act(() => staleClick([1.25, -1, -3.5]));
+      act(() => jest.advanceTimersByTime(1500));
+      expect(host('ViroARPlane')).toHaveLength(1);
+      expect(host('ViroQuad')).toHaveLength(0);
+      act(() => detector.props.onAnchorUpdated(plane));
+      act(() => jest.advanceTimersByTime(1499));
+      expect(host('ViroARPlane')).toHaveLength(1);
+      act(() => jest.advanceTimersByTime(1));
+      expect(host('ViroARPlane')).toHaveLength(1);
+    },
+  );
+
+  test.each(['horizontal', 'vertical'] as const)(
+    'keeps a %s plane unlocked after the stability deadline until tapped',
+    async orientation => {
+      await mountAR(withRules({
+        plane: { orientation, minWidth: 2, minLength: 3, stableMs: 2400 },
+      }));
+      act(() => scene().props.onTrackingUpdated(3));
+      const detector = host('ViroARPlane')[0];
+      const update = detector.props.onAnchorUpdated;
+      const click = detector.props.onClick;
+      const plane = {
+        ...anchor,
+        alignment: orientation === 'vertical' ? 'Vertical' : 'HorizontalUpward',
+        rotation: orientation === 'vertical' ? [90, 90, 0] : [0, 90, 0],
+      };
+      act(() => detector.props.onAnchorFound(plane));
+      act(() => jest.advanceTimersByTime(600));
+      act(() => update({ ...plane, position: [1.01, -1, -3], width: 2.5 }));
+      act(() => jest.advanceTimersByTime(600));
+      act(() => update({ ...plane, position: [1.02, -1, -3], width: 2.6 }));
+      act(() => jest.advanceTimersByTime(1199));
+      expect(host('ViroARPlane')).toHaveLength(1);
+      act(() => jest.advanceTimersByTime(1));
+      expect(host('ViroARPlane')).toHaveLength(1);
+      expect(onEvent.mock.calls.filter(([event]) => event.name === 'planeReady')).toHaveLength(0);
+      act(() => {
+        click([1.25, -1, -3.5]);
+        update({ ...plane, position: [10, 0, 0] });
+        jest.advanceTimersByTime(5000);
+      });
+      expect(onEvent.mock.calls.filter(([event]) => event.name === 'planeReady')).toHaveLength(1);
+      expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({
+        name: 'planeReady',
+        data: expect.objectContaining({ position: [1.25, -1, -3.5] }),
+      }));
+    },
+  );
+
+  test.each([
+    ['horizontal', 'position'], ['vertical', 'position'],
+    ['horizontal', 'rotation'], ['vertical', 'rotation'],
+    ['horizontal', 'anchor'], ['vertical', 'anchor'],
+  ] as const)(  'keeps a %s plane unlocked after a change of %s', async (orientation, change) => {
+    await mountAR(withRules({
+      plane: { orientation, minWidth: 2, minLength: 3, stableMs: 1800 },
+    }));
+    act(() => scene().props.onTrackingUpdated(3));
+    const detector = host('ViroARPlane')[0];
+    const plane = {
+      ...anchor,
+      alignment: orientation === 'vertical' ? 'Vertical' : 'HorizontalUpward',
+      rotation: orientation === 'vertical' ? [90, 90, 0] : [0, 90, 0],
+    };
+    act(() => detector.props.onAnchorFound(plane));
+    act(() => jest.advanceTimersByTime(1000));
+    const changed = {
+      ...plane,
+      ...(change === 'position' ? { position: [1.04, -1, -3] } : {}),
+      ...(change === 'rotation' ? { rotation: [plane.rotation[0] + 4, 90, 0] } : {}),
+      ...(change === 'anchor' ? { anchorId: 'replacement' } : {}),
+    };
+    act(() => detector.props.onAnchorUpdated(changed));
+    act(() => jest.advanceTimersByTime(1799));
+    expect(host('ViroARPlane')).toHaveLength(1);
+    act(() => jest.advanceTimersByTime(1));
+    expect(host('ViroARPlane')).toHaveLength(1);
+    expect(onEvent.mock.calls.filter(([event]) => event.name === 'planeReady')).toHaveLength(0);
+    act(() => detector.props.onClick([1.25, -1, -3.5]));
+    expect(onEvent.mock.calls.filter(([event]) => event.name === 'planeReady')).toHaveLength(1);
+  });
+
+  test.each(['horizontal', 'vertical'] as const)(
+    'cancels %s stability and immediate selection while tracking is lost',
+    async orientation => {
+      await mountAR(withRules({
+        plane: { orientation, minWidth: 2, minLength: 3, stableMs: 1300 },
+      }));
+      const plane = {
+        ...anchor,
+        alignment: orientation === 'vertical' ? 'Vertical' : 'HorizontalUpward',
+        rotation: orientation === 'vertical' ? [90, 90, 0] : [0, 90, 0],
+      };
+      act(() => scene().props.onTrackingUpdated(3));
+      act(() => host('ViroARPlane')[0].props.onAnchorFound(plane));
+      const staleClick = host('ViroQuad')[0].props.onClick;
+      act(() => jest.advanceTimersByTime(1200));
+      act(() => scene().props.onTrackingUpdated(2));
+      act(() => {
+        host('ViroARPlane')[0].props.onAnchorUpdated(plane);
+        staleClick([1.25, -1, -3.5]);
+        jest.advanceTimersByTime(5000);
+      });
+      expect(host('ViroQuad')).toHaveLength(0);
+      expect(host('ViroARPlane')).toHaveLength(1);
+      act(() => scene().props.onTrackingUpdated(3));
+      act(() => jest.advanceTimersByTime(1300));
+      expect(host('ViroARPlane')).toHaveLength(1);
+      act(() => host('ViroARPlane')[0].props.onAnchorUpdated(plane));
+      act(() => jest.advanceTimersByTime(1299));
+      expect(host('ViroARPlane')).toHaveLength(1);
+      act(() => jest.advanceTimersByTime(1));
+      expect(host('ViroARPlane')).toHaveLength(0);
+    },
+  );
+
+  test('locks a vertical wall by tap, keeping objects upright and shots in world space', async () => {
+    const configured = withSubtype('dartboard', {
+      plane: { ...aiming.games[0].settings!.plane, orientation: 'vertical' },
+    });
+    await mountAR(configured);
+    expect(scene().props.anchorDetectionTypes).toContain('PlanesVertical');
+    expect(scene().props.physicsWorld.gravity).toEqual([0, -9.81, 0]);
+    act(() => scene().props.onTrackingUpdated(3));
+    const detector = host('ViroARPlane')[0];
+    expect(detector.props.alignment).toBe('Vertical');
+    act(() => detector.props.onAnchorFound(anchor));
+    act(() => jest.advanceTimersByTime(1000));
+    expect(host('ViroQuad')).toHaveLength(0);
+    expect(host('ViroARPlane')).toHaveLength(1);
+    const wall = {
+      ...anchor, alignment: 'Vertical', rotation: [90, 90, 0],
+      position: [1, -1, -3],
+      center: [0.5, 0, 0.25],
+    };
+    act(() => detector.props.onAnchorUpdated({ ...wall, height: 2.99 }));
+    expect(host('ViroQuad')).toHaveLength(0);
+    act(() => detector.props.onAnchorUpdated(wall));
+    expect(host('ViroQuad')[0].props.rotation).toEqual([-90, 0, 0]);
+    expect(host('ViroQuad')[0].props.width).toBe(2);
+    expect(host('ViroQuad')[0].props.height).toBe(3);
+    act(() => jest.advanceTimersByTime(999));
+    expect(host('ViroARPlane')).toHaveLength(1);
+    act(() => host('ViroQuad')[0].props.onClick([1, -1.25, -3.5]));
+    expect(host('ViroARPlane')).toHaveLength(0);
+    expect(floor()).toBeUndefined();
+    const ready = onEvent.mock.calls.map(([event]) => event)
+      .find(event => event.name === 'planeReady');
+    expect(ready.data.position[0]).toBeCloseTo(1);
+    expect(ready.data.position[1]).toBeCloseTo(-1.25);
+    expect(ready.data.position[2]).toBeCloseTo(-3.5);
+    expect(ready.data.rotation[0]).toBe(0);
+    expect(ready.data.rotation[1]).toBeCloseTo(90);
+    expect(ready.data.rotation[2]).toBe(0);
+    expect(targetBody().props.rotation).toEqual([0, 0, 0]);
+    wall.position[0] = 10;
+    expect(ready.data.position[0]).toBeCloseTo(1);
+    expect(onEvent.mock.calls.filter(([event]) => event.name === 'planeReady')).toHaveLength(1);
+    act(() => scene().props.onCameraTransformUpdate(camera));
+    tap();
+    expect(projectiles()[0].props.position).toEqual([2.3, 1.05, 0]);
+    expect(projectiles()[0].props.physicsBody.instantVelocity).toEqual([6, 0, 0]);
+  });
+
+  test('prepares vertical games in the 3D viewer without a synthetic floor', async () => {
+    const configured = withSubtype('dartboard', {
+      plane: { ...aiming.games[0].settings!.plane, orientation: 'vertical' },
+    });
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <ExperienceViewer experience={configured} gameIndex={0} onError={onError} />,
+      );
+    });
+    expect(host('ViroARPlane')).toHaveLength(0);
+    expect(floor()).toBeUndefined();
+    expect(host('ViroNode').some(node =>
+      JSON.stringify(node.props.position) === '[0,0,-2]' &&
+      JSON.stringify(node.props.rotation) === '[0,0,0]',
+    )).toBe(true);
+    expect(targetBody()).toBeDefined();
+    expect(onError).not.toHaveBeenCalled();
   });
 
   test('resets plane stability on anchor removal and tracking loss', async () => {
@@ -1020,9 +1350,9 @@ describe('configured aiming runtime', () => {
     act(() => jest.advanceTimersByTime(1500));
     expect(floor()).toBeUndefined();
     act(() => host('ViroARPlane')[0].props.onAnchorUpdated(anchor));
-    act(() => jest.advanceTimersByTime(1000));
+    act(() => jest.advanceTimersByTime(999));
     expect(floor()).toBeUndefined();
-    act(() => host('ViroARPlane')[0].props.onClick());
+    act(() => host('ViroARPlane')[0].props.onClick([1.25, -1, -3.5]));
     expect(floor()).toBeDefined();
   });
 

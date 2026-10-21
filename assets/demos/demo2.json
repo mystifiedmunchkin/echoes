@@ -44,7 +44,7 @@
                 "asset": 2,
                 "active": true,
                 "collectible": false,
-                "position": [0, 0.3, -2],
+                "position": [0, 0, 1],
                 "rotation": [0, 0, 0],
                 "scale": [1, 1, 1],
                 "collider": {
@@ -63,7 +63,7 @@
             }
           ],
           "settings": {
-            "plane": { "minWidth": 1, "minLength": 3, "stableMs": 1000 },
+            "plane": { "orientation": "horizontal", "minWidth": 1, "minLength": 3, "stableMs": 1000 },
             "projectile": {
               "objectId": 1,
               "speed": 5,

@@ -1209,14 +1209,14 @@ const styles = StyleSheet.create({
   accountText: { color: COLORS.primary, fontSize: 12, fontFamily: 'monospace' },
 
   errorBanner: { backgroundColor: COLORS.danger, padding: 8, alignItems: 'center' },
-  errorText: { color: COLORS.text, fontSize: 12, fontFamily: 'monospace' },
+  errorText: { color: COLORS.textOnYellow, fontSize: 12, fontFamily: 'monospace' },
 
   map: { flex: 1, width: '100%' },
 
   bottomBar: { padding: 20, backgroundColor: COLORS.surface, alignItems: 'center' },
   button: { backgroundColor: COLORS.primaryStrong, paddingVertical: 15, borderRadius: 5, width: '100%', alignItems: 'center' },
   buttonText: { color: COLORS.text, fontWeight: 'bold', fontFamily: 'monospace' },
-  backButtonText: { color: COLORS.textOnDark, fontWeight: 'bold', fontFamily: 'monospace' },
+  backButtonText: { color: COLORS.textOnYellow, fontWeight: 'bold', fontFamily: 'monospace' },
 
   arScreen: { flex: 1, backgroundColor: COLORS.transparent },
   viroView: { flex: 1 },
