@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   replaceButtonText: {
-    color: COLORS.text,
+    color: COLORS.textOnPrimary,
     fontSize: 12,
     fontWeight: 'bold',
     fontFamily: 'monospace',

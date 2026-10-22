@@ -16,6 +16,7 @@ export const COLORS = {
   textSubtle: '#aee2e4',
   danger: '#fff475',
   textOnYellow: '#000',
+  textOnPrimary: '#000',
   textOnDark: '#FFF',
   textOnDarkMuted: '#DDD',
   mapRadiusFill: '#0f5b6846',

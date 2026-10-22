@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modelButtonText: {
-    color: COLORS.textOnDark,
+    color: COLORS.textOnPrimary,
     fontSize: 13,
     fontWeight: 'bold',
     fontFamily: 'monospace',

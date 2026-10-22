@@ -408,7 +408,7 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
       />}
       {game.objects
         .filter(object => object.id !== projectile.id)
-        .map(object => {
+        .map((object, index) => {
           if (!config.targets.includes(object.id)) return (
             <SceneObject
               key={object.id}
@@ -498,6 +498,7 @@ export function ConfiguredAimingTemplate(props: TemplateProps) {
                       0,
                     ]
                   : undefined}
+                modelLoadDelayMs={mode === 'ar' && config.fall ? index * 500 : 0}
               />
             </React.Fragment>
           );

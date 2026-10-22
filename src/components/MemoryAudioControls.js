@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     width: 36,
   },
   playButtonText: {
-    color: COLORS.textOnDark,
+    color: COLORS.textOnPrimary,
     fontSize: 13,
     fontWeight: 'bold',
   },

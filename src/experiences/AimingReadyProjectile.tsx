@@ -7,7 +7,7 @@ import {
 import { AimingSceneContext } from './AimingScene';
 import { SceneObject } from './SceneObject';
 import type { TemplateProps } from './ExperienceTemplates';
-import type { ExperienceObject } from './experience';
+import type { ExperienceObject, Vector3 } from './experience';
 import { colliderSize } from './aiming';
 const READY_PROJECTILE_SCALE = 0.05;
 
@@ -48,7 +48,7 @@ export function AimingReadyProjectile({
               rotation: [0, 0, 0],
               scale: (projectile.properties.scale || [1, 1, 1]).map(
                 value => value * READY_PROJECTILE_SCALE,
-              ),
+              ) as Vector3,
               physics: undefined,
               animation: undefined,
               collectible: false,

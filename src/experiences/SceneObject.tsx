@@ -16,6 +16,33 @@ import { AimingSceneContext } from './AimingScene';
 import type { ExperienceEvent, ExperienceObject, Vector3 } from './experience';
 import type { TemplateProps } from './ExperienceTemplates';
 
+const NATIVE_NODE_RETRY_DELAYS_MS = [0, 16, 50, 100, 250, 500];
+
+function isNodeRegistrationError(error: unknown) {
+  return error instanceof Error &&
+    /node view .*not registered/i.test(error.message);
+}
+
+async function readNodeTransform(
+  node: ViroNode,
+  isCancelled: () => boolean,
+): Promise<unknown | null> {
+  for (const delay of NATIVE_NODE_RETRY_DELAYS_MS) {
+    if (isCancelled()) return null;
+    if (delay > 0)
+      await new Promise<void>(resolve => setTimeout(resolve, delay));
+    if (isCancelled()) return null;
+    try {
+      return await node.getTransformAsync();
+    } catch (error) {
+      if (!isNodeRegistrationError(error) ||
+        delay === NATIVE_NODE_RETRY_DELAYS_MS[NATIVE_NODE_RETRY_DELAYS_MS.length - 1])
+        throw error;
+    }
+  }
+  return null;
+}
+
 export function SceneObject({
   object,
   game,
@@ -34,6 +61,7 @@ export function SceneObject({
   onSampleTransform,
   physicsPosition,
   visualOffset,
+  modelLoadDelayMs = 0,
 }: Omit<TemplateProps, 'mode'> & {
   object: ExperienceObject;
   sourceObjectId?: number;
@@ -47,6 +75,7 @@ export function SceneObject({
   onSampleTransform?: (transform: BodyTransform) => void;
   physicsPosition?: Vector3;
   visualOffset?: Vector3;
+  modelLoadDelayMs?: number;
   onPress?: () => void;
   onClickState?: React.ComponentProps<typeof ViroNode>['onClickState'];
   scoreOnBottom?: boolean;
@@ -110,7 +139,8 @@ export function SceneObject({
     const freezeBody = async () => {
       try {
         if (!node.current) throw new Error('Projectile body is not mounted');
-        const transform: unknown = await node.current.getTransformAsync();
+        const transform = await readNodeTransform(node.current, () => cancelled);
+        if (transform === null) return;
         if (!isBodyTransform(transform)) throw new Error('Invalid native projectile transform');
         if (!cancelled) setFrozen(transform);
       } catch (freezeError) {
@@ -130,7 +160,8 @@ export function SceneObject({
       busy = true;
       try {
         if (!node.current) throw new Error('Target body is not mounted');
-        const transform: unknown = await node.current.getTransformAsync();
+        const transform = await readNodeTransform(node.current, () => cancelled);
+        if (transform === null) return;
         if (!isBodyTransform(transform)) throw new Error('Invalid native target transform');
         if (!cancelled) sample.current?.(transform);
       } catch (sampleError) {
@@ -143,6 +174,16 @@ export function SceneObject({
     return () => { cancelled = true; clearInterval(timer); };
   }, [sampling, onError]);
   const model = React.useRef<Viro3DObject | null>(null);
+  const [modelReady, setModelReady] = React.useState(modelLoadDelayMs <= 0);
+  React.useEffect(() => {
+    if (modelLoadDelayMs <= 0) {
+      setModelReady(true);
+      return;
+    }
+    setModelReady(false);
+    const timer = setTimeout(() => setModelReady(true), modelLoadDelayMs);
+    return () => clearTimeout(timer);
+  }, [modelLoadDelayMs, object.id]);
   const diagnosticState = React.useRef({
     config: projectileDiagnostics,
     contacts: new Set<string>(),
@@ -261,7 +302,8 @@ export function SceneObject({
         if (![...point, ...normal].every(Number.isFinite) || Math.hypot(...normal) === 0)
           throw new Error('Invalid native collision contact');
         if (!node.current) throw new Error('Collision body is not mounted');
-        const transform: unknown = await node.current.getTransformAsync();
+        const transform = await readNodeTransform(node.current, () => !mounted.current);
+        if (transform === null) return;
         if (!isBodyTransform(transform)) throw new Error('Invalid native collision body transform');
         if (!mounted.current) return;
         onBodyCollision(tag, point, normal, transform);
@@ -273,7 +315,8 @@ export function SceneObject({
     if (scoreOnBottom && properties.collider && point && normal) {
       try {
         if (!node.current) throw new Error('Collision body is not mounted');
-        const transform: unknown = await node.current.getTransformAsync();
+        const transform = await readNodeTransform(node.current, () => !mounted.current);
+        if (transform === null) return;
         if (!isBodyTransform(transform))
           throw new Error('Invalid native collision body transform');
         if (!mounted.current) return;
@@ -335,7 +378,7 @@ export function SceneObject({
         position={visualOffset}
         scale={physicsBody ? properties.scale : undefined}
       >
-        {asset &&
+        {modelReady && asset &&
           (asset.type === 'GLB' ||
             asset.type === 'GLTF' ||
             asset.type === 'OBJ') && (
